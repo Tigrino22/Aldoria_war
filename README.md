@@ -13,7 +13,7 @@ Aperçu des graphismes : https://claude.ai/artifact/ErSWDhfGNd21g4KHnKc9tQ
 
 ## Lancer le jeu en local
 
-Prérequis : [Node.js 22](https://nodejs.org) ou plus récent, et [Docker](https://www.docker.com/products/docker-desktop/) pour la base de données.
+Prérequis : [Node.js 22.9](https://nodejs.org) ou plus récent, et [Docker](https://www.docker.com/products/docker-desktop/) pour la base de données.
 
 ```bash
 git checkout dev
