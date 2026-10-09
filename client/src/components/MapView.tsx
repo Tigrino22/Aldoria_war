@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
-import type { MapVillage } from '@fiefs/shared';
+import { Application, Assets, Container, Graphics, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
+import type { MapVillage } from '@aldoria/shared';
 import { api } from '../api';
 import { MAP_IMG } from '../assets';
 import { fmt } from '../format';
@@ -59,26 +59,23 @@ export default function MapView({ focus }: { focus?: string }) {
       if (destroyed) return app.destroy(true);
       host.appendChild(app.canvas);
       const textures: Record<string, Texture> = {};
-      for (const [k, src] of Object.entries(MAP_IMG)) textures[k] = await Assets.load({ src, data: { resolution: 3 } });
+      for (const [k, src] of Object.entries(MAP_IMG)) textures[k] = await Assets.load(k === 'flag' ? { src, data: { resolution: 3 } } : src);
       if (destroyed) return;
 
       const size = world.mapSize;
       const worldC = new Container();
       app.stage.addChild(worldC);
 
+      // Prairie : texture d'herbe répétée, puis un quadrillage discret des cases.
+      const meadow = new TilingSprite({ texture: textures.ground, width: size * TILE, height: size * TILE });
+      meadow.tileScale.set((TILE * 4) / textures.ground.width);
+      worldC.addChild(meadow);
       const ground = new Graphics();
-      for (let x = 0; x < size; x++) {
-        for (let y = 0; y < size; y++) {
-          const n = hash(x, y);
-          const shade = n < 0.33 ? 0x7fb04f : n < 0.66 ? 0x86b755 : 0x79a94a;
-          ground.rect(x * TILE, y * TILE, TILE, TILE).fill(shade);
-        }
-      }
       for (let i = 0; i <= size; i++) {
         ground.moveTo(i * TILE, 0).lineTo(i * TILE, size * TILE);
         ground.moveTo(0, i * TILE).lineTo(size * TILE, i * TILE);
       }
-      ground.stroke({ width: 1, color: 0x000000, alpha: 0.06 });
+      ground.stroke({ width: 1, color: 0x000000, alpha: 0.07 });
       ground.rect(0, 0, size * TILE, size * TILE).stroke({ width: 6, color: 0x3b2a1a, alpha: 0.5 });
       worldC.addChild(ground);
 
@@ -87,9 +84,9 @@ export default function MapView({ focus }: { focus?: string }) {
         for (let y = 0; y < size; y++) {
           const n = hash(y + 7, x + 13);
           if (n > 0.16) continue;
-          const s = new Sprite(n < 0.12 ? textures.tree : textures.hill);
-          s.width = s.height = TILE * 0.5;
-          s.position.set(x * TILE + TILE * (0.1 + hash(x, y + 1) * 0.4), y * TILE + TILE * (0.1 + hash(x + 1, y) * 0.4));
+          const s = new Sprite(n < 0.12 ? textures.trees : textures.hill);
+          s.width = s.height = TILE * (0.8 + hash(x, y + 3) * 0.3);
+          s.position.set(x * TILE + (TILE - s.width) / 2, y * TILE + (TILE - s.height) / 2);
           s.label = `${x},${y}`;
           deco.addChild(s);
         }
@@ -226,14 +223,16 @@ export default function MapView({ focus }: { focus?: string }) {
     p.layer.removeChildren().forEach((c) => c.destroy({ children: true }));
     // Le décor ne doit pas recouvrir les villages.
     const occupied = new Set(villagesRef.current.keys());
-    const deco = p.world.children[1] as Container;
+    const deco = p.world.children[2] as Container;
     deco.children.forEach((s) => (s.visible = !occupied.has(s.label)));
 
     const myTribe = me.player.tribe?.id ?? null;
     for (const v of villages) {
       const c = new Container();
       c.position.set(v.x * TILE, v.y * TILE);
-      const scale = v.ownerId ? 0.8 + Math.min(0.35, v.points / 2000) : 0.8;
+      // Hameau, bourg puis cité fortifiée selon les points du village.
+      const tex = !v.ownerId ? p.textures.barbarian : v.points < 120 ? p.textures.village1 : v.points < 600 ? p.textures.village2 : p.textures.village3;
+      const scale = v.ownerId ? 1.15 : 1;
       if (v.id === villageId) {
         const ring = new Graphics().circle(TILE / 2, TILE / 2, TILE * 0.48).fill({ color: 0xffffff, alpha: 0.35 }).stroke({ width: 3, color: COLORS.own });
         c.addChild(ring);
@@ -241,9 +240,9 @@ export default function MapView({ focus }: { focus?: string }) {
       if (selected && v.id === selected.id) {
         c.addChild(new Graphics().rect(2, 2, TILE - 4, TILE - 4).stroke({ width: 3, color: 0xf2c230 }));
       }
-      const s = new Sprite(v.ownerId ? p.textures.village : p.textures.barbarian);
+      const s = new Sprite(tex);
       s.width = s.height = TILE * scale;
-      s.position.set((TILE - s.width) / 2, (TILE - s.height) / 2 + 2);
+      s.position.set((TILE - s.width) / 2, (TILE - s.height) / 2 - 2);
       c.addChild(s);
       if (v.ownerId) {
         const f = new Sprite(p.textures.flag);

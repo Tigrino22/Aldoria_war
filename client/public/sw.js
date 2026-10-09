@@ -1,6 +1,6 @@
 // Service worker minimal : rend le jeu installable et garde l'interface en cache.
 // Les appels à l'API ne sont jamais mis en cache : le serveur fait foi.
-const CACHE = 'fiefs-v1';
+const CACHE = 'aldoria-v1';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icons/icon.svg'])));

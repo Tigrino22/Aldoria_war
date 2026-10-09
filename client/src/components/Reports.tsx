@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RESOURCES, UNIT_KEYS, type AttackReportData, type ReportSummary, type UnitCounts } from '@fiefs/shared';
+import { RESOURCES, UNIT_KEYS, type AttackReportData, type ReportSummary, type UnitCounts } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame, useRoute } from '../game';

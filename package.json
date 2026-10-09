@@ -1,8 +1,8 @@
 {
-  "name": "fiefs",
+  "name": "aldoria-war",
   "private": true,
   "version": "0.1.0",
-  "description": "Fiefs – jeu de stratégie médiéval multijoueur par navigateur et mobile",
+  "description": "Aldoria War – jeu de stratégie médiéval multijoueur par navigateur et mobile",
   "type": "module",
   "workspaces": ["shared", "server", "client"],
   "scripts": {

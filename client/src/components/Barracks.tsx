@@ -10,7 +10,7 @@ import {
   recruitTime,
   resourceProduction,
   scaleResources,
-} from '@fiefs/shared';
+} from '@aldoria/shared';
 import { api } from '../api';
 import { duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';

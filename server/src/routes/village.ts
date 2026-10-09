@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { BUILDING_KEYS, UNIT_KEYS } from '@fiefs/shared';
+import { BUILDING_KEYS, UNIT_KEYS } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import type { Db } from '../db';

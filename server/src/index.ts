@@ -12,7 +12,7 @@ async function main() {
 
   const app = await buildApp({ logger: true });
   await app.listen({ port: env.port, host: '0.0.0.0' });
-  app.log.info(`Monde Fiefs lancé : vitesse x${env.worldSpeed}, carte ${env.mapSize}x${env.mapSize}`);
+  app.log.info(`Monde Aldoria War lancé : vitesse x${env.worldSpeed}, carte ${env.mapSize}x${env.mapSize}`);
 
   // Le worker : toutes les 250 ms, il exécute les attaques, renforts et retours arrivés à destination.
   const timer = setInterval(() => {

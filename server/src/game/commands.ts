@@ -19,7 +19,7 @@ import {
   totalUnits,
   travelTime,
   warehouseCapacity,
-} from '@fiefs/shared';
+} from '@aldoria/shared';
 import { tx, type Db } from '../db';
 import { env } from '../env';
 import { GameError, forbidden } from '../errors';

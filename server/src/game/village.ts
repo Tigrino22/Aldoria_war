@@ -27,7 +27,7 @@ import {
   upkeepOf,
   villagePoints,
   warehouseCapacity,
-} from '@fiefs/shared';
+} from '@aldoria/shared';
 import type { Db } from '../db';
 import { env } from '../env';
 import { GameError, notFound } from '../errors';

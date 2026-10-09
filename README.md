@@ -1,4 +1,4 @@
-# Fiefs
+# Aldoria War
 
 Jeu de stratégie médiéval multijoueur, par navigateur et mobile, inspiré de Guerre Tribale.
 On développe un village, on produit des ressources, on lève une armée, on pille et on conquiert les villages voisins, seul ou en tribu.
@@ -35,13 +35,13 @@ Sans Docker, n'importe quel PostgreSQL 14+ convient : indiquez son adresse dans 
 | Commande | Effet |
 | --- | --- |
 | `npm run dev` | Serveur et client avec rechargement automatique |
-| `npm test` | Tests des règles du jeu et du serveur (utilise la base `fiefs_test`) |
+| `npm test` | Tests des règles du jeu et du serveur (utilise la base `aldoria_test`) |
 | `npm run typecheck` | Vérifie les types TypeScript des trois paquets |
 | `npm run build` | Construit le client pour la production dans `client/dist` |
 | `npm run db:reset` | Efface la base et repart d'un monde neuf |
-| `python3 tools/generate-buildings.py` | Régénère les dessins des bâtiments |
+| `cd tools/render && npm install && npx playwright install chromium && node render.mjs` | Régénère toutes les images 3D (bâtiments, décor, carte, icônes) |
 
-Pour les tests, créez une fois la base de test : `docker compose exec postgres createdb -U fiefs fiefs_test`.
+Pour les tests, créez une fois la base de test : `docker compose exec postgres createdb -U aldoria aldoria_test`.
 
 ### Réglages (`.env`)
 

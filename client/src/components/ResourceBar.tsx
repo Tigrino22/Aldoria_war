@@ -1,4 +1,4 @@
-import { RESOURCES, RESOURCE_NAMES } from '@fiefs/shared';
+import { RESOURCES, RESOURCE_NAMES } from '@aldoria/shared';
 import { fmt } from '../format';
 import { useGame, useNow } from '../game';
 import { liveResources, ResIcon } from '../ui';

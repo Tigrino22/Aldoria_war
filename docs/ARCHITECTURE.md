@@ -1,4 +1,4 @@
-# Architecture de Fiefs
+# Architecture de Aldoria War
 
 ## Principe : le serveur fait foi
 
@@ -41,9 +41,13 @@ le client recharge alors ce qu'il affiche. Les notifications sont collectées pe
 
 ## Graphismes
 
-Un fichier SVG par élément de jeu dans `client/src/assets/`. Les bâtiments ont trois stades générés par
-`tools/generate-buildings.py` à partir de pièces réutilisables. `client/src/assets.ts` fait le lien entre les clés du jeu
-(`farm`, `spearman`…) et les fichiers. Un illustrateur peut remplacer un dessin en gardant le même nom de fichier.
+Vue 3/4 réaliste façon Guerre Tribale. Chaque élément est un modèle 3D procédural (three.js) dans `tools/render/`
+(`kit.js` : pièces de construction, `textures.js` : textures peintes par le code, `buildings.js`, `scenes.js`, `icons.js`),
+rendu en PNG transparent par `render.mjs` dans un Chromium sans écran, toujours avec la même caméra (orthographique,
+32° de lacet, 38° d'inclinaison) et le même soleil, pour que tout s'assemble. Les bâtiments ont trois stades
+(niveaux 1-6, 7-13, 14-20). Le décor du village est rendu avec la même caméra et `village-spots.json` donne la position
+à l'écran de chaque emplacement. `client/src/assets.ts` fait le lien entre les clés du jeu (`farm`, `spearman`…) et les
+fichiers ; un illustrateur peut remplacer une image en gardant le même nom de fichier.
 
 ## Base de données
 

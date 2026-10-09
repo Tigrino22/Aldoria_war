@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { MeResponse, VillageState, WorldInfo } from '@fiefs/shared';
+import type { MeResponse, VillageState, WorldInfo } from '@aldoria/shared';
 import { api, ApiError, getToken, setToken } from './api';
 
 export interface Toast {
@@ -30,7 +30,7 @@ export const useGame = () => {
   return ctx;
 };
 
-const VILLAGE_KEY = 'fiefs.village';
+const VILLAGE_KEY = 'aldoria.village';
 const readStoredVillage = () => {
   try {
     return Number(localStorage.getItem(VILLAGE_KEY)) || 0;
@@ -180,7 +180,7 @@ export function GameProvider({ children, onLogout }: { children: (state: 'loadin
         }
         if (msg.type === 'incoming') {
           toast('Une attaque se dirige vers votre village !', 'warning');
-          if ('Notification' in window && Notification.permission === 'granted') new Notification('Fiefs', { body: 'Une attaque arrive sur votre village !' });
+          if ('Notification' in window && Notification.permission === 'granted') new Notification('Aldoria War', { body: 'Une attaque arrive sur votre village !' });
           if (msg.villageId === villageIdRef.current) refreshVillage();
         }
       };

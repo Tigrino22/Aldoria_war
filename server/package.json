@@ -1,5 +1,5 @@
 {
-  "name": "@fiefs/server",
+  "name": "@aldoria/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
   "dependencies": {
     "@fastify/rate-limit": "^11.0.0",
     "@fastify/websocket": "^11.0.0",
-    "@fiefs/shared": "*",
+    "@aldoria/shared": "*",
     "fastify": "^5.0.0",
     "pg": "^8.13.0",
     "zod": "^3.23.0"

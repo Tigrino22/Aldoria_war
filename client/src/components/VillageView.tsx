@@ -14,24 +14,13 @@ import {
   resourceProduction,
   warehouseCapacity,
   WALL_BONUS_PER_LEVEL,
-} from '@fiefs/shared';
+} from '@aldoria/shared';
 import { api } from '../api';
-import { buildingImg, villageBg } from '../assets';
+import { buildingImg, SPOT_WIDTH, VILLAGE_SPOTS as SPOTS, villageBg } from '../assets';
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { Cost, Countdown, liveResources, Panel } from '../ui';
 
-/** Emplacement de chaque bâtiment sur le décor du village (centre, en % de la scène). */
-const SPOTS: Record<BuildingKey, { x: number; y: number }> = {
-  townhall: { x: 50, y: 20 },
-  barracks: { x: 23, y: 38 },
-  warehouse: { x: 77, y: 38 },
-  woodcutter: { x: 11, y: 66 },
-  farm: { x: 31, y: 72 },
-  claypit: { x: 69, y: 72 },
-  ironmine: { x: 89, y: 64 },
-  wall: { x: 50, y: 86 },
-};
 
 function effectiveLevels(v: VillageState): Buildings {
   const out = { ...v.buildings };
@@ -184,11 +173,12 @@ export default function VillageView() {
           <button
             key={k}
             className={`spot ${selected === k ? 'selected' : ''} ${levels[k] > v.buildings[k] ? 'building' : ''}`}
-            style={{ left: `${SPOTS[k].x}%`, top: `${SPOTS[k].y}%` }}
+            style={{ left: `${SPOTS[k].x}%`, top: `${SPOTS[k].y}%`, width: `${SPOT_WIDTH}%`, zIndex: Math.round(SPOTS[k].y) }}
             onClick={() => setSelected(selected === k ? null : k)}
             aria-label={`${BUILDINGS[k].name}, niveau ${v.buildings[k]}`}
           >
             <img src={buildingImg(k, v.buildings[k])} alt="" />
+            <span className="spot-hit" />
             <span className="spot-label">
               {BUILDINGS[k].name} <b>{v.buildings[k]}</b>
             </span>

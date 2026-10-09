@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { BEGINNER_PROTECTION_HOURS, MeResponse, STARTING_BUILDINGS, STARTING_RESOURCES } from '@fiefs/shared';
+import { BEGINNER_PROTECTION_HOURS, MeResponse, STARTING_BUILDINGS, STARTING_RESOURCES } from '@aldoria/shared';
 import { act } from '../act';
 import { createSession, hashPassword, requirePlayer, verifyPassword, bearer } from '../auth';
 import { pool, type Db } from '../db';

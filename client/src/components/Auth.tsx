@@ -28,7 +28,7 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
     <div className="auth" style={{ backgroundImage: `url("${villageBg}")` }}>
       <form className="auth-card" onSubmit={submit}>
         <img src={logo} alt="" width={72} height={72} />
-        <h1>Fiefs</h1>
+        <h1>Aldoria War</h1>
         <p className="muted">Bâtissez votre village, levez une armée, conquérez vos voisins.</p>
         <div className="tabs" role="tablist">
           <button type="button" role="tab" aria-selected={mode === 'login'} onClick={() => setMode('login')}>

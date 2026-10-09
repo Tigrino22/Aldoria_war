@@ -3,12 +3,12 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: fiefs
-      POSTGRES_PASSWORD: fiefs
-      POSTGRES_DB: fiefs
+      POSTGRES_USER: aldoria
+      POSTGRES_PASSWORD: aldoria
+      POSTGRES_DB: aldoria
     ports:
       - "5432:5432"
     volumes:
-      - fiefs-db:/var/lib/postgresql/data
+      - aldoria-db:/var/lib/postgresql/data
 volumes:
-  fiefs-db:
+  aldoria-db:

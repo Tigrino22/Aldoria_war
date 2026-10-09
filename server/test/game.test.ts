@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { emptyUnits, STARTING_BUILDINGS } from '@fiefs/shared';
+import { emptyUnits, STARTING_BUILDINGS } from '@aldoria/shared';
 import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';

@@ -1,4 +1,4 @@
-const TOKEN_KEY = 'fiefs.token';
+const TOKEN_KEY = 'aldoria.token';
 
 export function getToken(): string | null {
   try {

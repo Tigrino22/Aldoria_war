@@ -7,7 +7,7 @@ import {
   type UnitCounts,
   type UnitKey,
   type VillageState,
-} from '@fiefs/shared';
+} from '@aldoria/shared';
 import { RESOURCE_IMG, UNIT_IMG } from './assets';
 import { duration, fmt } from './format';
 import { useNow } from './game';

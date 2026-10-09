@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UNITS, UNIT_KEYS, type MapVillage, type UnitKey, normalizeUnits, totalUnits, travelTime, distance } from '@fiefs/shared';
+import { UNITS, UNIT_KEYS, type MapVillage, type UnitKey, normalizeUnits, totalUnits, travelTime, distance } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow } from '../game';

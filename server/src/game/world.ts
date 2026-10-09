@@ -1,4 +1,4 @@
-import { BUILDING_KEYS, Buildings, emptyUnits, STARTING_BUILDINGS } from '@fiefs/shared';
+import { BUILDING_KEYS, Buildings, emptyUnits, STARTING_BUILDINGS } from '@aldoria/shared';
 import type { Db } from '../db';
 import { env } from '../env';
 import { createVillage } from './village';

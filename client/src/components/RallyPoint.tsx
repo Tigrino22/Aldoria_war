@@ -1,4 +1,4 @@
-import type { CommandView } from '@fiefs/shared';
+import type { CommandView } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime } from '../format';
 import { useGame } from '../game';

@@ -6,7 +6,7 @@ function num(name: string, fallback: number): number {
 }
 
 export const env = {
-  databaseUrl: process.env.DATABASE_URL ?? 'postgres://fiefs:fiefs@localhost:5432/fiefs',
+  databaseUrl: process.env.DATABASE_URL ?? 'postgres://aldoria:aldoria@localhost:5432/aldoria',
   port: num('PORT', 3001),
   worldSpeed: num('WORLD_SPEED', 1),
   mapSize: Math.floor(num('MAP_SIZE', 100)),

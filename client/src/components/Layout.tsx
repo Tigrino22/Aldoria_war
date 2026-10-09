@@ -50,7 +50,7 @@ export default function Layout() {
       <header className="topbar">
         <a className="brand" href="#/village">
           <img src={logo} alt="" width={32} height={32} />
-          <span>Fiefs</span>
+          <span>Aldoria War</span>
         </a>
         <select aria-label="Village actif" value={villageId} onChange={(e) => setVillageId(Number(e.target.value))}>
           {me.villages.map((v) => (

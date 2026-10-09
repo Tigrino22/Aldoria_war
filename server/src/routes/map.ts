@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { MapVillage } from '@fiefs/shared';
+import type { MapVillage } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 
