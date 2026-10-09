@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+.git
+tools
+docs
+client/ios
+client/android
+client/assets
+.env
+*.log

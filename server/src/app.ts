@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
+import path from 'node:path';
 import { ZodError } from 'zod';
 import { playerFromToken } from './auth';
 import { GameError } from './errors';
@@ -12,7 +14,7 @@ import socialRoutes from './routes/social';
 import villageRoutes from './routes/village';
 
 export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] } = {}) {
-  const app = Fastify({ logger: opts.logger ?? false });
+  const app = Fastify({ logger: opts.logger ?? false, trustProxy: env.trustProxy });
 
   // CORS : l'application mobile embarque le client et appelle l'API depuis son origine locale.
   // L'authentification passe par un jeton dans l'en-tête (pas de cookie), d'où une liste blanche simple.
@@ -57,5 +59,16 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   await app.register(villageRoutes);
   await app.register(mapRoutes);
   await app.register(socialRoutes);
+
+  // En production, le même serveur distribue aussi le site (le client utilise des routes en #, donc
+  // tout chemin inconnu hors /api renvoie la page d'accueil).
+  if (env.staticDir) {
+    const root = path.resolve(env.staticDir);
+    await app.register(fastifyStatic, { root, wildcard: false });
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method === 'GET' && !req.url.startsWith('/api')) return reply.sendFile('index.html');
+      return reply.status(404).send({ error: 'Introuvable' });
+    });
+  }
   return app;
 }

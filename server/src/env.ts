@@ -11,6 +11,10 @@ export const env = {
   worldSpeed: num('WORLD_SPEED', 1),
   mapSize: Math.floor(num('MAP_SIZE', 100)),
   barbarianVillages: Math.floor(num('BARBARIAN_VILLAGES', 250)),
+  // Dossier du client compilé (client/dist) à servir avec l'API, pour héberger le jeu sur un seul serveur.
+  staticDir: process.env.STATIC_DIR || null,
+  // Derrière un proxy (hébergeur, Caddy) : lire la vraie adresse IP des joueurs pour la limitation des requêtes.
+  trustProxy: process.env.TRUST_PROXY === '1',
   // Origines autorisées à appeler l'API depuis un autre domaine : par défaut, les applications iOS
   // (capacitor://localhost) et Android (https://localhost). Ajouter d'autres domaines séparés par des virgules.
   corsOrigins: (process.env.CORS_ORIGINS ?? 'capacitor://localhost,ionic://localhost,https://localhost,http://localhost')

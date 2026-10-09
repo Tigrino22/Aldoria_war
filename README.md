@@ -70,6 +70,8 @@ docs/     Notes d'architecture
 Toutes les valeurs d'équilibrage sont dans `shared/src/config.ts` : modifier un coût ou une statistique d'unité suffit, le serveur et le client suivent.
 
 Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour le fonctionnement interne.
+Pour mettre un serveur de test en ligne : [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
+
 Toutes les valeurs (production, coûts, durées, unités) sont résumées dans [docs/PARAMETRES.md](docs/PARAMETRES.md).
 
 ## Ce que contient cette première version
@@ -95,4 +97,4 @@ Toutes les valeurs (production, coûts, durées, unités) sont résumées dans [
 - Notifications push quand l'application est fermée, et e-mails
 - Anti-bots et détection des multi-comptes
 - Abonnement confort et cosmétiques (Stripe)
-- Mise en production (hébergement, HTTPS, sauvegardes)
+- Mise en production (sauvegardes, supervision)

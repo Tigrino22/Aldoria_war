@@ -1,0 +1,27 @@
+# Déploiement sur Render (render.com) : « New > Blueprint », choisir ce dépôt, valider.
+# Crée le serveur de jeu (image Docker) et sa base PostgreSQL. Voir docs/DEPLOIEMENT.md.
+services:
+  - type: web
+    name: aldoria-war
+    runtime: docker
+    plan: free
+    branch: dev
+    autoDeploy: true
+    healthCheckPath: /api/world
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aldoria-db
+          property: connectionString
+      - key: WORLD_SPEED
+        value: "10"
+      - key: MAP_SIZE
+        value: "100"
+      - key: BARBARIAN_VILLAGES
+        value: "250"
+
+databases:
+  - name: aldoria-db
+    plan: free
+    databaseName: aldoria
+    user: aldoria
