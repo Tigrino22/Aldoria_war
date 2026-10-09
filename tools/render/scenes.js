@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { rand } from './textures.js';
 import {
   group, place, patch, rectPatch, well, deciduousTree, pineTree, bush, rock, fence, haystack, barrel, crate, sack,
-  logPile, box, cyl, flag, mat,
+  logPile, box, cyl, cone, flag, mat, palisade, crenels, roundCrenels,
 } from './kit.js';
 import { BUILDERS } from './buildings.js';
 
@@ -101,6 +101,40 @@ export const SCENES = {
     };
   },
 
+  /**
+   * Enceinte complète autour du village, selon le stade de la muraille. Rendue en deux calques
+   * transparents cadrés comme le décor : `back` (derrière les bâtiments) et `front` (devant).
+   * La porte elle-même reste le bâtiment « muraille » posé à son emplacement.
+   */
+  wallRing(stage = 1, part = 'back') {
+    const g = new THREE.Group();
+    const pts = ringPoints(stage === 1 ? 0.9 : 2.2);
+    const keep = (sz) => (part === 'back' ? sz < RING.split : sz >= RING.split);
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (!keep(mid[1])) continue;
+      if (mid[1] > RING.cz && Math.abs(mid[0]) < RING.gate) continue; // passage de la porte
+      const [ax, az] = W(...a), [bx, bz] = W(...b);
+      const len = Math.hypot(bx - ax, bz - az) + (stage === 1 ? 0.05 : 0.25);
+      const seg = wallSegment(stage, len);
+      seg.position.set((ax + bx) / 2, 0, (az + bz) / 2);
+      seg.rotation.y = -Math.atan2(bz - az, bx - ax);
+      g.add(seg);
+    }
+    // Tours d'angle (et de flanc au dernier stade).
+    if (stage >= 2) {
+      const angles = stage === 3 ? [0.25, 0.75, 1.25, 1.75, 0, 1] : [0.25, 0.75, 1.25, 1.75];
+      for (const t of angles) {
+        const p = superPoint(t * Math.PI);
+        if (!keep(p[1])) continue;
+        const [x, z] = W(...p);
+        g.add(ringTower(stage, x, z));
+      }
+    }
+    return { object: g, view: { frame: 64, px: 1400, aspect: 800 / 560, ground: 'shadow', centerY: 0, target: [W(...CENTER)[0], 0, W(...CENTER)[1]] } };
+  },
+
   // --- Carte : villages selon leur taille, ruines barbares, bosquets, collines -------------------
   mapVillage1: () => mapItem(hamlet(1)),
   mapVillage2: () => mapItem(hamlet(2)),
@@ -109,6 +143,50 @@ export const SCENES = {
   mapTrees: () => mapItem(group(pineTree(1.1, -1.6, 0, -1), deciduousTree(1, 1.6, 0, -0.6), pineTree(0.9, 0.2, 0, 1.6), bush(0.8, -2, 0, 1.8))),
   mapHill: () => mapItem(hill()),
 };
+
+// Tracé de l'enceinte : un « super-ellipse » (rectangle aux coins arrondis) en coordonnées écran,
+// assez large pour laisser tous les bâtiments à l'intérieur, la porte au niveau de l'emplacement de la muraille.
+const RING = { rx: 31.5, rz: 21.5, cz: 3.5, n: 3.2, gate: 5.6, split: 9 };
+function superPoint(t) {
+  const c = Math.cos(t), s = Math.sin(t);
+  const e = 2 / RING.n;
+  return [RING.rx * Math.sign(c) * Math.abs(c) ** e, RING.cz + RING.rz * Math.sign(s) * Math.abs(s) ** e];
+}
+/** Points régulièrement espacés (tous les `step` mètres) le long de l'enceinte. */
+function ringPoints(step) {
+  const dense = [];
+  for (let i = 0; i < 2000; i++) dense.push(superPoint((i / 2000) * Math.PI * 2));
+  const out = [dense[0]];
+  let acc = 0;
+  for (let i = 1; i <= dense.length; i++) {
+    const a = dense[i - 1], b = dense[i % dense.length];
+    acc += Math.hypot(b[0] - a[0], (b[1] - a[1]));
+    if (acc >= step) {
+      out.push(b);
+      acc = 0;
+    }
+  }
+  return out;
+}
+function wallSegment(stage, len) {
+  if (stage === 1) return palisade(len, 2.5);
+  const h = stage === 2 ? 2.8 : 3.6, d = stage === 2 ? 0.9 : 1.3;
+  return group(box(len, h, d, 'stone', 0, 0, 0), crenels(len, d, h, 'stone', 0.42));
+}
+function ringTower(stage, x, z) {
+  if (stage === 2) {
+    const g = group(box(2.4, 4, 2.4, 'stone', 0, 0, 0), crenels(2.4, 2.4, 4, 'stone', 0.42));
+    g.position.set(x, 0, z);
+    return g;
+  }
+  const g = group(
+    cyl(1.6, 1.75, 5.4, 'stone', 0, 0, 0, { seg: 16 }),
+    roundCrenels(1.6, 5.4, 'stone', 10),
+    cone(1.9, 2.2, 'slate', 0, 5.7, 0, { seg: 16 }),
+  );
+  g.position.set(x, 0, z);
+  return g;
+}
 
 function mapItem(object) {
   return { object, view: { frame: 11, px: 256, aspect: 1, ground: 'shadow', centerY: 1.6 } };

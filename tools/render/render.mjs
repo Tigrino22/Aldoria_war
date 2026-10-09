@@ -63,6 +63,9 @@ if (want('village')) {
   fs.writeFileSync(`${out}/village-spots.json`, JSON.stringify(v.spots, null, 2) + '\n');
   console.log('  emplacements', v.spots);
 }
+for (const stage of [1, 2, 3])
+  for (const part of ['back', 'front'])
+    if (want(`wall-ring-${stage}`)) save(`${out}/wall-ring-${stage}-${part}.png`, (await page.evaluate(([s, p]) => window.renderScene('wallRing', s, p), [stage, part])).png);
 const MAP = { mapVillage1: 'village-1', mapVillage2: 'village-2', mapVillage3: 'village-3', mapBarbarian: 'barbarian', mapTrees: 'trees', mapHill: 'hill' };
 for (const [scene, file] of Object.entries(MAP))
   if (want(scene)) save(`${out}/map/${file}.png`, (await page.evaluate((n) => window.renderScene(n), scene)).png);

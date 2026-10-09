@@ -33,6 +33,13 @@ const stageFiles = import.meta.glob('./assets/buildings/*-[123].png', { eager: t
 
 export const PLOT_IMG = plot;
 
+// Enceinte complète du village : un calque derrière les bâtiments, un devant, par stade de muraille.
+const ringFiles = import.meta.glob('./assets/wall-ring-*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+export function wallRingImg(level: number, part: 'back' | 'front'): string | null {
+  const stage = buildingStage(level);
+  return stage === 0 ? null : ringFiles[`./assets/wall-ring-${stage}-${part}.png`];
+}
+
 /** Image d'un bâtiment à un niveau donné (l'emplacement vide au niveau 0). */
 export function buildingImg(key: BuildingKey, level: number): string {
   const stage = buildingStage(level);

@@ -70,6 +70,7 @@ docs/     Notes d'architecture
 Toutes les valeurs d'équilibrage sont dans `shared/src/config.ts` : modifier un coût ou une statistique d'unité suffit, le serveur et le client suivent.
 
 Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour le fonctionnement interne.
+Toutes les valeurs (production, coûts, durées, unités) sont résumées dans [docs/PARAMETRES.md](docs/PARAMETRES.md).
 
 ## Ce que contient cette première version
 
@@ -85,6 +86,7 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour le fonctionnement interne
 - Rapports de combat, messagerie privée, tribus (création, invitations, exclusion, description), classements joueurs et tribus
 - Notifications en direct (attaque entrante, rapport, message) et installation sur téléphone (PWA)
 - Applications iOS et Android téléchargeables sur les stores (Capacitor), suppression du compte depuis l'app : voir [docs/MOBILE.md](docs/MOBILE.md)
+- Muraille : l'enceinte fait tout le tour du village (palissade, puis pierre, puis forteresse à tours)
 - Graphismes 3D réalistes en vue 3/4 : chaque bâtiment change d'aspect à 3 stades (niveaux 1-6, 7-13, 14-20)
 
 ## Pas encore fait (prochaines étapes)

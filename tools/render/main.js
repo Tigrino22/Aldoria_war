@@ -90,9 +90,9 @@ window.renderBuilding = (key, stage) => {
   return shoot(BUILDERS[key](stage), { frame: 18, px: 384, centerY: 4.2 }).png;
 };
 
-window.renderScene = (name) => {
+window.renderScene = (name, ...args) => {
   setSeed(42);
-  const s = SCENES[name]();
+  const s = SCENES[name](...args);
   const res = shoot(s.object, s.view);
   // Position à l'écran (en % de l'image) des emplacements nommés, pour placer les bâtiments par-dessus.
   const spots = {};

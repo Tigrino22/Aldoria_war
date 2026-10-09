@@ -18,7 +18,7 @@ import {
   WALL_BONUS_PER_LEVEL,
 } from '@aldoria/shared';
 import { api } from '../api';
-import { buildingImg, SPOT_WIDTH, VILLAGE_SPOTS as SPOTS, villageBg } from '../assets';
+import { buildingImg, SPOT_WIDTH, VILLAGE_SPOTS as SPOTS, villageBg, wallRingImg } from '../assets';
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { Cost, Countdown, liveResources, Panel } from '../ui';
@@ -178,6 +178,13 @@ export default function VillageView() {
       )}
 
       <div className="scene" style={{ backgroundImage: `url("${villageBg}")` }}>
+        {v.buildings.wall > 0 && (
+          <>
+            <img className="ring" src={wallRingImg(v.buildings.wall, 'back')!} alt="" style={{ zIndex: 0 }} />
+            {/* L'avant de l'enceinte passe devant les bâtiments, mais sous la porte. */}
+            <img className="ring" src={wallRingImg(v.buildings.wall, 'front')!} alt="" style={{ zIndex: Math.round(SPOTS.wall.y) - 1 }} />
+          </>
+        )}
         {BUILDING_KEYS.map((k) => (
           <button
             key={k}
