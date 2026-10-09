@@ -7,15 +7,28 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build:mobile": "vite build --mode mobile && cap sync",
+    "ios": "npm run build:mobile && cap open ios",
+    "android": "npm run build:mobile && cap open android",
+    "assets:mobile": "capacitor-assets generate --ios --android --iconBackgroundColor '#2b2018' --iconBackgroundColorDark '#2b2018' --splashBackgroundColor '#2b2018' --splashBackgroundColorDark '#2b2018'"
   },
   "dependencies": {
     "@aldoria/shared": "*",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "pixi.js": "^8.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",

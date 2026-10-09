@@ -1,3 +1,5 @@
+import { API_BASE } from './config';
+
 const TOKEN_KEY = 'aldoria.token';
 
 export function getToken(): string | null {
@@ -33,7 +35,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(API_BASE + path, {
       method: opts.method ?? (opts.body !== undefined ? 'POST' : 'GET'),
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,

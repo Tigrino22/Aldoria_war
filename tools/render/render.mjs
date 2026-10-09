@@ -34,6 +34,14 @@ const save = (file, dataUrl) => {
 };
 const want = (name) => !only || name.includes(only);
 
+if (only?.startsWith('preview:')) {
+  // Aide au réglage : une icône en grand dans tools/render/.preview/
+  const [n, frame, cy] = only.slice(8).split(':');
+  save(`${here}/.preview/${n}-${frame ? 'zoom' : 'large'}.png`, await page.evaluate(([x, f, c]) => window.renderIconLarge(x, f && +f, c && +c), [n, frame, cy]));
+  await browser.close();
+  server.close();
+  process.exit(0);
+}
 if (only === 'textures') {
   // Aide au réglage : toutes les textures procédurales dans tools/render/.preview/
   const names = await page.evaluate(() => window.textureNames());

@@ -14,6 +14,23 @@ async function tribeOf(c: Db, playerId: number) {
   return { tribeId: rows[0]?.tribe_id as number | null, isLeader: rows[0]?.leader_id === playerId };
 }
 
+/** Retire le joueur de sa tribu : la direction passe au plus gros membre, la tribu vide disparaît. */
+export async function leaveTribe(c: Db, playerId: number): Promise<boolean> {
+  const { tribeId, isLeader } = await tribeOf(c, playerId);
+  if (!tribeId) return false;
+  await c.query('UPDATE players SET tribe_id = NULL WHERE id = $1', [playerId]);
+  const rest = (
+    await c.query(
+      `SELECT p.id FROM players p LEFT JOIN villages v ON v.owner_id = p.id WHERE p.tribe_id = $1
+       GROUP BY p.id ORDER BY coalesce(sum(v.points), 0) DESC LIMIT 1`,
+      [tribeId],
+    )
+  ).rows;
+  if (!rest.length) await c.query('DELETE FROM tribes WHERE id = $1', [tribeId]);
+  else if (isLeader) await c.query('UPDATE tribes SET leader_id = $2 WHERE id = $1', [tribeId, rest[0].id]);
+  return true;
+}
+
 export default async function socialRoutes(app: FastifyInstance) {
   // ---------- Rapports ----------
   app.get('/api/reports', async (req) => {
@@ -176,18 +193,7 @@ export default async function socialRoutes(app: FastifyInstance) {
   app.post('/api/tribes/leave', async (req) => {
     const playerId = await requirePlayer(req);
     return act(async (c, outbox) => {
-      const { tribeId, isLeader } = await tribeOf(c, playerId);
-      if (!tribeId) throw new GameError('Vous n’êtes dans aucune tribu');
-      await c.query('UPDATE players SET tribe_id = NULL WHERE id = $1', [playerId]);
-      const rest = (
-        await c.query(
-          `SELECT p.id FROM players p LEFT JOIN villages v ON v.owner_id = p.id WHERE p.tribe_id = $1
-           GROUP BY p.id ORDER BY coalesce(sum(v.points), 0) DESC LIMIT 1`,
-          [tribeId],
-        )
-      ).rows;
-      if (!rest.length) await c.query('DELETE FROM tribes WHERE id = $1', [tribeId]);
-      else if (isLeader) await c.query('UPDATE tribes SET leader_id = $2 WHERE id = $1', [tribeId, rest[0].id]);
+      if (!(await leaveTribe(c, playerId))) throw new GameError('Vous n’êtes dans aucune tribu');
       outbox.push(playerId, { type: 'me' });
       return { ok: true };
     });

@@ -107,6 +107,8 @@ textarea { width: 100%; resize: vertical; }
 .who { margin-left: auto; display: flex; gap: 10px; align-items: baseline; font-size: 14px; }
 .who .muted { color: #c9b896; }
 .who .link { color: #f2d98a; }
+.who-name { color: inherit; text-decoration: none; }
+.who-name:hover { text-decoration: underline; }
 
 .resbar {
   position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
@@ -291,3 +293,7 @@ textarea { width: 100%; resize: vertical; }
 .village-title h1 .link { font: 500 13px var(--body); vertical-align: middle; }
 .scene { max-width: 980px; align-self: center; }
 .panel > .btn, .stack > .btn { align-self: flex-start; }
+
+/* ---------- Application mobile ---------- */
+.native body { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+.native input, .native textarea { -webkit-user-select: text; user-select: text; }

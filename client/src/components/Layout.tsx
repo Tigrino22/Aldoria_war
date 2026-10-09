@@ -7,6 +7,7 @@ import RallyPoint from './RallyPoint';
 import Ranking from './Ranking';
 import Reports from './Reports';
 import Market from './Market';
+import Account from './Account';
 import ResourceBar from './ResourceBar';
 import Tribe from './Tribe';
 import VillageView from './VillageView';
@@ -61,10 +62,10 @@ export default function Layout() {
           ))}
         </select>
         <div className="who">
-          <span>
+          <a href="#/compte" className="who-name">
             {me.player.username}
             {me.player.tribe && <b> [{me.player.tribe.tag}]</b>}
-          </span>
+          </a>
           <span className="muted">{me.player.points.toLocaleString('fr-FR')} pts</span>
           <button className="link" onClick={logout}>Quitter</button>
         </div>
@@ -84,6 +85,7 @@ export default function Layout() {
         {page === 'tribu' && <Tribe id={route[1] ? Number(route[1]) : undefined} />}
         {page === 'classement' && <Ranking />}
         {page === 'marche' && <Market focus={route[1]} />}
+        {page === 'compte' && <Account />}
       </main>
       <nav className="nav">
         {NAV.map((n) => (

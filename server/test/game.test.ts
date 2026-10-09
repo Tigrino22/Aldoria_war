@@ -9,6 +9,7 @@ import { createVillage, enqueueBuild, enqueueRecruit, getTroops, syncVillage } f
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 const HOUR = 3_600_000;
+const auth = (t: string) => ({ authorization: `Bearer ${t}` });
 
 async function register(username: string) {
   const res = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { username, password: 'secret123' } });
@@ -219,7 +220,6 @@ describe('jeu', () => {
   it('carte, classement, tribus et messages répondent', async () => {
     const a = await register('Gauvain');
     const b = await register('Yvain');
-    const auth = (t: string) => ({ authorization: `Bearer ${t}` });
     const map = await app.inject({ method: 'GET', url: '/api/map', headers: auth(a.token) });
     expect(map.json().length).toBeGreaterThan(2);
 
@@ -239,5 +239,33 @@ describe('jeu', () => {
 
     const ranking = (await app.inject({ method: 'GET', url: '/api/ranking/tribes', headers: auth(a.token) })).json();
     expect(ranking[0].tag).toBe('TR');
+  });
+
+  it("l'application mobile peut appeler l'API (CORS)", async () => {
+    const pre = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/login',
+      headers: { origin: 'capacitor://localhost', 'access-control-request-method': 'POST' },
+    });
+    expect(pre.statusCode).toBe(204);
+    expect(pre.headers['access-control-allow-origin']).toBe('capacitor://localhost');
+    expect(pre.headers['access-control-allow-headers']).toContain('authorization');
+    const world = await app.inject({ method: 'GET', url: '/api/world', headers: { origin: 'https://localhost' } });
+    expect(world.headers['access-control-allow-origin']).toBe('https://localhost');
+    const evil = await app.inject({ method: 'GET', url: '/api/world', headers: { origin: 'https://evil.example' } });
+    expect(evil.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('un joueur peut supprimer son compte, ses villages deviennent barbares', async () => {
+    const { token, me } = await register('Partant');
+    const vid = me.villages[0].id;
+    const wrong = await app.inject({ method: 'DELETE', url: '/api/me', headers: auth(token), payload: { password: 'mauvais' } });
+    expect(wrong.statusCode).toBe(403);
+    const ok = await app.inject({ method: 'DELETE', url: '/api/me', headers: auth(token), payload: { password: 'secret123' } });
+    expect(ok.statusCode).toBe(200);
+    const v = (await pool.query('SELECT owner_id FROM villages WHERE id = $1', [vid])).rows[0];
+    expect(v.owner_id).toBeNull();
+    const after = await app.inject({ method: 'GET', url: '/api/me', headers: auth(token) });
+    expect(after.statusCode).toBe(401);
   });
 });

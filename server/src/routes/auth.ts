@@ -8,6 +8,7 @@ import { env } from '../env';
 import { GameError } from '../errors';
 import { createVillage } from '../game/village';
 import { ensureWorld, spawnLocation } from '../game/world';
+import { leaveTribe } from './social';
 
 const credentials = z.object({
   username: z
@@ -123,6 +124,27 @@ export default async function authRoutes(app: FastifyInstance) {
       const { rows } = await c.query('SELECT username FROM players WHERE id = $1', [playerId]);
       await spawnVillage(c, playerId, rows[0].username, now);
       return loadMe(c, playerId);
+    });
+  });
+
+  /**
+   * Suppression définitive du compte (exigée par l'App Store pour toute app qui permet de s'inscrire).
+   * Les villages deviennent barbares, les troupes en route sont perdues, rapports et messages reçus sont effacés.
+   */
+  app.delete('/api/me', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { password } = z.object({ password: z.string().min(1, 'Mot de passe requis') }).parse(req.body);
+    const { rows } = await pool.query('SELECT password_hash FROM players WHERE id = $1', [playerId]);
+    if (!rows[0] || !(await verifyPassword(password, rows[0].password_hash))) throw new GameError('Mot de passe incorrect', 403);
+    return act(async (c) => {
+      await leaveTribe(c, playerId);
+      const villages = (await c.query('SELECT id FROM villages WHERE owner_id = $1', [playerId])).rows.map((r) => r.id as number);
+      await c.query("UPDATE villages SET owner_id = NULL, name = 'Village abandonné' WHERE owner_id = $1", [playerId]);
+      await c.query('DELETE FROM build_queue WHERE village_id = ANY($1)', [villages]);
+      await c.query('DELETE FROM recruit_queue WHERE village_id = ANY($1)', [villages]);
+      await c.query('DELETE FROM commands WHERE player_id = $1', [playerId]);
+      await c.query('DELETE FROM players WHERE id = $1', [playerId]);
+      return { ok: true };
     });
   });
 }

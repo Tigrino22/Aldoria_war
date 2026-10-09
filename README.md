@@ -38,6 +38,7 @@ Sans Docker, n'importe quel PostgreSQL 14+ convient : indiquez son adresse dans 
 | `npm test` | Tests des règles du jeu et du serveur (utilise la base `aldoria_test`) |
 | `npm run typecheck` | Vérifie les types TypeScript des trois paquets |
 | `npm run build` | Construit le client pour la production dans `client/dist` |
+| `cd client && npm run ios` / `npm run android` | Construit l'application mobile et ouvre Xcode ou Android Studio ([guide](docs/MOBILE.md)) |
 | `npm run db:reset` | Efface la base et repart d'un monde neuf |
 | `cd tools/render && npm install && npx playwright install chromium && node render.mjs` | Régénère toutes les images 3D (bâtiments, décor, carte, icônes) |
 
@@ -52,6 +53,7 @@ Pour les tests, créez une fois la base de test : `docker compose exec postgres 
 | `BARBARIAN_VILLAGES` | 250 | Villages barbares créés au démarrage d'un monde |
 | `DATABASE_URL` | postgres local | Connexion PostgreSQL |
 | `PORT` | 3001 | Port de l'API |
+| `CORS_ORIGINS` | apps iOS et Android | Origines autorisées à appeler l'API depuis un autre domaine, séparées par des virgules |
 
 Les barbares sont créés à la première exécution. Après avoir changé `MAP_SIZE` ou `BARBARIAN_VILLAGES`, lancez `npm run db:reset`.
 
@@ -60,8 +62,8 @@ Les barbares sont créés à la première exécution. Après avoir changé `MAP_
 ```
 shared/   Règles du jeu partagées : bâtiments, unités, coûts, formules, combat (TypeScript pur)
 server/   API Fastify + PostgreSQL, worker des mouvements de troupes, WebSocket
-client/   Interface React + Vite (PWA), carte du monde en PixiJS, graphismes SVG
-tools/    Générateur des illustrations de bâtiments
+client/   Interface React + Vite (PWA et apps iOS/Android via Capacitor), carte du monde en PixiJS
+tools/    Générateur des illustrations 3D (bâtiments, décor, unités)
 docs/     Notes d'architecture
 ```
 
@@ -82,13 +84,13 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour le fonctionnement interne
 - Conquête par les nobles (loyauté), regain de loyauté avec le temps, relance si l'on perd son dernier village
 - Rapports de combat, messagerie privée, tribus (création, invitations, exclusion, description), classements joueurs et tribus
 - Notifications en direct (attaque entrante, rapport, message) et installation sur téléphone (PWA)
+- Applications iOS et Android téléchargeables sur les stores (Capacitor), suppression du compte depuis l'app : voir [docs/MOBILE.md](docs/MOBILE.md)
 - Graphismes 3D réalistes en vue 3/4 : chaque bâtiment change d'aspect à 3 stades (niveaux 1-6, 7-13, 14-20)
 
 ## Pas encore fait (prochaines étapes)
 
 - Mode vacances, fin de monde et condition de victoire
 - Notifications push quand l'application est fermée, et e-mails
-- Applications iOS et Android (Capacitor)
 - Anti-bots et détection des multi-comptes
 - Abonnement confort et cosmétiques (Stripe)
 - Mise en production (hébergement, HTTPS, sauvegardes)

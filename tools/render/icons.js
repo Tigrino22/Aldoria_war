@@ -1,8 +1,11 @@
 // Icônes : ressources (bois, argile, fer, blé) et unités (figurines), même lumière et même caméra que le reste.
 import * as THREE from 'three';
 import { group, place, box, cyl, cone, mesh, mat, plain, logPile, sack, rock } from './kit.js';
+import { FIGURES } from './figures.js';
 
 const YAW = THREE.MathUtils.degToRad(32);
+/** Les unités sont vues presque de face, comme un portrait, et non d'en haut comme les bâtiments. */
+const PORTRAIT = THREE.MathUtils.degToRad(16);
 const BLUE = 0x24418c, RED = 0x8c2a22, GOLD = 0xc9a03a;
 const SKIN = 0xd9a882;
 
@@ -298,10 +301,11 @@ export const ICONS = {
   clay: () => ({ object: clayRes(), view: { frame: 3.2, centerY: 0.35 } }),
   iron: () => ({ object: iron(), view: { frame: 3.2, centerY: 0.3 } }),
   wheat: () => ({ object: wheat(), view: { frame: 3, centerY: 0.6 } }),
-  spearman: () => ({ object: face(spearman()), view: { frame: 3.4, centerY: 1.35 } }),
-  swordsman: () => ({ object: face(swordsman()), view: { frame: 2.9, centerY: 1.1 } }),
-  cavalry: () => ({ object: place(cavalry(), 0, 0, 0, YAW - 1.1), view: { frame: 4.4, centerY: 1.5 } }),
-  noble: () => ({ object: face(noble()), view: { frame: 3.4, centerY: 1.35 } }),
-  scout: () => ({ object: place(scout(), 0, 0, 0, YAW - 1.1), view: { frame: 4.0, centerY: 1.35 } }),
-  ram: () => ({ object: place(ram(), 0, 0, 0, YAW - 1.1), view: { frame: 4.8, centerY: 0.9 } }),
+  // Figurines sculptées (figures.js), tournées de trois quarts vers la caméra.
+  spearman: () => ({ object: place(FIGURES.spearman(), 0, 0, 0, YAW - 0.45), view: { frame: 3.4, centerY: 1.2, env: true, pitch: PORTRAIT } }),
+  swordsman: () => ({ object: place(FIGURES.swordsman(), 0, 0, 0, YAW - 0.45), view: { frame: 3.0, centerY: 1.0, env: true, pitch: PORTRAIT } }),
+  noble: () => ({ object: place(FIGURES.noble(), 0, 0, 0, YAW - 0.45), view: { frame: 3.4, centerY: 1.2, env: true, pitch: PORTRAIT } }),
+  cavalry: () => ({ object: place(FIGURES.cavalry(), 0, 0, 0, YAW - 1.15), view: { frame: 4.6, centerY: 1.5, env: true, pitch: PORTRAIT } }),
+  scout: () => ({ object: place(FIGURES.scout(), 0, 0, 0, YAW - 1.15), view: { frame: 4.4, centerY: 1.4, env: true, pitch: PORTRAIT } }),
+  ram: () => ({ object: place(ram(), 0, 0, 0, YAW - 1.1), view: { frame: 4.8, centerY: 0.9, env: true, pitch: PORTRAIT } }),
 };

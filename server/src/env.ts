@@ -11,4 +11,10 @@ export const env = {
   worldSpeed: num('WORLD_SPEED', 1),
   mapSize: Math.floor(num('MAP_SIZE', 100)),
   barbarianVillages: Math.floor(num('BARBARIAN_VILLAGES', 250)),
+  // Origines autorisées à appeler l'API depuis un autre domaine : par défaut, les applications iOS
+  // (capacitor://localhost) et Android (https://localhost). Ajouter d'autres domaines séparés par des virgules.
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'capacitor://localhost,ionic://localhost,https://localhost,http://localhost')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
 };

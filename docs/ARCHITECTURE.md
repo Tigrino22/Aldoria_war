@@ -49,6 +49,10 @@ rendu en PNG transparent par `render.mjs` dans un Chromium sans écran, toujours
 à l'écran de chaque emplacement. `client/src/assets.ts` fait le lien entre les clés du jeu (`farm`, `spearman`…) et les
 fichiers ; un illustrateur peut remplacer une image en gardant le même nom de fichier.
 
+Les personnages et les chevaux (`figures.js`) sont sculptés par champs de distance (`sdf.js`) : des formes simples
+fondues entre elles (corps, membres, vêtements superposés), puis transformées en maillage par marching cubes. Les
+vêtements reçoivent des plis et un matelassage en relief (bruit 3D), maillés plus finement que le reste du corps.
+
 ## Base de données
 
 Les migrations SQL sont dans `server/migrations/`, appliquées dans l'ordre par `npm run db:migrate` (et au démarrage du serveur).

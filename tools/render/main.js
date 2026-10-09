@@ -1,6 +1,7 @@
 // Moteur de rendu : une caméra orthographique en vue 3/4, lumière du soir venant de la gauche,
 // ombres douces projetées sur un sol invisible. Chaque élément est rendu seul, fond transparent.
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { BUILDERS } from './buildings.js';
 import { SCENES } from './scenes.js';
 import { ICONS } from './icons.js';
@@ -18,13 +19,13 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 0);
 document.body.appendChild(renderer.domElement);
 
-function cameraDir() {
-  return new THREE.Vector3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
+function cameraDir(pitch = PITCH) {
+  return new THREE.Vector3(Math.sin(YAW) * Math.cos(pitch), Math.sin(pitch), Math.cos(YAW) * Math.cos(pitch));
 }
 
-function lights(scene, span) {
-  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x5a4a32, 1.1));
-  const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
+function lights(scene, span, { hemi = 1.1, sunPower = 2.6 } = {}) {
+  scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x5a4a32, hemi));
+  const sun = new THREE.DirectionalLight(0xfff0d8, sunPower);
   // Soleil en haut à gauche de l'image, légèrement face à la caméra.
   const right = new THREE.Vector3(Math.cos(YAW), 0, -Math.sin(YAW));
   const toCam = cameraDir().setY(0).normalize();
@@ -47,10 +48,18 @@ function lights(scene, span) {
  * `frame` = largeur visible en mètres (fixe pour garder la même échelle entre tous les bâtiments),
  * `px` = taille de l'image, `ground` = 'shadow' (sol transparent qui reçoit l'ombre) ou rien.
  */
-function shoot(obj, { frame = 16, px = 512, aspect = 1, ground = 'shadow', centerY = 2.2, target = [0, 0, 0] }) {
+let envMap = null;
+function shoot(obj, { frame = 16, px = 512, aspect = 1, ground = 'shadow', centerY = 2.2, target = [0, 0, 0], env = false, pitch = PITCH }) {
   const scene = new THREE.Scene();
   scene.add(obj);
-  lights(scene, frame);
+  // Personnages : lumière plus contrastée (ombres franches, modelé marqué), comme un portrait peint.
+  lights(scene, frame, env ? { hemi: 0.45, sunPower: 3.2 } : {});
+  if (env) {
+    // Éclairage d'ambiance réaliste : reflets sur les métaux, ombres douces dans les creux.
+    envMap ??= new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envMap;
+    scene.environmentIntensity = 0.55;
+  }
   if (ground === 'shadow') {
     const g = new THREE.Mesh(new THREE.PlaneGeometry(frame * 4, frame * 4), new THREE.ShadowMaterial({ opacity: 0.38 }));
     g.rotation.x = -Math.PI / 2;
@@ -60,7 +69,7 @@ function shoot(obj, { frame = 16, px = 512, aspect = 1, ground = 'shadow', cente
   const w = frame, h = frame / aspect;
   const cam = new THREE.OrthographicCamera(-w / 2, w / 2, h / 2, -h / 2, 0.1, 1000);
   const t = new THREE.Vector3(target[0], target[1] + centerY, target[2]);
-  cam.position.copy(t).add(cameraDir().multiplyScalar(200));
+  cam.position.copy(t).add(cameraDir(pitch).multiplyScalar(200));
   cam.lookAt(t);
   const ss = 2; // suréchantillonnage
   renderer.setPixelRatio(1);
@@ -92,6 +101,13 @@ window.renderScene = (name) => {
     spots[k] = { x: +(((v.x + 1) / 2) * 100).toFixed(2), y: +(((1 - v.y) / 2) * 100).toFixed(2) };
   }
   return { png: res.png, spots, frame: s.view.frame };
+};
+
+window.renderIconLarge = (name, frame, centerY) => {
+  setSeed(7);
+  const s = ICONS[name]();
+  if (frame) return shoot(s.object, { ...s.view, px: 512, frame, centerY }).png;
+  return trim(shoot(s.object, { ...s.view, px: 768 }).png, 512);
 };
 
 window.renderIcon = (name) => {

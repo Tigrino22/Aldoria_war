@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MeResponse, VillageState, WorldInfo } from '@aldoria/shared';
 import { api, ApiError, getToken, setToken } from './api';
+import { wsUrl } from './config';
+import { alertHaptic } from './native';
 
 export interface Toast {
   id: number;
@@ -163,8 +165,7 @@ export function GameProvider({ children, onLogout }: { children: (state: 'loadin
     let closed = false;
     let retry = 1000;
     const connect = () => {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      socket = new WebSocket(`${proto}://${location.host}/ws?token=${getToken() ?? ''}`);
+      socket = new WebSocket(wsUrl(`/ws?token=${getToken() ?? ''}`));
       socket.onopen = () => (retry = 1000);
       socket.onmessage = (e) => {
         const msg = JSON.parse(e.data);
@@ -180,6 +181,7 @@ export function GameProvider({ children, onLogout }: { children: (state: 'loadin
         }
         if (msg.type === 'incoming') {
           toast('Une attaque se dirige vers votre village !', 'warning');
+          alertHaptic();
           if ('Notification' in window && Notification.permission === 'granted') new Notification('Aldoria War', { body: 'Une attaque arrive sur votre village !' });
           if (msg.villageId === villageIdRef.current) refreshVillage();
         }

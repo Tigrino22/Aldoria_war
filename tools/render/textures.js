@@ -85,6 +85,154 @@ function wrapDraw(size, fn) {
 
 // ---------- Générateurs ----------
 const GEN = {
+  // ---------- Matières des personnages ----------
+  mail(ctx, s) {
+    // Cotte de mailles : anneaux imbriqués en quinconce.
+    ctx.fillStyle = '#2a2b2e';
+    ctx.fillRect(0, 0, s, s);
+    const n = 32, step = s / n;
+    for (let row = 0; row < n * 1.5 + 2; row++)
+      for (let col = -1; col <= n; col++) {
+        const x = col * step + (row % 2 ? step / 2 : 0), y = row * step * 0.62;
+        wrapDraw(s, (dx, dy) => {
+          const g = ctx.createRadialGradient(x + dx - 2, y + dy - 2, 1, x + dx, y + dy, step * 0.55);
+          g.addColorStop(0, '#d8dade');
+          g.addColorStop(0.6, '#8a8d93');
+          g.addColorStop(1, '#3a3b3f');
+          ctx.strokeStyle = g;
+          ctx.lineWidth = step * 0.22;
+          ctx.beginPath();
+          ctx.ellipse(x + dx, y + dy, step * 0.42, step * 0.34, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+      }
+    grain(ctx, s, 14);
+  },
+  quilt(ctx, s) {
+    // Toile de lin écrue du gambison (le matelassage est sculpté) : trame, salissures, taches.
+    noiseFill(ctx, s, '#6e5c40', '#9c8862', 5, 1.5);
+    const img = ctx.getImageData(0, 0, s, s);
+    for (let y = 0; y < s; y++)
+      for (let x = 0; x < s; x++) {
+        const weave = (x % 3 === 0 ? -0.05 : 0) + (y % 3 === 0 ? -0.04 : 0);
+        const dirt = Math.max(0, fbm(x / s + 5.3, y / s + 2.1, 4, 3) - 0.55) * 1.2;
+        const i = (y * s + x) * 4;
+        for (let k = 0; k < 3; k++) img.data[i + k] *= 1 + weave - dirt;
+      }
+    ctx.putImageData(img, 0, 0);
+    grain(ctx, s, 22);
+  },
+  paint(ctx, s) {
+    // Peinture usée sur bois (teinte donnée par le matériau) : écaillures, coups, crasse.
+    noiseFill(ctx, s, '#a8a8a8', '#d8d8d8', 5, 1.3);
+    const img = ctx.getImageData(0, 0, s, s);
+    for (let y = 0; y < s; y++)
+      for (let x = 0; x < s; x++) {
+        const i = (y * s + x) * 4;
+        const chip = fbm(x / s + 9.1, y / s, 14, 3);
+        const grainWood = Math.sin(y * 0.35 + fbm(x / s, y / s, 6) * 20) * 0.04;
+        if (chip > 0.68) {
+          // Bois nu sous la peinture écaillée.
+          img.data[i] = 120; img.data[i + 1] = 92; img.data[i + 2] = 60;
+        } else for (let k = 0; k < 3; k++) img.data[i + k] *= 1 + grainWood - Math.max(0, chip - 0.55) * 1.5;
+      }
+    ctx.putImageData(img, 0, 0);
+    for (let i = 0; i < 70; i++) {
+      ctx.strokeStyle = `rgba(40,28,18,${range(0.15, 0.4)})`;
+      ctx.lineWidth = range(0.8, 2);
+      const x = rand() * s, y = rand() * s, a = rand() * Math.PI, l = range(8, 40);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+      ctx.stroke();
+    }
+    grain(ctx, s, 18);
+  },
+  wool(ctx, s) {
+    noiseFill(ctx, s, '#b8b0a0', '#d8d0c0', 12, 1.1);
+    const img = ctx.getImageData(0, 0, s, s);
+    for (let y = 0; y < s; y++)
+      for (let x = 0; x < s; x++) {
+        const w = (Math.sin(x * 1.6) * Math.sin(y * 1.6) + 1) * 0.06;
+        const i = (y * s + x) * 4;
+        for (let k = 0; k < 3; k++) img.data[i + k] *= 0.9 + w;
+      }
+    ctx.putImageData(img, 0, 0);
+    grain(ctx, s, 22);
+  },
+  leather(ctx, s) {
+    noiseFill(ctx, s, '#4a2e18', '#7a5232', 6, 1.6);
+    const img = ctx.getImageData(0, 0, s, s);
+    for (let y = 0; y < s; y++)
+      for (let x = 0; x < s; x++) {
+        const n = Math.abs(fbm(x / s, y / s, 10) - 0.5);
+        const i = (y * s + x) * 4;
+        if (n < 0.02) for (let k = 0; k < 3; k++) img.data[i + k] *= 0.75;
+      }
+    ctx.putImageData(img, 0, 0);
+    grain(ctx, s, 18);
+  },
+  skin(ctx, s) {
+    noiseFill(ctx, s, '#a87058', '#c48e70', 10, 1.3);
+    grain(ctx, s, 8);
+  },
+  hair(ctx, s) {
+    ctx.fillStyle = '#3a2616';
+    ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 2600; i++) {
+      const x = rand() * s, y = rand() * s, len = range(20, 60);
+      ctx.strokeStyle = rgb(mix(hex('#24160c'), hex('#6a4a2c'), rand()));
+      ctx.lineWidth = range(0.8, 2);
+      wrapDraw(s, (dx, dy) => {
+        ctx.beginPath();
+        ctx.moveTo(x + dx, y + dy);
+        ctx.lineTo(x + dx + range(-4, 4), y + dy + len);
+        ctx.stroke();
+      });
+    }
+  },
+  steel(ctx, s) {
+    noiseFill(ctx, s, '#8a8d92', '#a8abb0', 4, 1.0);
+    // Brossage horizontal et petites marques de coups.
+    for (let i = 0; i < 900; i++) {
+      ctx.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '0,0,0'},${range(0.02, 0.06)})`;
+      ctx.fillRect(0, rand() * s, s, range(0.5, 2));
+    }
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = 'rgba(40,30,20,0.15)';
+      ctx.beginPath();
+      ctx.arc(rand() * s, rand() * s, range(2, 8), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    grain(ctx, s, 10);
+  },
+  coat(ctx, s) {
+    // Robe de cheval : poil fin orienté.
+    noiseFill(ctx, s, '#7a4a2a', '#9a6438', 5, 1.3);
+    for (let i = 0; i < 6000; i++) {
+      const x = rand() * s, y = rand() * s;
+      ctx.strokeStyle = `rgba(${rand() < 0.5 ? '30,18,8' : '150,105,70'},0.18)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + range(6, 12), y + range(-1, 1));
+      ctx.stroke();
+    }
+  },
+  cloth(ctx, s) {
+    // Drap teint (la couleur vient du matériau) : trame fine et légers plis.
+    noiseFill(ctx, s, '#c8c8c8', '#ececec', 6, 1.0);
+    const img = ctx.getImageData(0, 0, s, s);
+    for (let y = 0; y < s; y++)
+      for (let x = 0; x < s; x++) {
+        const weave = ((x % 4 < 2) !== (y % 4 < 2) ? 0.04 : -0.04);
+        const i = (y * s + x) * 4;
+        for (let k = 0; k < 3; k++) img.data[i + k] *= 0.95 + weave;
+      }
+    ctx.putImageData(img, 0, 0);
+    grain(ctx, s, 14);
+  },
+
   stone(ctx, s) {
     noiseFill(ctx, s, '#4d4a44', '#6b675f', 10);
     let y = 0;
@@ -444,6 +592,7 @@ const GEN = {
 export const WORLD = {
   stone: 3, planks: 2.4, logs: 2.2, thatch: 2.5, tiles: 2, shingles: 2.2, plaster: 3, timber: 1, grass: 6, dirt: 5,
   clay: 4, brick: 1.6, rock: 4, field: 4, leaves: 2, pine: 2, bark: 1, canvasCloth: 2, water: 4, slate: 2, iron: 1, ore: 2,
+  mail: 0.3, quilt: 0.25, paint: 0.7, wool: 0.4, leather: 0.6, skin: 0.5, hair: 0.25, steel: 0.8, coat: 0.8, cloth: 0.5,
 };
 
 const cache = {};

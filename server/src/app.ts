@@ -4,14 +4,31 @@ import websocket from '@fastify/websocket';
 import { ZodError } from 'zod';
 import { playerFromToken } from './auth';
 import { GameError } from './errors';
+import { env } from './env';
 import { register } from './notify';
 import authRoutes from './routes/auth';
 import mapRoutes from './routes/map';
 import socialRoutes from './routes/social';
 import villageRoutes from './routes/village';
 
-export async function buildApp(opts: { logger?: boolean } = {}) {
+export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] } = {}) {
   const app = Fastify({ logger: opts.logger ?? false });
+
+  // CORS : l'application mobile embarque le client et appelle l'API depuis son origine locale.
+  // L'authentification passe par un jeton dans l'en-tête (pas de cookie), d'où une liste blanche simple.
+  const origins = new Set(opts.corsOrigins ?? env.corsOrigins);
+  app.addHook('onRequest', async (req, reply) => {
+    const origin = req.headers.origin;
+    if (!origin || !origins.has(origin)) return;
+    reply.header('access-control-allow-origin', origin);
+    reply.header('vary', 'Origin');
+    if (req.method === 'OPTIONS') {
+      reply.header('access-control-allow-methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      reply.header('access-control-allow-headers', 'authorization,content-type');
+      reply.header('access-control-max-age', '86400');
+      return reply.status(204).send();
+    }
+  });
 
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
   await app.register(websocket);
