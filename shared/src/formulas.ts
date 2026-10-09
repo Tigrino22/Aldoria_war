@@ -145,3 +145,11 @@ export function plunder(available: Resources, capacity: number): Resources {
   }
   return loot;
 }
+
+/** Stade visuel d'un bâtiment : 0 = emplacement vide, puis 1 (niv. 1-6), 2 (niv. 7-13), 3 (niv. 14-20). */
+export function buildingStage(level: number): 0 | 1 | 2 | 3 {
+  if (level <= 0) return 0;
+  if (level <= 6) return 1;
+  if (level <= 13) return 2;
+  return 3;
+}

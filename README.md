@@ -1,5 +1,91 @@
 # Fiefs
 
-Jeu de stratégie médiéval multijoueur, par navigateur et mobile.
+Jeu de stratégie médiéval multijoueur, par navigateur et mobile, inspiré de Guerre Tribale.
+On développe un village, on produit des ressources, on lève une armée, on pille et on conquiert les villages voisins, seul ou en tribu.
 
-La branche `main` est réservée à la production. Le développement se fait sur `dev`.
+Cahier des charges : https://claude.ai/code/artifact/6d0a4a26-a787-4d4c-b0d4-8d0ad2a871ce
+Aperçu des graphismes : https://claude.ai/artifact/ErSWDhfGNd21g4KHnKc9tQ
+
+## Branches
+
+- `main` : production. On n'y pousse que des versions validées.
+- `dev` : développement. Tout le travail se fait ici, puis on fusionne `dev` dans `main` pour une mise en production.
+
+## Lancer le jeu en local
+
+Prérequis : [Node.js 22](https://nodejs.org) ou plus récent, et [Docker](https://www.docker.com/products/docker-desktop/) pour la base de données.
+
+```bash
+git checkout dev
+cp .env.example .env        # réglages locaux (vitesse du monde x10 par défaut)
+docker compose up -d        # démarre PostgreSQL
+npm install
+npm run db:migrate          # crée les tables
+npm run dev                 # lance le serveur (port 3001) et le client (port 5173)
+```
+
+Ouvrez ensuite http://localhost:5173, créez un compte et jouez.
+Pour tester à plusieurs, ouvrez une fenêtre de navigation privée et créez un deuxième compte.
+Depuis un téléphone sur le même réseau Wi-Fi, ouvrez l'adresse « Network » affichée par Vite (par exemple http://192.168.1.20:5173).
+
+Sans Docker, n'importe quel PostgreSQL 14+ convient : indiquez son adresse dans `DATABASE_URL` du fichier `.env`.
+
+### Commandes utiles
+
+| Commande | Effet |
+| --- | --- |
+| `npm run dev` | Serveur et client avec rechargement automatique |
+| `npm test` | Tests des règles du jeu et du serveur (utilise la base `fiefs_test`) |
+| `npm run typecheck` | Vérifie les types TypeScript des trois paquets |
+| `npm run build` | Construit le client pour la production dans `client/dist` |
+| `npm run db:reset` | Efface la base et repart d'un monde neuf |
+| `python3 tools/generate-buildings.py` | Régénère les dessins des bâtiments |
+
+Pour les tests, créez une fois la base de test : `docker compose exec postgres createdb -U fiefs fiefs_test`.
+
+### Réglages (`.env`)
+
+| Variable | Défaut | Rôle |
+| --- | --- | --- |
+| `WORLD_SPEED` | 10 | Multiplie la production et divise toutes les durées. 1 pour un vrai monde. |
+| `MAP_SIZE` | 100 | Carte de 100 × 100 cases |
+| `BARBARIAN_VILLAGES` | 250 | Villages barbares créés au démarrage d'un monde |
+| `DATABASE_URL` | postgres local | Connexion PostgreSQL |
+| `PORT` | 3001 | Port de l'API |
+
+Les barbares sont créés à la première exécution. Après avoir changé `MAP_SIZE` ou `BARBARIAN_VILLAGES`, lancez `npm run db:reset`.
+
+## Organisation du code
+
+```
+shared/   Règles du jeu partagées : bâtiments, unités, coûts, formules, combat (TypeScript pur)
+server/   API Fastify + PostgreSQL, worker des mouvements de troupes, WebSocket
+client/   Interface React + Vite (PWA), carte du monde en PixiJS, graphismes SVG
+tools/    Générateur des illustrations de bâtiments
+docs/     Notes d'architecture
+```
+
+Toutes les valeurs d'équilibrage sont dans `shared/src/config.ts` : modifier un coût ou une statistique d'unité suffit, le serveur et le client suivent.
+
+Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour le fonctionnement interne.
+
+## Ce que contient cette première version
+
+- Comptes (pseudo + mot de passe), protection débutant de 5 jours (divisée par la vitesse du monde)
+- 4 ressources, 8 bâtiments sur 20 niveaux, file de construction de 2
+- 4 unités (lancier, épéiste, cavalier, noble), recrutement progressif, entretien en blé
+- Carte de 100 × 100 avec villages barbares, déplacement et zoom à la souris ou au doigt
+- Attaques, pillage avec ressources cachées par l'entrepôt, renforts entre joueurs, rappel des troupes
+- Conquête par les nobles (loyauté), regain de loyauté avec le temps, relance si l'on perd son dernier village
+- Rapports de combat, messagerie privée, tribus (création, invitations, exclusion, description), classements joueurs et tribus
+- Notifications en direct (attaque entrante, rapport, message) et installation sur téléphone (PWA)
+- Graphismes originaux : chaque bâtiment change d'aspect à 3 stades (niveaux 1-6, 7-13, 14-20)
+
+## Pas encore fait (prochaines étapes)
+
+- Mode vacances, fin de monde et condition de victoire
+- Notifications push quand l'application est fermée, et e-mails
+- Applications iOS et Android (Capacitor)
+- Anti-bots et détection des multi-comptes
+- Abonnement confort et cosmétiques (Stripe)
+- Mise en production (hébergement, HTTPS, sauvegardes)
