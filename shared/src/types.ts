@@ -57,7 +57,7 @@ export interface TroopGroup {
   units: UnitCounts;
 }
 
-export type CommandType = 'attack' | 'support' | 'return';
+export type CommandType = 'attack' | 'support' | 'return' | 'trade' | 'trade_return';
 
 export interface CommandView {
   id: number;
@@ -66,7 +66,9 @@ export interface CommandView {
   target: { id: number; name: string; x: number; y: number; ownerName: string | null };
   /** Absent pour les attaques entrantes ennemies : on ne voit pas ce qui arrive. */
   units: UnitCounts | null;
+  /** Butin au retour d'une attaque, ou cargaison d'un convoi de marchands. */
   loot: Resources | null;
+  merchants: number;
   sentAt: string;
   arriveAt: string;
 }
@@ -94,6 +96,7 @@ export interface VillageState {
   supportAway: TroopGroup[];
   incoming: CommandView[];
   outgoing: CommandView[];
+  market: { merchants: number; available: number };
 }
 
 export interface MapVillage {
@@ -131,4 +134,26 @@ export interface AttackReportData {
   loot: Resources | null;
   loyalty: { before: number; after: number } | null;
   conquered: boolean;
+  /** Muraille avant/après le passage des béliers, quand elle a été abîmée. */
+  wallDamage?: { before: number; after: number } | null;
+  /** Ce que les éclaireurs survivants ont vu. */
+  intel?: Intel | null;
+}
+
+export interface Intel {
+  resources: Resources;
+  buildings: Buildings;
+}
+
+export interface ScoutReportData {
+  attacker: CombatSide;
+  defender: CombatSide;
+  /** Absent quand aucun éclaireur n'a survécu. */
+  intel: (Intel & { troops: UnitCounts }) | null;
+}
+
+export interface TradeReportData {
+  from: { id: number; name: string; x: number; y: number; playerName: string | null };
+  to: { id: number; name: string; x: number; y: number; playerName: string | null };
+  resources: Resources;
 }

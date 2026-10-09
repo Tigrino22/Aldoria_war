@@ -133,9 +133,92 @@ function stoneHall(w, h, d, roof = 'slate') {
   return group(box(w, h, d, 'stone'), at(gableRoof(w, d, d * 0.5, roof, 'stone', { overhang: 0.35 }), 0, h, 0));
 }
 
+/** Étal de marché : comptoir, quatre poteaux et toile tendue en pente. */
+function stall(color, x, z, rot = 0) {
+  const cloth = new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: THREE.DoubleSide });
+  const g = group(box(2.2, 0.9, 1.0, 'planks', 0, 0, 0.3));
+  for (const [px, pz, h] of [[-1.1, -0.5, 2.3], [1.1, -0.5, 2.3], [-1.1, 0.9, 1.9], [1.1, 0.9, 1.9]]) g.add(box(0.1, h, 0.1, 'timber', px, 0, pz));
+  const roof = mesh(new THREE.PlaneGeometry(2.6, 1.8, 6, 2), cloth);
+  roof.rotation.x = -Math.PI / 2 + 0.25;
+  roof.position.set(0, 2.15, 0.2);
+  g.add(roof);
+  // Rayures claires sur la toile.
+  for (const sx of [-0.65, 0.65]) {
+    const band = mesh(new THREE.PlaneGeometry(0.4, 1.8), new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.85, side: THREE.DoubleSide }));
+    band.rotation.x = -Math.PI / 2 + 0.25;
+    band.position.set(sx, 2.16, 0.2);
+    g.add(band);
+  }
+  // Marchandises sur le comptoir.
+  g.add(place(mesh(new THREE.SphereGeometry(0.16, 8, 6), plain(0xc0392b, 0.6)), -0.6, 1.02, 0.4));
+  g.add(place(mesh(new THREE.SphereGeometry(0.16, 8, 6), plain(0xd4a020, 0.6)), -0.3, 1.02, 0.5));
+  g.add(box(0.5, 0.25, 0.4, 'planks', 0.5, 0.9, 0.35));
+  g.add(sack(1.5, 0, 0.7, 0.4));
+  return at(g, x, 0, z, rot);
+}
+
+/** Charrette à bras de marchand. */
+function cart(x, z, rot = 0) {
+  const g = group(box(1.6, 0.5, 1.0, 'planks', 0, 0.55, 0), box(1.7, 0.08, 0.08, 'timber', 1.4, 0.7, 0.35), box(1.7, 0.08, 0.08, 'timber', 1.4, 0.7, -0.35));
+  for (const sz of [-0.58, 0.58]) {
+    const wheel = mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.08, 14), mat('planks', { repeat: [1, 1] }));
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(0, 0.45, sz);
+    g.add(wheel);
+  }
+  g.add(sack(-0.3, 0.75, 0, 0.3), sack(0.35, 0.75, 0.1, 1.2), crate(0.5, 0.2, 1.05, -0.2, 0.3));
+  return at(g, x, 0, z, rot);
+}
+
 // ---------------------------------------------------------------------------
 
+function marketAt(stage) {
+    if (stage === 1)
+      return group(
+        patch(5.5, 4.5, 'dirt'),
+        stall(RED, -1.8, -0.8, 0.15),
+        stall(BLUE, 2.0, 0.2, -0.25),
+        barrel(-3.6, 0, 1.6),
+        crate(0.8, 0.2, 0, 2.6, 0.4),
+        sack(-0.8, 0, 2.4),
+      );
+    if (stage === 2)
+      return group(
+        patch(6.5, 5.5, 'dirt'),
+        at(house({ w: 4.4, h: 2.6, d: 3.4, wall: 'timbered', roof: 'tiles', rise: 1.8, windows: [[1.4, 1.1]] }), 0, 0, -2.4),
+        stall(RED, -3.6, 0.6, 0.35),
+        stall(GOLD, 3.6, 0.8, -0.35),
+        stall(BLUE, 0.2, 2.2, 0),
+        cart(-3.4, 3.2, 0.5),
+        barrel(4.6, 0, -1.2),
+        barrel(5.1, 0, -0.6),
+      );
+    // Halle couverte en pierre et charpente, entourée d'étals.
+    const hall = group();
+    for (const px of [-3.3, -1.1, 1.1, 3.3]) for (const pz of [-1.6, 1.6]) hall.add(box(0.5, 2.8, 0.5, 'stone', px, 0, pz));
+    hall.add(box(7.4, 0.35, 3.8, 'timber', 0, 2.8, 0));
+    hall.add(at(gableRoof(7.6, 4.2, 2.2, 'tiles', 'timber', { overhang: 0.4 }), 0, 3.15, 0));
+    hall.add(rectPatch(7, 3.4, 'stone', 0, 0.04, 0));
+    hall.add(stall(GOLD, -1.6, -0.3, 0), stall(RED, 1.6, -0.3, 0));
+    return group(
+      patch(7.5, 6, 'dirt'),
+      at(hall, 0, 0, -1.4),
+      stall(BLUE, -4.6, 2.6, 0.4),
+      stall(RED, 4.4, 2.8, -0.4),
+      cart(0.4, 3.6, 0.2),
+      hangingBanner(BLUE, -3.3, 2.6, 0.5, 0.6, 1.2),
+      hangingBanner(BLUE, 3.3, 2.6, 0.5, 0.6, 1.2),
+      barrel(-5.6, 0, -0.4),
+      barrel(-6, 0, 0.4),
+      crate(0.8, 5.8, 0, -0.6, 0.3),
+    );
+  }
+
 export const BUILDERS = {
+  market(stage) {
+    // Les étals sont petits : on agrandit un peu l'ensemble pour qu'il pèse autant que ses voisins.
+    return place(marketAt(stage), 0, 0, 0, 0, stage === 3 ? 1.05 : 1.25);
+  },
   townhall(stage) {
     if (stage === 1)
       return group(

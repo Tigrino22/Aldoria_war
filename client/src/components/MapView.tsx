@@ -315,7 +315,14 @@ export default function MapView({ focus }: { focus?: string }) {
           {selected.id === villageId ? (
             <p className="muted">C'est votre village actif.</p>
           ) : (
-            <SendTroops target={selected} protectedTarget={!!info?.protected} onSent={() => setSelected(null)} />
+            <>
+              <SendTroops target={selected} protectedTarget={!!info?.protected} onSent={() => setSelected(null)} />
+              {selected.ownerId && village && village.buildings.market > 0 && (
+                <a className="btn ghost small" href={`#/marche/${selected.x},${selected.y}`}>
+                  Envoyer des ressources
+                </a>
+              )}
+            </>
           )}
         </aside>
       )}

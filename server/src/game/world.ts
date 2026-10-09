@@ -49,7 +49,7 @@ export async function ensureWorld(c: Db, now: Date) {
     const dist = Math.hypot(x - size / 2, y - size / 2) / (size / 2);
     const top = Math.max(1, Math.round(2 + dist * 6));
     const buildings: Buildings = { ...STARTING_BUILDINGS };
-    for (const k of BUILDING_KEYS) buildings[k] = randInt(k === 'barracks' || k === 'wall' ? 0 : 1, top);
+    for (const k of BUILDING_KEYS) buildings[k] = k === 'market' ? 0 : randInt(k === 'barracks' || k === 'wall' ? 0 : 1, top);
     const stock = randInt(200, 400 + top * 150);
     await createVillage(c, {
       ownerId: null,

@@ -1,5 +1,6 @@
 import {
   BUILDINGS,
+  BUILDING_KEYS,
   BUILD_QUEUE_LIMIT,
   BuildingKey,
   Buildings,
@@ -18,6 +19,7 @@ import {
   canAfford,
   emptyUnits,
   meetsRequirements,
+  merchantCount,
   normalizeUnits,
   productionRates,
   recruitTime,
@@ -48,11 +50,15 @@ export interface VillageRow {
   points: number;
 }
 
+const STARTING_ZERO = Object.fromEntries(BUILDING_KEYS.map((k) => [k, 0])) as Buildings;
+
 export const resourcesOf = (v: VillageRow): Resources => ({ wood: v.wood, clay: v.clay, iron: v.iron, wheat: v.wheat });
 
 export async function loadVillage(c: Db, id: number, forUpdate = false): Promise<VillageRow> {
   const { rows } = await c.query(`SELECT * FROM villages WHERE id = $1 ${forUpdate ? 'FOR UPDATE' : ''}`, [id]);
   if (!rows[0]) throw notFound('Village introuvable');
+  // Un bâtiment ajouté après la création du village démarre au niveau 0.
+  rows[0].buildings = { ...STARTING_ZERO, ...rows[0].buildings };
   return rows[0];
 }
 
@@ -291,6 +297,7 @@ export function toCommandView(r: any, showUnits: boolean): CommandView {
     target: { id: r.target_village_id, name: r.t_name, x: r.t_x, y: r.t_y, ownerName: r.t_owner },
     units: showUnits ? normalizeUnits(r.units) : null,
     loot: showUnits ? r.loot : null,
+    merchants: r.merchants ?? 0,
     sentAt: new Date(r.sent_at).toISOString(),
     arriveAt: new Date(r.arrive_at).toISOString(),
   };
@@ -303,7 +310,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
   const incoming = (await c.query(`${COMMAND_SELECT} WHERE c.target_village_id = $1 AND NOT c.processed ORDER BY c.arrive_at`, [v.id]))
     .rows;
   const outgoing = (
-    await c.query(`${COMMAND_SELECT} WHERE c.origin_village_id = $1 AND c.type <> 'return' AND NOT c.processed ORDER BY c.arrive_at`, [
+    await c.query(`${COMMAND_SELECT} WHERE c.origin_village_id = $1 AND c.type NOT IN ('return', 'trade_return') AND NOT c.processed ORDER BY c.arrive_at`, [
       v.id,
     ])
   ).rows;
@@ -336,6 +343,16 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     // On voit ce qui arrive chez soi, sauf la composition des attaques ennemies.
     incoming: incoming.map((r) => toCommandView(r, r.type !== 'attack' || r.player_id === viewerId)),
     outgoing: outgoing.map((r) => toCommandView(r, true)),
+    market: { merchants: merchantCount(v.buildings.market), available: merchantCount(v.buildings.market) - (await busyMerchants(c, v.id)) },
   };
 }
 
+
+/** Marchands partis en convoi ou sur le chemin du retour. */
+export async function busyMerchants(c: Db, villageId: number): Promise<number> {
+  const { rows } = await c.query(
+    "SELECT COALESCE(SUM(merchants), 0)::int AS n FROM commands WHERE home_village_id = $1 AND type IN ('trade', 'trade_return') AND NOT processed",
+    [villageId],
+  );
+  return rows[0].n;
+}

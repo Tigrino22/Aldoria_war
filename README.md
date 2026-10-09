@@ -72,14 +72,17 @@ Voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) pour le fonctionnement interne
 ## Ce que contient cette première version
 
 - Comptes (pseudo + mot de passe), protection débutant de 5 jours (divisée par la vitesse du monde)
-- 4 ressources, 8 bâtiments sur 20 niveaux, file de construction de 2
-- 4 unités (lancier, épéiste, cavalier, noble), recrutement progressif, entretien en blé
+- 4 ressources, 9 bâtiments sur 20 niveaux, file de construction de 2
+- 6 unités (lancier, épéiste, éclaireur, cavalier, bélier, noble), recrutement progressif, entretien en blé
+- Marché : les marchands livrent des ressources à vos autres villages ou à d'autres joueurs, puis rentrent
+- Espionnage : des éclaireurs envoyés seuls rapportent ressources, bâtiments et troupes sans combattre
+- Béliers : ils abaissent la muraille pendant le combat et la détruisent en partie après une victoire
 - Carte de 100 × 100 avec villages barbares, déplacement et zoom à la souris ou au doigt
 - Attaques, pillage avec ressources cachées par l'entrepôt, renforts entre joueurs, rappel des troupes
 - Conquête par les nobles (loyauté), regain de loyauté avec le temps, relance si l'on perd son dernier village
 - Rapports de combat, messagerie privée, tribus (création, invitations, exclusion, description), classements joueurs et tribus
 - Notifications en direct (attaque entrante, rapport, message) et installation sur téléphone (PWA)
-- Graphismes originaux : chaque bâtiment change d'aspect à 3 stades (niveaux 1-6, 7-13, 14-20)
+- Graphismes 3D réalistes en vue 3/4 : chaque bâtiment change d'aspect à 3 stades (niveaux 1-6, 7-13, 14-20)
 
 ## Pas encore fait (prochaines étapes)
 

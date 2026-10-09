@@ -19,6 +19,7 @@ export const BUILDING_KEYS = [
   'ironmine',
   'farm',
   'warehouse',
+  'market',
   'barracks',
   'wall',
 ] as const;
@@ -98,6 +99,16 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
     timeFactor: 1.2,
     requires: {},
   },
+  market: {
+    name: 'Marché',
+    description: 'Ses marchands transportent vos ressources vers vos autres villages ou ceux de vos alliés.',
+    maxLevel: 20,
+    baseCost: { wood: 100, clay: 100, iron: 100, wheat: 30 },
+    costFactor: 1.26,
+    baseTime: 800,
+    timeFactor: 1.2,
+    requires: { townhall: 3, warehouse: 2 },
+  },
   barracks: {
     name: 'Caserne',
     description: 'Recrute les unités. Plus elle est haute, plus le recrutement est rapide.',
@@ -127,6 +138,7 @@ export const STARTING_BUILDINGS: Buildings = {
   ironmine: 1,
   farm: 1,
   warehouse: 1,
+  market: 0,
   barracks: 0,
   wall: 0,
 };
@@ -136,7 +148,7 @@ export const STARTING_RESOURCES: Resources = { wood: 500, clay: 500, iron: 500, 
 /** Nombre maximum de constructions en file d'attente par village. */
 export const BUILD_QUEUE_LIMIT = 2;
 
-export const UNIT_KEYS = ['spearman', 'swordsman', 'cavalry', 'noble'] as const;
+export const UNIT_KEYS = ['spearman', 'swordsman', 'scout', 'cavalry', 'ram', 'noble'] as const;
 export type UnitKey = (typeof UNIT_KEYS)[number];
 export type UnitCounts = Record<UnitKey, number>;
 
@@ -188,6 +200,20 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     time: 260,
     requires: { barracks: 3 },
   },
+  scout: {
+    name: 'Éclaireur',
+    description: "Espionne un village : ressources, bâtiments et troupes. Envoyé seul, il ne combat pas.",
+    kind: 'cavalry',
+    cost: { wood: 50, clay: 50, iron: 20, wheat: 10 },
+    upkeep: 2,
+    attack: 0,
+    defenseInfantry: 2,
+    defenseCavalry: 1,
+    speed: 9,
+    carry: 0,
+    time: 300,
+    requires: { barracks: 2 },
+  },
   cavalry: {
     name: 'Cavalier',
     description: 'Rapide et capable de rapporter un gros butin.',
@@ -201,6 +227,20 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     carry: 80,
     time: 600,
     requires: { barracks: 5 },
+  },
+  ram: {
+    name: 'Bélier',
+    description: 'Abaisse la muraille pendant le combat et la détruit en partie après une victoire.',
+    kind: 'infantry',
+    cost: { wood: 300, clay: 200, iron: 200, wheat: 40 },
+    upkeep: 5,
+    attack: 2,
+    defenseInfantry: 20,
+    defenseCavalry: 50,
+    speed: 30,
+    carry: 0,
+    time: 900,
+    requires: { barracks: 5, wall: 1 },
   },
   noble: {
     name: 'Noble',
@@ -233,3 +273,12 @@ export const LOYALTY_REGEN_PER_HOUR = 1;
 export const LOYALTY_AFTER_CONQUEST = 25;
 /** Durée de la protection débutant en heures à vitesse x1. */
 export const BEGINNER_PROTECTION_HOURS = 120;
+
+/** Ressources transportées par un marchand. */
+export const MERCHANT_CAPACITY = 1000;
+/** Minutes pour parcourir une case à vitesse x1 (marchands). */
+export const MERCHANT_SPEED = 6;
+/** Pendant le combat, la muraille perd un niveau pour ce nombre de béliers. */
+export const RAMS_PER_WALL_LEVEL_IN_COMBAT = 8;
+/** Après une victoire, chaque groupe de ce nombre de béliers survivants détruit un niveau de muraille. */
+export const RAMS_PER_WALL_LEVEL_DESTROYED = 4;

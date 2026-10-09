@@ -4,7 +4,7 @@ import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
-import { processDueEvents, sendCommand, setRandom } from '../src/game/commands';
+import { processDueEvents, sendCommand, sendTrade, setRandom } from '../src/game/commands';
 import { createVillage, enqueueBuild, enqueueRecruit, getTroops, syncVillage } from '../src/game/village';
 
 let app: Awaited<ReturnType<typeof buildApp>>;
@@ -147,6 +147,64 @@ describe('jeu', () => {
     expect(r.attackerWins).toBe(false);
     const supportReports = (await pool.query("SELECT title FROM reports WHERE player_id = $1 AND title LIKE 'Vos renforts à%'", [a])).rows;
     expect(supportReports).toHaveLength(1);
+  });
+
+  it('les marchands livrent des ressources puis rentrent', async () => {
+    const a = await makePlayer('Marchand');
+    const b = await makePlayer('Client');
+    const t0 = new Date(Date.now() - 10 * HOUR);
+    const va = await tx((c) => createVillage(c, { ownerId: a, name: 'Comptoir', x: 50, y: 60, buildings: { ...STARTING_BUILDINGS, market: 1 }, resources: { wood: 900, clay: 900, iron: 900, wheat: 900 }, at: t0 }));
+    const vb = await tx((c) => createVillage(c, { ownerId: b, name: 'Client', x: 53, y: 64, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0 }));
+    // Un marché niveau 1 n'a qu'un marchand : 1000 ressources maximum.
+    await expect(tx((c) => sendTrade(c, new Outbox(), a, va, { targetId: vb, resources: { wood: 600, clay: 600, iron: 0, wheat: 0 } }, t0))).rejects.toThrow(/marchand/);
+    const t = await tx((c) => sendTrade(c, new Outbox(), a, va, { targetId: vb, resources: { wood: 600, clay: 400, iron: 0, wheat: 0 } }, t0));
+    // 5 cases × 6 min, vitesse x1 en test.
+    expect(t.arriveAt.getTime() - t0.getTime()).toBe(5 * 6 * 60 * 1000);
+    await expect(tx((c) => sendTrade(c, new Outbox(), a, va, { targetId: vb, resources: { wood: 10, clay: 0, iron: 0, wheat: 0 } }, t0))).rejects.toThrow(/marchand/);
+    await processDueEvents(new Date(t.arriveAt.getTime() + 1));
+    const got = (await pool.query('SELECT wood, clay FROM villages WHERE id = $1', [vb])).rows[0];
+    expect(Math.floor(got.wood)).toBeGreaterThanOrEqual(600);
+    expect(Math.floor(got.clay)).toBeGreaterThanOrEqual(400);
+    const reports = (await pool.query("SELECT player_id FROM reports WHERE type = 'trade' AND player_id = ANY($1)", [[a, b]])).rows;
+    expect(reports).toHaveLength(2);
+    // Le marchand rentre : il est de nouveau disponible.
+    await processDueEvents(new Date(t.arriveAt.getTime() + 2 * 30 * 60 * 1000));
+    await tx((c) => sendTrade(c, new Outbox(), a, va, { targetId: vb, resources: { wood: 10, clay: 0, iron: 0, wheat: 0 } }, new Date(t.arriveAt.getTime() + 2 * 30 * 60 * 1000)));
+  });
+
+  it("les éclaireurs espionnent sans combattre, et la défense en tue s'il y en a", async () => {
+    const a = await makePlayer('Espion');
+    const d = await makePlayer('Guetteur');
+    const t0 = new Date(Date.now() - 10 * HOUR);
+    const va = await tx((c) => createVillage(c, { ownerId: a, name: 'Nid', x: 70, y: 70, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), scout: 10 } }));
+    const vd = await tx((c) => createVillage(c, { ownerId: d, name: 'Tour', x: 72, y: 70, buildings: { ...STARTING_BUILDINGS, wall: 3 }, resources: { wood: 700, clay: 700, iron: 700, wheat: 700 }, at: t0, troops: { ...emptyUnits(), spearman: 50, scout: 4 } }));
+    const s = await tx((c) => sendCommand(c, new Outbox(), a, va, { type: 'attack', targetId: vd, units: { scout: 10 } }, t0));
+    await processDueEvents(new Date(s.arriveAt.getTime() + 1));
+    const r = (await pool.query("SELECT data FROM reports WHERE player_id = $1 AND type = 'scout'", [a])).rows[0].data;
+    // (4/10)^1.5 × 10 ≈ 3 éclaireurs perdus, les lanciers ne bougent pas.
+    expect(r.attacker.losses.scout).toBe(3);
+    expect(r.intel.troops.spearman).toBe(50);
+    expect(r.intel.buildings.wall).toBe(3);
+    expect(r.intel.resources.wood).toBeGreaterThanOrEqual(700);
+    const defTroops = await tx((c) => getTroops(c, vd, vd));
+    expect(defTroops.spearman).toBe(50);
+    const warned = (await pool.query("SELECT id FROM reports WHERE player_id = $1 AND type = 'scout'", [d])).rows;
+    expect(warned).toHaveLength(1);
+  });
+
+  it('les béliers abaissent puis détruisent la muraille', async () => {
+    const a = await makePlayer('Assiégeant');
+    const t0 = new Date(Date.now() - 10 * HOUR);
+    const va = await tx((c) => createVillage(c, { ownerId: a, name: 'Camp', x: 80, y: 20, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), swordsman: 300, ram: 20 } }));
+    const vb = await tx((c) => createVillage(c, { ownerId: null, name: 'Fort', x: 81, y: 20, buildings: { ...STARTING_BUILDINGS, wall: 10 }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), spearman: 20 } }));
+    const s = await tx((c) => sendCommand(c, new Outbox(), a, va, { type: 'attack', targetId: vb, units: { swordsman: 300, ram: 20 } }, t0));
+    await processDueEvents(new Date(s.arriveAt.getTime() + 1));
+    const r = (await pool.query("SELECT data FROM reports WHERE player_id = $1 AND type = 'attack' ORDER BY id DESC LIMIT 1", [a])).rows[0].data;
+    expect(r.attackerWins).toBe(true);
+    expect(r.wallDamage.before).toBe(10);
+    expect(r.wallDamage.after).toBeLessThan(10);
+    const wall = (await pool.query('SELECT buildings FROM villages WHERE id = $1', [vb])).rows[0].buildings.wall;
+    expect(wall).toBe(r.wallDamage.after);
   });
 
   it('la protection débutant empêche les attaques', async () => {

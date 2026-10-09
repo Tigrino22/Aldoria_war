@@ -74,6 +74,8 @@ export default function SendTroops({ target, protectedTarget, onSent }: { target
       </div>
       {protectedTarget && !ownTarget && <p className="warn small">Ce joueur est encore sous protection débutant.</p>}
       {units.noble > 0 && <p className="muted small">Les nobles font baisser la loyauté du village si l'attaque est victorieuse.</p>}
+      {units.scout > 0 && units.scout === total && <p className="muted small">Envoyés seuls, les éclaireurs espionnent le village sans combattre.</p>}
+      {units.ram > 0 && <p className="muted small">Les béliers abaissent la muraille pendant le combat et l'abîment après une victoire.</p>}
     </div>
   );
 }

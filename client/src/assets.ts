@@ -5,6 +5,8 @@ import spearman from './assets/units/spearman.png';
 import swordsman from './assets/units/swordsman.png';
 import cavalry from './assets/units/cavalry.png';
 import noble from './assets/units/noble.png';
+import scout from './assets/units/scout.png';
+import ram from './assets/units/ram.png';
 import wood from './assets/resources/wood.png';
 import clay from './assets/resources/clay.png';
 import iron from './assets/resources/iron.png';
@@ -37,7 +39,7 @@ export function buildingImg(key: BuildingKey, level: number): string {
   if (stage === 0) return plot;
   return stageFiles[`./assets/buildings/${key}-${stage}.png`];
 }
-export const UNIT_IMG: Record<UnitKey, string> = { spearman, swordsman, cavalry, noble };
+export const UNIT_IMG: Record<UnitKey, string> = { spearman, swordsman, scout, cavalry, ram, noble };
 export const RESOURCE_IMG: Record<Resource, string> = { wood, clay, iron, wheat };
 export const MAP_IMG = { village1, village2, village3, barbarian, flag, trees, hill, ground };
 /** Centre de chaque emplacement sur le décor du village, en % (calculé au rendu du décor). */

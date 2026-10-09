@@ -43,7 +43,7 @@ if (only === 'textures') {
   process.exit(0);
 }
 
-const BUILDINGS = ['townhall', 'barracks', 'warehouse', 'woodcutter', 'farm', 'claypit', 'ironmine', 'wall'];
+const BUILDINGS = ['townhall', 'barracks', 'warehouse', 'market', 'woodcutter', 'farm', 'claypit', 'ironmine', 'wall'];
 for (const key of BUILDINGS)
   for (const stage of [1, 2, 3])
     if (want(`${key}-${stage}`)) save(`${out}/buildings/${key}-${stage}.png`, await page.evaluate(([k, s]) => window.renderBuilding(k, s), [key, stage]));
@@ -60,7 +60,7 @@ for (const [scene, file] of Object.entries(MAP))
   if (want(scene)) save(`${out}/map/${file}.png`, (await page.evaluate((n) => window.renderScene(n), scene)).png);
 for (const r of ['wood', 'clay', 'iron', 'wheat'])
   if (want(r)) save(`${out}/resources/${r}.png`, await page.evaluate((n) => window.renderIcon(n), r));
-for (const u of ['spearman', 'swordsman', 'cavalry', 'noble'])
+for (const u of ['spearman', 'swordsman', 'scout', 'cavalry', 'ram', 'noble'])
   if (want(u)) save(`${out}/units/${u}.png`, await page.evaluate((n) => window.renderIcon(n), u));
 if (want('ground')) save(`${out}/map/ground.png`, await page.evaluate(() => window.exportTexture('grass')));
 

@@ -11,6 +11,8 @@ import {
   canAfford,
   hiddenResources,
   meetsRequirements,
+  merchantCount,
+  MERCHANT_CAPACITY,
   resourceProduction,
   warehouseCapacity,
   WALL_BONUS_PER_LEVEL,
@@ -41,6 +43,8 @@ function effect(key: BuildingKey, level: number, speed: number): string {
       return `Stocke ${fmt(warehouseCapacity(level))}, cache ${fmt(hiddenResources(level))}`;
     case 'barracks':
       return level ? `Recrutement ${Math.round((1 - Math.pow(0.94, level - 1)) * 100)} % plus rapide` : 'Pas encore construite';
+    case 'market':
+      return level ? `${merchantCount(level)} marchands, ${fmt(merchantCount(level) * MERCHANT_CAPACITY)} ressources par envoi` : 'Pas encore construit';
     case 'wall':
       return `+${Math.round(level * WALL_BONUS_PER_LEVEL * 100)} % de défense`;
   }
@@ -101,6 +105,11 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
               <button className="btn primary" disabled={!reqOk || queueFull || !affordable} onClick={upgrade}>
                 {current === 0 && levels[k] === 0 ? 'Construire' : `Améliorer au niveau ${next}`}
               </button>
+              {k === 'market' && current > 0 && (
+                <button className="btn" onClick={() => go('marche')}>
+                  Envoyer des ressources
+                </button>
+              )}
               {k === 'barracks' && current > 0 && (
                 <button className="btn" onClick={() => go('caserne')}>
                   Recruter

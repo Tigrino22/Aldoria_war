@@ -4,7 +4,7 @@ import { clockTime } from '../format';
 import { useGame } from '../game';
 import { Countdown, Panel, UnitList } from '../ui';
 
-const TYPE_LABEL = { attack: 'Attaque', support: 'Renfort', return: 'Retour' } as const;
+const TYPE_LABEL = { attack: 'Attaque', support: 'Renfort', return: 'Retour', trade: 'Marchands', trade_return: 'Retour des marchands' } as const;
 
 function Movement({ c, direction }: { c: CommandView; direction: 'in' | 'out' }) {
   const other = direction === 'in' ? c.origin : c.target;

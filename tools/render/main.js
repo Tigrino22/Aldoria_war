@@ -97,8 +97,39 @@ window.renderScene = (name) => {
 window.renderIcon = (name) => {
   setSeed(7);
   const s = ICONS[name]();
-  return shoot(s.object, { px: 160, ...s.view }).png;
+  return trim(shoot(s.object, { px: 256, ...s.view }).png, 128);
 };
+
+/** Recadre une icône au plus près de ce qui est dessiné, en carré, pour qu'elle reste lisible en petit. */
+async function trimAsync(dataUrl, size) {
+  const img = new Image();
+  img.src = dataUrl;
+  await img.decode();
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const { data } = ctx.getImageData(0, 0, c.width, c.height);
+  let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < c.height; y++)
+    for (let x = 0; x < c.width; x++)
+      if (data[(y * c.width + x) * 4 + 3] > 40) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+  const side = Math.max(x1 - x0, y1 - y0) * 1.08;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const out = document.createElement('canvas');
+  out.width = out.height = size;
+  const o = out.getContext('2d');
+  o.imageSmoothingQuality = 'high';
+  o.drawImage(c, cx - side / 2, cy - side / 2, side, side, 0, 0, size, size);
+  return out.toDataURL('image/png');
+}
+const trim = (url, size) => trimAsync(url, size);
 
 window.ready = true;
 

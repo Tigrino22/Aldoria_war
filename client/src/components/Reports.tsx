@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RESOURCES, UNIT_KEYS, type AttackReportData, type ReportSummary, type UnitCounts } from '@aldoria/shared';
+import { BUILDINGS, BUILDING_KEYS, RESOURCES, UNIT_KEYS, type AttackReportData, type Intel, type Resources, type ReportSummary, type ScoutReportData, type TradeReportData, type UnitCounts } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame, useRoute } from '../game';
@@ -35,6 +35,73 @@ function TroopTable({ units, losses }: { units: UnitCounts | null; losses: UnitC
   );
 }
 
+function ResLine({ label, res }: { label: string; res: Resources }) {
+  return (
+    <p className="cost">
+      {label} :
+      {RESOURCES.map((r) => (
+        <span key={r}>
+          <ResIcon r={r} size={16} />
+          {fmt(res[r])}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function IntelBlock({ intel }: { intel: Intel }) {
+  return (
+    <div className="stack">
+      <h3>Ce que les éclaireurs ont vu</h3>
+      <ResLine label="Ressources" res={intel.resources} />
+      <div className="intel-grid">
+        {BUILDING_KEYS.map((k) => (
+          <span key={k}>
+            {BUILDINGS[k].name} <b>{intel.buildings[k] ?? 0}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const villageLink = (v: { name: string; x: number; y: number }) => <a href={`#/carte/${v.x},${v.y}`}>{v.name} ({v.x}|{v.y})</a>;
+
+function ScoutReport({ d }: { d: ScoutReportData }) {
+  return (
+    <div className="stack">
+      <p className={`verdict ${d.intel ? 'win' : 'loss'}`}>{d.intel ? 'Espionnage réussi' : "Aucun éclaireur n'est revenu"}</p>
+      <h3>
+        Éclaireurs de {d.attacker.playerName ?? 'inconnu'} · {villageLink(d.attacker.village)}
+      </h3>
+      <TroopTable units={d.attacker.units} losses={d.attacker.losses} />
+      <h3>
+        Cible : {d.defender.playerName ?? 'barbares'} · {villageLink(d.defender.village)}
+      </h3>
+      {d.intel && (
+        <>
+          <h3>Troupes présentes</h3>
+          <TroopTable units={d.intel.troops} losses={null} />
+          <IntelBlock intel={d.intel} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function TradeReport({ d }: { d: TradeReportData }) {
+  return (
+    <div className="stack">
+      <p>
+        De {villageLink(d.from)} {d.from.playerName && <span className="muted">({d.from.playerName})</span>} vers {villageLink(d.to)}{' '}
+        {d.to.playerName && <span className="muted">({d.to.playerName})</span>}
+      </p>
+      <ResLine label="Cargaison" res={d.resources} />
+      <p className="muted small">Ce qui dépassait la capacité de l'entrepôt a été perdu.</p>
+    </div>
+  );
+}
+
 function AttackReport({ d }: { d: AttackReportData }) {
   return (
     <div className="stack">
@@ -50,6 +117,11 @@ function AttackReport({ d }: { d: AttackReportData }) {
       </h3>
       <TroopTable units={d.defender.units} losses={d.defender.losses} />
       {d.wall !== null && <p>Muraille : niveau {d.wall}</p>}
+      {d.wallDamage && (
+        <p>
+          Les béliers ont abîmé la muraille : niveau {d.wallDamage.before} → <b>{d.wallDamage.after}</b>
+        </p>
+      )}
       {d.loot && (
         <p className="cost">
           Butin :
@@ -66,6 +138,7 @@ function AttackReport({ d }: { d: AttackReportData }) {
           Loyauté : {d.loyalty.before} → <b>{d.loyalty.after}</b>
         </p>
       )}
+      {d.intel && <IntelBlock intel={d.intel} />}
     </div>
   );
 }
@@ -105,7 +178,11 @@ export default function Reports({ id }: { id?: number }) {
         }
       >
         <p className="muted small">{clockTime(report.createdAt)}</p>
-        {report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
+        {report.type === 'scout' ? (
+          <ScoutReport d={report.data} />
+        ) : report.type === 'trade' ? (
+          <TradeReport d={report.data} />
+        ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
           <AttackReport d={report.data} />
         ) : (
           <div className="stack">
@@ -120,7 +197,7 @@ export default function Reports({ id }: { id?: number }) {
   return (
     <Panel title="Rapports">
       {list.length === 0 ? (
-        <p className="muted">Aucun rapport pour l'instant. Ils apparaissent après chaque combat ou arrivée de renforts.</p>
+        <p className="muted">Aucun rapport pour l'instant. Ils apparaissent après chaque combat, espionnage, livraison ou arrivée de renforts.</p>
       ) : (
         <ul className="list">
           {list.map((r) => (

@@ -6,18 +6,27 @@ import {
   NOBLE_LOYALTY_MIN,
   RESOURCES,
   Resources,
+  ScoutReportData,
+  TradeReportData,
   UnitCounts,
   carryCapacity,
   emptyResources,
   emptyUnits,
   hasUnits,
   hiddenResources,
+  merchantCount,
+  merchantTravelTime,
+  merchantsNeeded,
   normalizeUnits,
+  scoutLosses,
+  wallAfterRams,
+  wallDuringCombat,
   plunder,
   resolveCombat,
   subtractUnits,
   totalUnits,
   travelTime,
+  villagePoints,
   warehouseCapacity,
 } from '@aldoria/shared';
 import { tx, type Db } from '../db';
@@ -25,7 +34,7 @@ import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { createReport } from './reports';
-import { VillageRow, addTroops, getTroops, loadVillage, saveVillage, setTroops, syncVillage } from './village';
+import { VillageRow, addTroops, busyMerchants, getTroops, loadVillage, resourcesOf, saveVillage, setTroops, syncVillage } from './village';
 
 let rng: () => number = Math.random;
 /** Permet aux tests de rendre la baisse de loyauté déterministe. */
@@ -49,13 +58,14 @@ async function insertCommand(
     playerId: number | null;
     units: UnitCounts;
     loot?: Resources | null;
+    merchants?: number;
     sentAt: Date;
     arriveAt: Date;
   },
 ) {
   const { rows } = await c.query(
-    `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, loot, sent_at, arrive_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+    `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, loot, sent_at, arrive_at, merchants)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
     [
       cmd.type,
       cmd.originId,
@@ -66,6 +76,7 @@ async function insertCommand(
       cmd.loot ? JSON.stringify(cmd.loot) : null,
       cmd.sentAt,
       cmd.arriveAt,
+      cmd.merchants ?? 0,
     ],
   );
   return rows[0].id as number;
@@ -147,7 +158,126 @@ export async function recallTroops(c: Db, outbox: Outbox, playerId: number, stat
   outbox.push(stationed.owner_id, { type: 'village', villageId: stationedId });
 }
 
+/** Envoie un convoi de marchands chargé de ressources vers un village de joueur. */
+export async function sendTrade(
+  c: Db,
+  outbox: Outbox,
+  playerId: number,
+  originId: number,
+  input: { targetId: number; resources: Resources },
+  now: Date,
+) {
+  const origin = await syncVillage(c, originId, now);
+  if (origin.owner_id !== playerId) throw forbidden("Ce village n'est pas à vous");
+  const target = await loadVillage(c, input.targetId);
+  if (target.id === origin.id) throw new GameError('Choisissez un autre village');
+  if (!target.owner_id) throw new GameError("Les marchands ne commercent pas avec les villages barbares");
+  const cargo = emptyResources();
+  for (const r of RESOURCES) cargo[r] = Math.max(0, Math.floor(input.resources[r] ?? 0));
+  const needed = merchantsNeeded(cargo);
+  if (needed === 0) throw new GameError('Indiquez les ressources à envoyer');
+  for (const r of RESOURCES) if (cargo[r] > Math.floor(origin[r])) throw new GameError("Vous n'avez pas assez de ressources");
+  const available = merchantCount(origin.buildings.market) - (await busyMerchants(c, origin.id));
+  if (needed > available) throw new GameError(`Il faut ${needed} marchand${needed > 1 ? 's' : ''}, vous en avez ${Math.max(0, available)} de libre${available > 1 ? 's' : ''}`);
+
+  for (const r of RESOURCES) origin[r] -= cargo[r];
+  await saveVillage(c, origin);
+  const arriveAt = new Date(now.getTime() + merchantTravelTime(origin, target, env.worldSpeed) * 1000);
+  const id = await insertCommand(c, {
+    type: 'trade',
+    originId: origin.id,
+    targetId: target.id,
+    homeId: origin.id,
+    playerId,
+    units: emptyUnits(),
+    loot: cargo,
+    merchants: needed,
+    sentAt: now,
+    arriveAt,
+  });
+  outbox.push(playerId, { type: 'village', villageId: origin.id });
+  if (target.owner_id !== playerId) outbox.push(target.owner_id, { type: 'village', villageId: target.id });
+  return { id, arriveAt };
+}
+
 // ---------- Arrivées ----------
+
+async function handleTrade(c: Db, outbox: Outbox, cmd: any) {
+  const at = new Date(cmd.arrive_at);
+  const target = await syncVillage(c, cmd.target_village_id, at);
+  const origin = await loadVillage(c, cmd.home_village_id);
+  const cargo: Resources = { ...emptyResources(), ...cmd.loot };
+  const cap = warehouseCapacity(target.buildings.warehouse);
+  // Ce qui dépasse la capacité de l'entrepôt est perdu, comme pour la production.
+  for (const r of RESOURCES) target[r] = Math.max(target[r], Math.min(cap, target[r] + cargo[r]));
+  await saveVillage(c, target);
+  await insertCommand(c, {
+    type: 'trade_return',
+    originId: target.id,
+    targetId: origin.id,
+    homeId: origin.id,
+    playerId: cmd.player_id,
+    units: emptyUnits(),
+    merchants: cmd.merchants,
+    sentAt: at,
+    arriveAt: new Date(at.getTime() + merchantTravelTime(target, origin, env.worldSpeed) * 1000),
+  });
+  const data: TradeReportData = {
+    from: { id: origin.id, name: origin.name, x: origin.x, y: origin.y, playerName: await playerName(c, cmd.player_id) },
+    to: { id: target.id, name: target.name, x: target.x, y: target.y, playerName: await playerName(c, target.owner_id) },
+    resources: cargo,
+  };
+  await createReport(c, outbox, cmd.player_id, 'trade', `Livraison arrivée à ${label(target)}`, data, at);
+  if (target.owner_id && target.owner_id !== cmd.player_id) {
+    await createReport(c, outbox, target.owner_id, 'trade', `${data.from.playerName ?? 'Un joueur'} vous livre des ressources à ${label(target)}`, data, at);
+  }
+  outbox.push(target.owner_id, { type: 'village', villageId: target.id });
+  outbox.push(cmd.player_id, { type: 'village', villageId: origin.id });
+}
+
+/** Mission d'espionnage : seuls des éclaireurs, pas de combat ni de pillage. */
+async function handleScouting(c: Db, outbox: Outbox, cmd: any, target: VillageRow, origin: VillageRow, attackers: UnitCounts) {
+  const at = new Date(cmd.arrive_at);
+  const attackerId: number | null = cmd.player_id;
+  const rows = (await c.query('SELECT units FROM troops WHERE village_id = $1', [target.id])).rows;
+  const present = rows.reduce((sum, r) => {
+    const u = normalizeUnits(r.units);
+    for (const k of Object.keys(u) as (keyof UnitCounts)[]) sum[k] += u[k];
+    return sum;
+  }, emptyUnits());
+  const lost = scoutLosses(attackers.scout, present.scout);
+  const survivors = { ...attackers, scout: attackers.scout - lost };
+  const attackerLosses = { ...emptyUnits(), scout: lost };
+  if (survivors.scout > 0) {
+    await insertCommand(c, {
+      type: 'return',
+      originId: target.id,
+      targetId: origin.id,
+      homeId: origin.id,
+      playerId: attackerId,
+      units: survivors,
+      sentAt: at,
+      arriveAt: new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed) * 1000),
+    });
+  }
+  const side = (v: VillageRow, name: string | null) => ({ playerName: name, village: { id: v.id, name: v.name, x: v.x, y: v.y } });
+  const attackerName = await playerName(c, attackerId);
+  const defenderName = await playerName(c, target.owner_id);
+  const data: ScoutReportData = {
+    attacker: { ...side(origin, attackerName), units: attackers, losses: attackerLosses },
+    defender: { ...side(target, defenderName), units: null, losses: null },
+    intel: survivors.scout > 0 ? { resources: floorResources(resourcesOf(target)), buildings: target.buildings, troops: present } : null,
+  };
+  const outcome = survivors.scout > 0 ? (lost > 0 ? `${lost} éclaireur${lost > 1 ? 's' : ''} perdu${lost > 1 ? 's' : ''}` : 'réussi') : 'échec, tous les éclaireurs ont été tués';
+  await createReport(c, outbox, attackerId, 'scout', `Espionnage de ${label(target)} : ${outcome}`, data, at);
+  if (target.owner_id && lost > 0) {
+    const defView: ScoutReportData = { ...data, intel: null };
+    await createReport(c, outbox, target.owner_id, 'scout', `Des éclaireurs de ${attackerName ?? 'un inconnu'} ont été repérés à ${label(target)}`, defView, at);
+  }
+  if (attackerId) outbox.push(attackerId, { type: 'village', villageId: origin.id });
+}
+
+const floorResources = (r: Resources): Resources => ({ wood: Math.floor(r.wood), clay: Math.floor(r.clay), iron: Math.floor(r.iron), wheat: Math.floor(r.wheat) });
 
 async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
   const at = new Date(cmd.arrive_at);
@@ -163,6 +293,9 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
     return;
   }
 
+  // Uniquement des éclaireurs : mission d'espionnage.
+  if (attackers.scout > 0 && attackers.scout === totalUnits(attackers)) return handleScouting(c, outbox, cmd, target, origin, attackers);
+
   const defenderRows = (await c.query('SELECT home_village_id, units FROM troops WHERE village_id = $1 FOR UPDATE', [target.id])).rows;
   const defenders = defenderRows.map((r) => normalizeUnits(r.units));
   const defendersBefore = defenders.reduce((sum, g) => {
@@ -170,7 +303,8 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
     return sum;
   }, emptyUnits());
 
-  const result = resolveCombat({ attackers, defenders, wallLevel: target.buildings.wall });
+  const wallBefore = target.buildings.wall;
+  const result = resolveCombat({ attackers, defenders, wallLevel: wallDuringCombat(wallBefore, attackers.ram) });
   const defenderLossesTotal = emptyUnits();
   for (let i = 0; i < defenderRows.length; i++) {
     const loss = result.defenderLosses[i];
@@ -183,6 +317,16 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
   let loyalty: AttackReportData['loyalty'] = null;
   let conquered = false;
   const previousOwner = target.owner_id;
+
+  let wallDamage: AttackReportData['wallDamage'] = null;
+  if (result.attackerWins && survivors.ram > 0) {
+    const after = wallAfterRams(wallBefore, survivors.ram);
+    if (after < wallBefore) {
+      target.buildings.wall = after;
+      target.points = villagePoints(target.buildings);
+      wallDamage = { before: wallBefore, after };
+    }
+  }
 
   if (result.attackerWins) {
     if (survivors.noble > 0) {
@@ -238,16 +382,19 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
       units: defendersBefore,
       losses: defenderLossesTotal,
     },
-    wall: target.buildings.wall,
+    wall: wallBefore,
     loot,
     loyalty,
     conquered,
+    wallDamage,
   } satisfies AttackReportData;
 
   const outcome = conquered ? 'conquête !' : result.attackerWins ? 'victoire' : 'défaite';
+  // Les éclaireurs survivants d'une attaque gagnée rapportent ce qu'il reste dans le village.
+  const intel = result.attackerWins && survivors.scout > 0 && !conquered ? { resources: floorResources(resourcesOf(target)), buildings: target.buildings } : null;
   const attackerView: AttackReportData = attackerSees
-    ? base
-    : { ...base, defender: { ...base.defender, units: null, losses: null }, wall: null };
+    ? { ...base, intel }
+    : { ...base, defender: { ...base.defender, units: null, losses: null }, wall: null, wallDamage: null };
   await createReport(c, outbox, attackerId, 'attack', `Attaque sur ${label(target)} : ${outcome}`, attackerView, at);
   if (previousOwner) {
     const title = conquered
@@ -325,6 +472,8 @@ export async function processDueEvents(now: Date): Promise<number> {
       await c.query('UPDATE commands SET processed = true WHERE id = $1', [cmd.id]);
       if (cmd.type === 'attack') await handleAttack(c, outbox, cmd);
       else if (cmd.type === 'support') await handleSupport(c, outbox, cmd);
+      else if (cmd.type === 'trade') await handleTrade(c, outbox, cmd);
+      else if (cmd.type === 'trade_return') outbox.push(cmd.player_id, { type: 'village', villageId: cmd.target_village_id });
       else await handleReturn(c, outbox, cmd);
       return true;
     });

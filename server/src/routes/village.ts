@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { BUILDING_KEYS, UNIT_KEYS } from '@aldoria/shared';
+import { BUILDING_KEYS, RESOURCES, UNIT_KEYS } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import type { Db } from '../db';
 import { GameError, forbidden } from '../errors';
-import { recallTroops, sendCommand } from '../game/commands';
+import { recallTroops, sendCommand, sendTrade } from '../game/commands';
 import { enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -95,6 +95,21 @@ export default async function villageRoutes(app: FastifyInstance) {
       .parse(req.body);
     return act(async (c, outbox, now) => {
       await sendCommand(c, outbox, playerId, id, body, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  app.post('/api/villages/:id/trade', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const body = z
+      .object({
+        targetId: z.number().int().positive(),
+        resources: z.object(Object.fromEntries(RESOURCES.map((r) => [r, z.number().int().min(0).max(10_000_000)])) as Record<(typeof RESOURCES)[number], z.ZodNumber>),
+      })
+      .parse(req.body);
+    return act(async (c, outbox, now) => {
+      await sendTrade(c, outbox, playerId, id, body, now);
       return villageState(c, await syncVillage(c, id, now), playerId);
     });
   });

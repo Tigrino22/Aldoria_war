@@ -203,6 +203,69 @@ function cavalry() {
   return g;
 }
 
+function scout() {
+  const g = horse();
+  // Monture plus claire et sans caparaçon : l'éclaireur voyage léger.
+  g.traverse((o) => {
+    if (o.material?.color?.getHex() === 0x5a3a22) o.material = cloth(0x9a7a52, 0.75);
+  });
+  g.remove(g.children.at(-1));
+  const rider = figure({ tunic: 0x3e5a34, legs: 0x4a3a2a });
+  rider.scale.setScalar(0.85);
+  rider.position.set(0, 1.05, -0.05);
+  // Capuche et cape vertes.
+  rider.add(part(new THREE.ConeGeometry(0.2, 0.32, 12), cloth(0x3e5a34), 0, 1.86, -0.02));
+  const cape = part(new THREE.CylinderGeometry(0.22, 0.42, 0.9, 12, 1, true, Math.PI * 0.6, Math.PI * 0.8), cloth(0x334a2c), 0, 1.15, 0);
+  cape.material.side = THREE.DoubleSide;
+  rider.add(cape);
+  rider.add(arm(0x3e5a34, -0.27, -0.6, 0.1), arm(0x3e5a34, 0.27, -0.3, -0.1));
+  // Cor de chasse en bandoulière.
+  const horn = part(new THREE.TorusGeometry(0.14, 0.035, 6, 12, Math.PI), cloth(0xd8c8a0, 0.5), 0.22, 1.05, 0.18);
+  horn.rotation.y = 0.6;
+  rider.add(horn);
+  g.add(rider);
+  return g;
+}
+
+function ram() {
+  const g = group();
+  // Châssis à quatre roues.
+  g.add(box(1.0, 0.18, 2.6, 'planks', 0, 0.4, 0));
+  for (const sx of [-0.58, 0.58])
+    for (const sz of [-0.85, 0.85]) {
+      const wheel = mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.12, 14), mat('planks', { repeat: [1, 1] }));
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(sx, 0.36, sz);
+      g.add(wheel);
+      g.add(place(mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.14, 8), metal(0x55585e)), sx * 1.05, 0.36, sz));
+      g.children.at(-1).rotation.z = Math.PI / 2;
+    }
+  // Abri en A recouvert de peaux.
+  for (const sz of [-1.1, 0, 1.1]) {
+    for (const sx of [-1, 1]) {
+      const post = box(0.1, 1.5, 0.1, 'timber', sx * 0.42, 0.5, sz);
+      post.rotation.z = sx * 0.3;
+      g.add(post);
+    }
+  }
+  const hide = cloth(0x7a5a3a, 0.9);
+  for (const sx of [-1, 1]) {
+    const panel = part(new THREE.BoxGeometry(0.05, 1.5, 2.5), hide, sx * 0.34, 1.2, 0);
+    panel.rotation.z = sx * 0.33;
+    g.add(panel);
+  }
+  // Tronc suspendu, tête de fer vers l'avant.
+  const log = cyl(0.17, 0.17, 3.1, 'bark', 0, 0, 0, { seg: 12, repeat: [1, 2] });
+  log.rotation.x = Math.PI / 2;
+  log.position.set(0, 1.0, 0.4);
+  g.add(log);
+  const head = part(new THREE.CylinderGeometry(0.22, 0.2, 0.36, 12), metal(0x66696f, 0.4), 0, 1.0, 2.05);
+  head.rotation.x = Math.PI / 2;
+  g.add(head);
+  for (const sz of [-0.5, 0.9]) g.add(box(0.03, 0.6, 0.03, 'timber', 0, 1.15, sz));
+  return g;
+}
+
 function noble() {
   const g = figure({ tunic: 0x6a1f3a, legs: 0x2a1a22 });
   // Grande cape.
@@ -237,6 +300,8 @@ export const ICONS = {
   wheat: () => ({ object: wheat(), view: { frame: 3, centerY: 0.6 } }),
   spearman: () => ({ object: face(spearman()), view: { frame: 3.4, centerY: 1.35 } }),
   swordsman: () => ({ object: face(swordsman()), view: { frame: 2.9, centerY: 1.1 } }),
-  cavalry: () => ({ object: face(cavalry()), view: { frame: 4.2, centerY: 1.6 } }),
+  cavalry: () => ({ object: place(cavalry(), 0, 0, 0, YAW - 1.1), view: { frame: 4.4, centerY: 1.5 } }),
   noble: () => ({ object: face(noble()), view: { frame: 3.4, centerY: 1.35 } }),
+  scout: () => ({ object: place(scout(), 0, 0, 0, YAW - 1.1), view: { frame: 4.0, centerY: 1.35 } }),
+  ram: () => ({ object: place(ram(), 0, 0, 0, YAW - 1.1), view: { frame: 4.8, centerY: 0.9 } }),
 };

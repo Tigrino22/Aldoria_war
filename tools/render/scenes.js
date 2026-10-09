@@ -23,8 +23,10 @@ const LAYOUT = {
   claypit: [10, 14],
   ironmine: [24, 6],
   wall: [0, 25],
+  market: [0, 4],
 };
 const CENTER = [0, 4];
+const WELL = [7, -6];
 
 /** Chemin de terre entre deux points écran : une suite de petites plaques. */
 function path(a, b, width = 1.1) {
@@ -64,7 +66,9 @@ export const SCENES = {
     // Place centrale, puits, chemins vers chaque emplacement.
     const [cx, cz] = W(...CENTER);
     g.add(patch(6.5, 5.5, 'dirt', cx, 0.02, cz, 0.25));
-    g.add(well(cx, 0, cz));
+    const [wx, wz] = W(...WELL);
+    g.add(patch(2.2, 2, 'dirt', wx, 0.025, wz, 0.25));
+    g.add(well(wx, 0, wz));
     for (const spot of Object.values(LAYOUT)) g.add(path(CENTER, spot));
     g.add(path(LAYOUT.wall, [0, 40]));
     // Arbres, buissons et rochers autour, sans gêner les emplacements.
@@ -85,8 +89,8 @@ export const SCENES = {
     }
     // Quelques détails de vie près de la place.
     const deco = (sx, sz, obj) => { const [x, z] = W(sx, sz); obj.position.x += x; obj.position.z += z; g.add(obj); };
-    deco(4.5, 5.5, group(barrel(0, 0, 0), barrel(0.8, 0, 0.5), crate(0.8, -0.9, 0, 0.3, 0.4)));
-    deco(-4.5, 6, group(sack(0, 0, 0), sack(0.6, 0, 0.3, 1), haystack(-1.3, 0, -0.4, 0.8)));
+    deco(9.5, -4.5, group(barrel(0, 0, 0), barrel(0.8, 0, 0.5)));
+    deco(-7, -6, group(sack(0, 0, 0), sack(0.6, 0, 0.3, 1), haystack(-1.3, 0, -0.4, 0.8)));
     const target = W(...CENTER);
     const spots = {};
     for (const [k, s] of Object.entries(LAYOUT)) { const [x, z] = W(...s); spots[k] = [x, 0, z]; }

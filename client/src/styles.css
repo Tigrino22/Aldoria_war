@@ -248,6 +248,12 @@ textarea { width: 100%; resize: vertical; }
 .send-grid label { display: flex; align-items: center; gap: 6px; }
 .send-grid label.dim { opacity: 0.5; }
 .send-grid input { width: 70px; }
+.market-form { display: flex; flex-direction: column; gap: 10px; }
+.market-form input#trade-target { width: 120px; }
+.trade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.trade-grid label { display: flex; align-items: center; gap: 6px; }
+.trade-grid input { width: 90px; }
+.intel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 14px; font-variant-numeric: tabular-nums; }
 
 /* ---------- Rapports, messages, classements ---------- */
 .list li { border-bottom: 1px solid var(--line); }
@@ -259,6 +265,8 @@ textarea { width: 100%; resize: vertical; }
 .dot.type-attack { background: var(--danger); }
 .dot.type-defense { background: var(--warn); }
 .dot.type-support { background: var(--ok); }
+.dot.type-scout { background: #5b7a3c; }
+.dot.type-trade { background: var(--gold); }
 .verdict { font: 700 18px var(--display); }
 .verdict.win { color: var(--ok); }
 .verdict.loss { color: var(--danger); }

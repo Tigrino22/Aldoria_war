@@ -3,6 +3,10 @@ import {
   BuildingKey,
   Buildings,
   HIDDEN_SHARE,
+  MERCHANT_CAPACITY,
+  MERCHANT_SPEED,
+  RAMS_PER_WALL_LEVEL_DESTROYED,
+  RAMS_PER_WALL_LEVEL_IN_COMBAT,
   RESOURCES,
   Resources,
   UNITS,
@@ -14,7 +18,7 @@ import {
 
 export const emptyResources = (): Resources => ({ wood: 0, clay: 0, iron: 0, wheat: 0 });
 
-export const emptyUnits = (): UnitCounts => ({ spearman: 0, swordsman: 0, cavalry: 0, noble: 0 });
+export const emptyUnits = (): UnitCounts => ({ spearman: 0, swordsman: 0, scout: 0, cavalry: 0, ram: 0, noble: 0 });
 
 export function normalizeUnits(raw: Partial<UnitCounts> | null | undefined): UnitCounts {
   const units = emptyUnits();
@@ -121,6 +125,31 @@ export function slowestSpeed(units: UnitCounts): number {
 export function travelTime(units: UnitCounts, from: { x: number; y: number }, to: { x: number; y: number }, worldSpeed: number) {
   const seconds = (distance(from, to) * slowestSpeed(units) * 60) / worldSpeed;
   return Math.max(1, Math.round(seconds));
+}
+
+/** Durée (en secondes réelles) d'un trajet de marchands. */
+export function merchantTravelTime(from: { x: number; y: number }, to: { x: number; y: number }, worldSpeed: number) {
+  return Math.max(1, Math.round((distance(from, to) * MERCHANT_SPEED * 60) / worldSpeed));
+}
+
+/** Nombre de marchands d'un marché. */
+export const merchantCount = (marketLevel: number) => (marketLevel <= 0 ? 0 : Math.round(marketLevel * (1 + marketLevel / 10)));
+
+export const merchantsNeeded = (res: Resources) =>
+  Math.ceil(RESOURCES.reduce((sum, r) => sum + res[r], 0) / MERCHANT_CAPACITY);
+
+/** Niveau de muraille pris en compte pendant le combat, une fois les béliers passés. */
+export const wallDuringCombat = (wall: number, rams: number) => Math.max(0, wall - Math.floor(rams / RAMS_PER_WALL_LEVEL_IN_COMBAT));
+
+/** Niveau de muraille après une victoire, selon les béliers survivants. */
+export const wallAfterRams = (wall: number, survivingRams: number) =>
+  Math.max(0, wall - Math.floor(survivingRams / RAMS_PER_WALL_LEVEL_DESTROYED));
+
+/** Pertes d'éclaireurs : tous si la défense en a autant ou plus, sinon (défense / attaque)^1.5. */
+export function scoutLosses(attacking: number, defending: number): number {
+  if (attacking <= 0) return 0;
+  if (defending >= attacking) return attacking;
+  return Math.round(attacking * Math.pow(defending / attacking, 1.5));
 }
 
 export function carryCapacity(units: UnitCounts): number {

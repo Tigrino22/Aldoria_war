@@ -6,6 +6,7 @@ import Messages from './Messages';
 import RallyPoint from './RallyPoint';
 import Ranking from './Ranking';
 import Reports from './Reports';
+import Market from './Market';
 import ResourceBar from './ResourceBar';
 import Tribe from './Tribe';
 import VillageView from './VillageView';
@@ -82,6 +83,7 @@ export default function Layout() {
         {page === 'messages' && <Messages id={route[1] ? Number(route[1]) : undefined} />}
         {page === 'tribu' && <Tribe id={route[1] ? Number(route[1]) : undefined} />}
         {page === 'classement' && <Ranking />}
+        {page === 'marche' && <Market focus={route[1]} />}
       </main>
       <nav className="nav">
         {NAV.map((n) => (
