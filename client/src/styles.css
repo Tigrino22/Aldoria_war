@@ -226,7 +226,7 @@ textarea { width: 100%; resize: vertical; }
 .map-popup {
   position: absolute; right: 12px; top: 56px; width: min(360px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--line);
   border-radius: 12px; padding: 14px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.3); display: flex; flex-direction: column; gap: 10px;
-  max-height: calc(100% - 70px); overflow: auto;
+  max-height: calc(100% - 70px); overflow: auto; z-index: 30;
 }
 .map-popup header { display: flex; justify-content: space-between; gap: 8px; }
 @media (max-width: 640px) { .map-popup { top: auto; bottom: 12px; } }

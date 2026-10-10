@@ -390,7 +390,7 @@ export default function MapView({ focus }: { focus?: string }) {
           <i style={{ background: '#2f6fdc' }} /> vous <i style={{ background: '#3ca34a' }} /> tribu <i style={{ background: '#d0453a' }} /> autres <i style={{ background: '#a39886' }} /> barbares
         </span>
       </div>
-      <div className="map-wrap">
+      <div className={`map-wrap ${selected ? 'has-popup' : ''}`}>
         <div className="map-canvas" ref={hostRef} />
         {showMini && (
           <div className="minimap">
