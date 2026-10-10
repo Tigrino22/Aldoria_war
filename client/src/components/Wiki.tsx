@@ -303,10 +303,6 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>L'ancien propriétaire perd les constructions et recrutements en cours ainsi que toutes les troupes de ce village, y compris celles qui étaient en dehors.</li>
           <li>Un village conquis n'est pas pillé.</li>
         </ul>
-        <p>
-          <b>Train de nobles :</b> un seul noble ne suffit presque jamais. La technique classique consiste à envoyer d'abord une attaque qui nettoie la défense, puis plusieurs nobles, chacun dans son propre
-          envoi, calés pour arriver à une seconde d'intervalle. Les défenseurs n'ont pas le temps de réagir entre deux nobles, et la loyauté tombe d'un coup. Gardez des troupes à la maison et surveillez les attaques groupées en approche.
-        </p>
       </>
     ),
     renforts: (
