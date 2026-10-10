@@ -16,3 +16,7 @@
 .admin-bar i { display: block; height: 100%; background: var(--gold); }
 .admin-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 @media (max-width: 800px) { .admin-grid2 { grid-template-columns: 1fr; } }
+.admin-settings { display: flex; flex-direction: column; }
+.admin-setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.admin-setting > span:first-child { display: flex; flex-direction: column; flex: 1; min-width: 200px; }
+.admin-setting input { width: 140px; }

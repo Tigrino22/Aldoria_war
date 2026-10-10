@@ -187,3 +187,7 @@ Les ressources offertes sont retirées du village à la publication et rendues �
 Page `#/admin` (menu « Aide » > « Administration »), en lecture seule : activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), joueurs et PNJ, offres du marché, totaux et paramètres du monde.
 
 Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).
+
+### Réglages modifiables depuis l'administration
+
+Onglet « Monde » : difficulté des PNJ, nouveaux PNJ par jour, maximum de PNJ, taille maximale des tribus de PNJ, heures calmes et fuseau. Les valeurs sont enregistrées en base (`world_settings`), s'appliquent tout de suite et remplacent les variables d'environnement au redémarrage ; « Rétablir » revient à la valeur d'origine. La vitesse du monde et la taille de la carte restent des variables Render (les changer en cours de partie fausserait les constructions, les trajets et les coordonnées).

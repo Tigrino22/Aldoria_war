@@ -14,6 +14,32 @@ async function register(username: string) {
 }
 
 describe('administration', () => {
+  it('les réglages du monde se modifient à chaud, se contrôlent et se rétablissent', async () => {
+    env.adminUsernames.push('chef');
+    const chef = await register('Chef');
+    const autre = await register('Badaud');
+    const put = (headers: Record<string, string>, payload: object) => app.inject({ method: 'PUT', url: '/api/admin/settings', headers, payload });
+
+    expect((await put(autre, { npcDifficulty: 2 })).statusCode).toBe(403);
+    const before = env.npcDifficulty;
+    const ok = await put(chef, { npcDifficulty: '1,5', npcQuietStart: 23 });
+    expect(ok.statusCode).toBe(200);
+    expect(env.npcDifficulty).toBe(1.5);
+    expect(env.npcQuietStart).toBe(23);
+    expect((await pool.query('SELECT value FROM world_settings WHERE key = $1', ['npcDifficulty'])).rows[0].value).toBe('1.5');
+
+    for (const bad of [{ npcDifficulty: 10 }, { npcQuietStart: 1.5 }, { npcTimezone: 'Mars/Olympus' }, { vitesse: 5 }]) {
+      expect((await put(chef, bad)).statusCode, JSON.stringify(bad)).toBe(400);
+    }
+    expect(env.npcDifficulty).toBe(1.5);
+
+    const reset = await put(chef, { npcDifficulty: null, npcQuietStart: null });
+    expect(reset.statusCode).toBe(200);
+    expect(env.npcDifficulty).toBe(before);
+    expect((await pool.query('SELECT count(*)::int AS n FROM world_settings')).rows[0].n).toBe(0);
+    env.adminUsernames.length = 0;
+  });
+
   beforeAll(async () => {
     await migrate(true);
     app = await buildApp();
