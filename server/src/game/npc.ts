@@ -16,14 +16,20 @@ import { Outbox } from '../notify';
 import { sendCommand } from './commands';
 import { pickNpcName } from './npc-names';
 import {
+  NOBLES_PER_CONQUEST,
   NPC_PROFILES,
+  NPC_TRIBE_NAMES,
+  SOLO_PROFILES,
   chooseBuilding,
   isQuiet,
   nextRecruit,
   npcCap,
   pickWinningUnits,
+  tribeMemberProfiles,
+  tribeRelations,
   type NpcProfile,
 } from './npc-rules';
+import { alertTribes, defendStep, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
 import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, syncVillage } from './village';
 
 let rng: () => number = Math.random;
@@ -89,13 +95,13 @@ async function spawnNpcVillage(c: Db, playerId: number, first: string, now: Date
 }
 
 /** Crée un joueur PNJ avec son village de départ. Son mot de passe n'est pas un hachage valide : personne ne peut s'y connecter. */
-export async function createNpc(c: Db, now: Date, profile?: NpcProfile): Promise<number> {
+export async function createNpc(c: Db, now: Date, profile?: NpcProfile, tribeId?: number): Promise<number> {
   const { first, username } = await uniqueNpcName(c);
-  const chosen = profile ?? NPC_PROFILES[Math.floor(rng() * NPC_PROFILES.length)];
+  const chosen = profile ?? SOLO_PROFILES[Math.floor(rng() * SOLO_PROFILES.length)];
   const { rows } = await c.query(
-    `INSERT INTO players (username, password_hash, is_npc, npc_profile, npc_next_action_at)
-     VALUES ($1, '!', true, $2, $3) RETURNING id`,
-    [username, chosen, new Date(now.getTime() + rng() * 10 * 60_000)],
+    `INSERT INTO players (username, password_hash, is_npc, npc_profile, npc_next_action_at, tribe_id)
+     VALUES ($1, '!', true, $2, $3, $4) RETURNING id`,
+    [username, chosen, new Date(now.getTime() + rng() * 10 * 60_000), tribeId ?? null],
   );
   await spawnNpcVillage(c, rows[0].id, first, now);
   return rows[0].id;
@@ -110,11 +116,54 @@ export async function renameLegacyNpcs(c: Db) {
   }
 }
 
-/** Complète la population de PNJ jusqu'à `NPC_COUNT` (sans jamais en retirer). */
+/** Complète la population de PNJ solitaires jusqu'à `NPC_COUNT` (sans jamais en retirer). Les membres de tribus comptent à part. */
 export async function ensureNpcs(c: Db, now: Date) {
   await renameLegacyNpcs(c);
-  const have = (await c.query('SELECT count(*)::int AS n FROM players WHERE is_npc')).rows[0].n as number;
+  const have = (await c.query('SELECT count(*)::int AS n FROM players WHERE is_npc AND tribe_id IS NULL')).rows[0].n as number;
   for (let i = have; i < env.npcCount; i++) await createNpc(c, now);
+}
+
+/**
+ * Complète les tribus de PNJ jusqu'à `NPC_TRIBES` tribus de `NPC_TRIBE_SIZE` membres (sans jamais en retirer),
+ * puis (re)distribue alliances et rivalités. Le premier membre de chaque tribu en est le chef.
+ */
+export async function ensureNpcTribes(c: Db, now: Date, opts: { tribes?: number; size?: number } = {}) {
+  const wanted = opts.tribes ?? env.npcTribes;
+  const size = opts.size ?? env.npcTribeSize;
+  const existing = (await c.query('SELECT id FROM tribes WHERE is_npc ORDER BY id')).rows.map((r) => r.id as number);
+  const ids = [...existing];
+  for (let i = existing.length; i < wanted; i++) {
+    const pick = NPC_TRIBE_NAMES[i % NPC_TRIBE_NAMES.length];
+    const lap = Math.floor(i / NPC_TRIBE_NAMES.length);
+    const name = lap ? `${pick.name} ${lap + 1}` : pick.name;
+    const tag = lap ? `${pick.tag}${lap + 1}` : pick.tag;
+    const taken = await c.query('SELECT 1 FROM tribes WHERE lower(name) = lower($1) OR lower(tag) = lower($2)', [name, tag]);
+    if (taken.rows.length) continue;
+    const { rows } = await c.query('INSERT INTO tribes (name, tag, is_npc, description) VALUES ($1, $2, true, $3) RETURNING id', [
+      name,
+      tag,
+      'Tribu de personnages non joueurs : ils bâtissent, pillent et se défendent entre eux. Seuls leurs membres peuvent la rejoindre.',
+    ]);
+    ids.push(rows[0].id);
+  }
+  for (const id of ids) {
+    const members = (await c.query('SELECT count(*)::int AS n FROM players WHERE tribe_id = $1', [id])).rows[0].n as number;
+    const profiles = tribeMemberProfiles(size);
+    let leader: number | null = null;
+    for (let i = members; i < size; i++) {
+      const npcId = await createNpc(c, now, profiles[i], id);
+      if (i === 0) leader = npcId;
+    }
+    if (leader) await c.query('UPDATE tribes SET leader_id = $2 WHERE id = $1', [id, leader]);
+  }
+  const relations = tribeRelations(ids);
+  for (const id of ids) {
+    const rel = relations.get(id)!;
+    await c.query(
+      "UPDATE tribes SET npc_state = npc_state || jsonb_build_object('allies', $2::jsonb, 'rivals', $3::jsonb) WHERE id = $1",
+      [id, JSON.stringify(rel.allies), JSON.stringify(rel.rivals)],
+    );
+  }
 }
 
 // ---------- Réflexion ----------
@@ -162,25 +211,38 @@ interface Candidate {
   x: number;
   y: number;
   ownerId: number | null;
+  /** Village d'un PNJ d'une tribu rivale : cible permise à toute heure. */
+  rival: boolean;
   dist: number;
 }
 
-async function candidates(c: Db, npcId: number, from: { id: number; x: number; y: number }, now: Date): Promise<Candidate[]> {
+async function candidates(
+  c: Db,
+  npcId: number,
+  from: { id: number; x: number; y: number },
+  now: Date,
+  rivals: number[],
+): Promise<Candidate[]> {
   const { rows } = await c.query(
-    `SELECT v.id, v.x, v.y, v.owner_id FROM villages v LEFT JOIN players p ON p.id = v.owner_id
+    `SELECT v.id, v.x, v.y, v.owner_id, (p.is_npc IS TRUE) AS rival FROM villages v LEFT JOIN players p ON p.id = v.owner_id
      WHERE v.id <> $1 AND (v.x - $2)^2 + (v.y - $3)^2 <= $5
-       AND (v.owner_id IS NULL OR (NOT p.is_npc AND (p.protection_until IS NULL OR p.protection_until <= $4)))
+       AND (v.owner_id IS NULL
+            OR (NOT p.is_npc AND (p.protection_until IS NULL OR p.protection_until <= $4))
+            OR (p.is_npc AND p.tribe_id = ANY($7::int[])))
        AND NOT EXISTS (SELECT 1 FROM commands cm WHERE cm.target_village_id = v.id AND cm.player_id = $6 AND NOT cm.processed)`,
-    [from.id, from.x, from.y, now, RAID_RADIUS * RAID_RADIUS, npcId],
+    [from.id, from.x, from.y, now, RAID_RADIUS * RAID_RADIUS, npcId, rivals],
   );
-  return rows.map((r) => ({ id: r.id, x: r.x, y: r.y, ownerId: r.owner_id, dist: Math.hypot(r.x - from.x, r.y - from.y) }));
+  return rows.map((r) => ({ id: r.id, x: r.x, y: r.y, ownerId: r.owner_id, rival: r.rival, dist: Math.hypot(r.x - from.x, r.y - from.y) }));
 }
 
-/** Un PNJ de type pillard vise aussi les joueurs, mais jamais pendant les heures calmes ni au-delà de ses plafonds. */
-async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, villageId: number, now: Date) {
+/**
+ * Un PNJ de type pillard ou conquérant vise aussi les joueurs, mais jamais pendant les heures calmes ni au-delà de ses plafonds.
+ * Dans une tribu, seul le chef lance une opération contre un joueur ; les autres s'y joignent si leur troupe peut arriver dans la fenêtre.
+ */
+async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, villageId: number, tribe: TribeInfo | null, now: Date) {
   const village = await loadVillage(c, villageId);
   const home = await getTroops(c, villageId, villageId);
-  const attackers: UnitCounts = { ...emptyUnits(), swordsman: home.swordsman, cavalry: home.cavalry };
+  const attackers: UnitCounts = { ...emptyUnits(), swordsman: home.swordsman, cavalry: home.cavalry, ram: home.ram };
   if (attackers.swordsman + attackers.cavalry < 5) return;
   const last = (
     await c.query(
@@ -192,18 +254,52 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   if (last && now.getTime() - new Date(last).getTime() < (RAID_COOLDOWN_GAME_HOURS * 3_600_000) / env.worldSpeed) return;
 
   const quiet = isQuietAt(now);
-  const all = await candidates(c, npcId, village, now);
+  const arrivalOf = (units: UnitCounts, to: { x: number; y: number }) => new Date(now.getTime() + travelTime(units, village, to, env.worldSpeed) * 1000);
+  const withNobles = (units: UnitCounts, hostile: boolean): UnitCounts =>
+    profile === 'conqueror' && !hostile && home.noble >= NOBLES_PER_CONQUEST ? { ...units, noble: NOBLES_PER_CONQUEST } : units;
+
+  // 1. Une opération de la tribu est en cours : on tente de s'y joindre.
+  const op = tribe?.state.op;
+  if (tribe && op && Date.parse(op.landBy) > now.getTime() && !op.joined.includes(npcId) && !quiet) {
+    const target = await loadVillage(c, op.targetId).catch(() => null);
+    const units = target && pickWinningUnits(attackers, op.troops, op.wall);
+    if (target && units) {
+      const arrival = arrivalOf(units, target);
+      const inWindow = arrival.getTime() >= Date.parse(op.landAt) - opWindowMs() && arrival.getTime() <= Date.parse(op.landBy);
+      if (inWindow && !isQuietAt(arrival)) {
+        try {
+          await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units }, now);
+          op.joined.push(npcId);
+          await saveTribeState(c, tribe);
+          return;
+        } catch (err) {
+          if (!(err instanceof GameError)) throw err;
+        }
+      }
+    }
+  }
+  if (tribe && op && Date.parse(op.landBy) <= now.getTime()) {
+    tribe.state.op = null;
+    await saveTribeState(c, tribe);
+  }
+
+  const all = await candidates(c, npcId, village, now, tribe?.state.rivals ?? []);
   const barbarians = all.filter((t) => t.ownerId === null);
-  let players = profile === 'raider' && !quiet ? all.filter((t) => t.ownerId !== null) : [];
+  const rivalVillages = all.filter((t) => t.rival);
+  const isLeader = !tribe || tribe.leaderId === npcId;
+  const opCooldownOk = !tribe || !tribe.state.lastOpAt || now.getTime() - Date.parse(tribe.state.lastOpAt) >= (12 * 3_600_000) / env.worldSpeed;
+  let players = profile !== 'builder' && !quiet && isLeader && opCooldownOk ? all.filter((t) => t.ownerId !== null && !t.rival) : [];
   if (players.length && (await raidsOnPlayersByNpc(c, npcId, now)) >= MAX_PLAYER_RAIDS_PER_NPC_PER_DAY) players = [];
-  const pool = players.length && (barbarians.length === 0 || rng() < 0.4) ? players : barbarians;
+  // Les PNJ en guerre préfèrent frapper les villages rivaux plutôt que les barbares.
+  const prey = rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
+  const pool = players.length && (prey.length === 0 || rng() < 0.4) ? players : prey;
   if (pool.length === 0) return;
   const target = pool.map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
 
-  const hostileToPlayer = target.ownerId !== null;
+  const hostileToPlayer = target.ownerId !== null && !target.rival;
   if (hostileToPlayer && (await raidsOnOwner(c, target.ownerId!, now)) >= MAX_RAIDS_PER_TARGET_PER_DAY) return;
   // L'arrivée d'une attaque ou d'un espion chez un joueur ne doit jamais tomber pendant les heures calmes.
-  const arrivesQuiet = (units: UnitCounts) => hostileToPlayer && isQuietAt(new Date(now.getTime() + travelTime(units, village, target, env.worldSpeed) * 1000));
+  const arrivesQuiet = (units: UnitCounts) => hostileToPlayer && isQuietAt(arrivalOf(units, target));
 
   const intel = await freshScoutIntel(c, npcId, target.id, now);
   try {
@@ -218,9 +314,25 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units: scouts }, now);
       return;
     }
-    const units = pickWinningUnits(attackers, intel.troops, intel.wall);
-    if (!units || arrivesQuiet(units)) return;
+    const picked = pickWinningUnits(attackers, intel.troops, intel.wall);
+    if (!picked) return;
+    const units = withNobles(picked, hostileToPlayer);
+    if (arrivesQuiet(units)) return;
     await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units }, now);
+    // Le chef d'une tribu qui frappe un joueur ouvre une opération : les autres membres ont une fenêtre pour le rejoindre.
+    if (tribe && hostileToPlayer) {
+      const landAt = arrivalOf(units, target);
+      tribe.state.op = {
+        targetId: target.id,
+        landAt: landAt.toISOString(),
+        landBy: new Date(landAt.getTime() + opWindowMs()).toISOString(),
+        troops: intel.troops,
+        wall: intel.wall,
+        joined: [npcId],
+      };
+      tribe.state.lastOpAt = now.toISOString();
+      await saveTribeState(c, tribe);
+    }
   } catch (err) {
     if (!(err instanceof GameError)) throw err;
   }
@@ -277,9 +389,11 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date) 
   }
 
   const cap = npcCap(await worldDays(c, now), env.npcDifficulty);
+  const tribe = await npcTribeOf(c, npcId);
   for (const v of villages.slice(0, 3)) {
     await economyStep(c, npcId, profile, v.id, cap, now);
-    await attackStep(c, outbox, npcId, profile, v.id, now);
+    if (tribe) await defendStep(c, outbox, npcId, v.id, tribe, now);
+    await attackStep(c, outbox, npcId, profile, v.id, tribe, now);
   }
   // Les rapports d'un PNJ ne servent qu'à ses décisions récentes.
   await c.query("DELETE FROM reports WHERE player_id = $1 AND created_at < $2", [npcId, new Date(now.getTime() - 2 * DAY_MS)]);
@@ -287,6 +401,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date) 
 
 /** Fait réfléchir tous les PNJ dont l'heure est venue. À appeler sous le verrou du jeu. */
 export async function processNpcs(now: Date, limit = 25): Promise<number> {
+  await alertTribes(now);
   const due = (
     await pool.query('SELECT id FROM players WHERE is_npc AND npc_next_action_at <= $1 ORDER BY npc_next_action_at LIMIT $2', [now, limit])
   ).rows;
