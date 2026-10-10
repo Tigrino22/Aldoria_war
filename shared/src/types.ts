@@ -160,6 +160,15 @@ export interface TradeReportData {
   resources: Resources;
 }
 
+export interface QuestView {
+  key: string;
+  title: string;
+  description: string;
+  reward: Resources;
+  done: boolean;
+  claimed: boolean;
+}
+
 /** Ce que le joueur sait d'un village cible, d'après son dernier espionnage ou sa dernière attaque. */
 export interface TargetIntel {
   /** Troupes qui étaient (ou restaient) sur place. */

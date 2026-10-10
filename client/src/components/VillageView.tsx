@@ -22,6 +22,7 @@ import { buildingImg, SPOT_WIDTH, VILLAGE_SPOTS as SPOTS, villageBg, wallRingImg
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { CancelButton, Cost, Countdown, liveResources, Panel } from '../ui';
+import Quests from './Quests';
 
 
 function effectiveLevels(v: VillageState): Buildings {
@@ -203,6 +204,8 @@ export default function VillageView() {
       </div>
 
       {selected && <BuildingPanel v={v} k={selected} onClose={() => setSelected(null)} />}
+
+      <Quests />
 
       <Panel title={`Constructions en cours (${v.buildQueue.length}/${BUILD_QUEUE_LIMIT})`}>
         {v.buildQueue.length === 0 ? (

@@ -10,6 +10,7 @@ import { env } from './env';
 import { register } from './notify';
 import authRoutes from './routes/auth';
 import mapRoutes from './routes/map';
+import questRoutes from './routes/quests';
 import socialRoutes from './routes/social';
 import villageRoutes from './routes/village';
 
@@ -58,6 +59,7 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   await app.register(authRoutes);
   await app.register(villageRoutes);
   await app.register(mapRoutes);
+  await app.register(questRoutes);
   await app.register(socialRoutes);
 
   // En production, le même serveur distribue aussi le site (le client utilise des routes en #, donc
