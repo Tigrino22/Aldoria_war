@@ -21,7 +21,7 @@ import { api } from '../api';
 import { buildingImg, SPOT_WIDTH, VILLAGE_SPOTS as SPOTS, villageBg, wallRingImg } from '../assets';
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
-import { Cost, Countdown, liveResources, Panel } from '../ui';
+import { CancelButton, Cost, Countdown, liveResources, Panel } from '../ui';
 import Quests from './Quests';
 
 
@@ -130,7 +130,7 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
 }
 
 export default function VillageView() {
-  const { village: v, world, me, run, refreshMe } = useGame();
+  const { village: v, world, me, run, refreshMe, setVillage } = useGame();
   const [selected, setSelected] = useState<BuildingKey | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
@@ -212,13 +212,19 @@ export default function VillageView() {
           <p className="muted">Aucune construction. Touchez un bâtiment pour l'améliorer.</p>
         ) : (
           <ul className="queue">
-            {v.buildQueue.map((q) => (
+            {v.buildQueue.map((q, i) => (
               <li key={q.id}>
                 <img src={buildingImg(q.building, q.level)} alt="" width={36} height={36} />
                 <span>
                   {BUILDINGS[q.building].name} → niveau {q.level}
                 </span>
                 <Countdown to={q.finishAt} />
+                {i === v.buildQueue.length - 1 && (
+                  <CancelButton
+                    since={q.queuedAt}
+                    onCancel={() => run(async () => setVillage(await api(`/api/villages/${v.id}/build/${q.id}`, { method: 'DELETE' })))}
+                  />
+                )}
               </li>
             ))}
           </ul>

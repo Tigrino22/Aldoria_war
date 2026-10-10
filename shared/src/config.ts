@@ -282,3 +282,8 @@ export const MERCHANT_SPEED = 6;
 export const RAMS_PER_WALL_LEVEL_IN_COMBAT = 8;
 /** Après une victoire, chaque groupe de ce nombre de béliers survivants détruit un niveau de muraille. */
 export const RAMS_PER_WALL_LEVEL_DESTROYED = 4;
+
+/** Annulation d'une construction, d'un recrutement ou d'un mouvement : remboursement total pendant ce délai (secondes réelles). */
+export const CANCEL_GRACE_SECONDS = 120;
+/** Part remboursée si on annule après le délai. Un mouvement ne peut plus être annulé passé ce délai. */
+export const CANCEL_REFUND_SHARE = 0.8;
