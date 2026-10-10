@@ -4,6 +4,7 @@ import App from './App';
 import { IS_NATIVE } from './config';
 import { initNative } from './native';
 import './styles.css';
+import './mobile.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
