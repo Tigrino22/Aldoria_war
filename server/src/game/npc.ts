@@ -14,8 +14,8 @@ import { env } from '../env';
 import { GameError } from '../errors';
 import { Outbox } from '../notify';
 import { sendCommand } from './commands';
+import { pickNpcName } from './npc-names';
 import {
-  NPC_FIRST_NAMES,
   NPC_PROFILES,
   chooseBuilding,
   isQuiet,
@@ -71,14 +71,8 @@ async function npcSpot(c: Db): Promise<{ x: number; y: number }> {
 }
 
 async function uniqueNpcName(c: Db): Promise<{ first: string; username: string }> {
-  for (let n = 0; n < 500; n++) {
-    const first = NPC_FIRST_NAMES[Math.floor(rng() * NPC_FIRST_NAMES.length)];
-    const suffix = n < 50 ? '' : ` ${n}`;
-    const username = `${first}${suffix} (PNJ)`;
-    const taken = await c.query('SELECT 1 FROM players WHERE lower(username) = lower($1)', [username]);
-    if (taken.rows.length === 0) return { first: `${first}${suffix}`, username };
-  }
-  throw new Error('Plus de nom disponible pour un PNJ');
+  const username = await pickNpcName(rng, async (name) => (await c.query('SELECT 1 FROM players WHERE lower(username) = lower($1)', [name])).rows.length > 0);
+  return { first: username, username };
 }
 
 async function spawnNpcVillage(c: Db, playerId: number, first: string, now: Date): Promise<number> {
@@ -107,8 +101,18 @@ export async function createNpc(c: Db, now: Date, profile?: NpcProfile): Promise
   return rows[0].id;
 }
 
+/** Les premiers PNJ portaient « (PNJ) » à la fin de leur nom : ils reçoivent un nom thématique, comme les nouveaux. */
+export async function renameLegacyNpcs(c: Db) {
+  const old = (await c.query("SELECT id FROM players WHERE is_npc AND username LIKE '% (PNJ)' ORDER BY id")).rows;
+  for (const { id } of old) {
+    const { username } = await uniqueNpcName(c);
+    await c.query('UPDATE players SET username = $2 WHERE id = $1', [id, username]);
+  }
+}
+
 /** Complète la population de PNJ jusqu'à `NPC_COUNT` (sans jamais en retirer). */
 export async function ensureNpcs(c: Db, now: Date) {
+  await renameLegacyNpcs(c);
   const have = (await c.query('SELECT count(*)::int AS n FROM players WHERE is_npc')).rows[0].n as number;
   for (let i = have; i < env.npcCount; i++) await createNpc(c, now);
 }
@@ -266,7 +270,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date) 
     if (lostAt === null) {
       await c.query("UPDATE players SET npc_state = jsonb_build_object('lostAt', $2::text) WHERE id = $1", [npcId, now.toISOString()]);
     } else if (now.getTime() - lostAt >= respawnMs()) {
-      await spawnNpcVillage(c, npcId, npc.username.replace(/ \(PNJ\)$/, ''), now);
+      await spawnNpcVillage(c, npcId, npc.username, now);
       await c.query("UPDATE players SET npc_state = '{}'::jsonb WHERE id = $1", [npcId]);
     }
     return;

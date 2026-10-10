@@ -13,6 +13,22 @@ const MIN = 60_000;
 const NOON = new Date('2030-01-15T12:00:00Z');
 const NIGHT = new Date('2030-01-15T22:00:00Z');
 
+describe('noms des PNJ', () => {
+  it('la liste est longue, sans doublon, et un nom pris reçoit un surnom puis un numéro', async () => {
+    const { NPC_FIRST_NAMES, NPC_EPITHETS, pickNpcName } = await import('../src/game/npc-names');
+    expect(NPC_FIRST_NAMES.length).toBeGreaterThanOrEqual(250);
+    expect(new Set(NPC_FIRST_NAMES.map((n) => n.toLowerCase())).size).toBe(NPC_FIRST_NAMES.length);
+    expect(NPC_EPITHETS.length).toBeGreaterThanOrEqual(40);
+    const used = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const name = await pickNpcName(() => 0, async (n) => used.has(n));
+      expect(used.has(name)).toBe(false);
+      used.add(name);
+    }
+    expect([...used].some((n) => /\d$/.test(n))).toBe(true);
+  });
+});
+
 describe('règles des PNJ', () => {
   it('les heures calmes vont de 22 h à 8 h, heure de Paris', () => {
     const quiet = (iso: string) => isQuiet(new Date(iso), 'Europe/Paris', 22, 8);
@@ -71,7 +87,8 @@ describe('PNJ en jeu', () => {
     await tx((c) => ensureNpcs(c, NOON));
     const { rows } = await pool.query('SELECT username, password_hash, npc_profile FROM players WHERE is_npc');
     expect(rows).toHaveLength(6);
-    expect(rows.every((r) => r.username.endsWith('(PNJ)') && r.password_hash === '!')).toBe(true);
+    expect(rows.every((r) => !r.username.includes('PNJ') && r.password_hash === '!')).toBe(true);
+    expect(new Set(rows.map((r) => r.username)).size).toBe(6);
     await tx((c) => ensureNpcs(c, NOON));
     expect((await pool.query('SELECT count(*)::int AS n FROM players WHERE is_npc')).rows[0].n).toBe(6);
     expect((await pool.query('SELECT count(*)::int AS n FROM villages v JOIN players p ON p.id = v.owner_id WHERE p.is_npc')).rows[0].n).toBe(6);
