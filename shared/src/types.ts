@@ -157,3 +157,12 @@ export interface TradeReportData {
   to: { id: number; name: string; x: number; y: number; playerName: string | null };
   resources: Resources;
 }
+
+export interface QuestView {
+  key: string;
+  title: string;
+  description: string;
+  reward: Resources;
+  done: boolean;
+  claimed: boolean;
+}
