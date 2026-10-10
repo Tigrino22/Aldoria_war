@@ -9,6 +9,7 @@ export default defineConfig({
       MAP_SIZE: '50',
       BARBARIAN_VILLAGES: '5',
       NPC_COUNT: '6',
+      NPC_TRIBES: '0',
     },
   },
 });

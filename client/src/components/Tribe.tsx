@@ -10,6 +10,7 @@ interface TribeInfo {
   tag: string;
   description: string;
   leaderId: number;
+  isNpc?: boolean;
   points: number;
   members: { id: number; username: string; villages: number; points: number }[];
   invites: { id: number; username: string }[];
@@ -105,6 +106,8 @@ export default function Tribe({ id }: { id?: number }) {
           </>
         )}
       </Panel>
+
+      {tribe.isNpc && <p className="muted small">Tribu de PNJ : ses membres sont pilotés par le serveur et ne rejoignent pas les tribus des joueurs.</p>}
 
       <Panel title="Membres">
         <div className="table-wrap">

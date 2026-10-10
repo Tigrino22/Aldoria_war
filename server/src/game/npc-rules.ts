@@ -14,12 +14,15 @@ import {
 
 // Règles pures des PNJ : pas de base de données ni d'horloge ici, pour pouvoir les tester facilement.
 
-export type NpcProfile = 'builder' | 'raider';
-export const NPC_PROFILES: NpcProfile[] = ['builder', 'raider'];
+export type NpcProfile = 'builder' | 'raider' | 'conqueror';
+export const NPC_PROFILES: NpcProfile[] = ['builder', 'raider', 'conqueror'];
+/** Les PNJ solitaires ; le conquérant est réservé aux tribus. */
+export const SOLO_PROFILES: NpcProfile[] = ['builder', 'raider'];
 
 export const PROFILE_LABEL: Record<NpcProfile, string> = {
   builder: 'Bâtisseur',
   raider: 'Pillard',
+  conqueror: 'Conquérant',
 };
 
 /** Heure (0-23) dans un fuseau donné. */
@@ -43,6 +46,8 @@ export function npcCap(worldDays: number, difficulty: number): number {
 const BUILD_WEIGHTS: Record<NpcProfile, Record<BuildingKey, number>> = {
   builder: { townhall: 1, woodcutter: 1.2, claypit: 1.2, ironmine: 1.1, farm: 1.2, warehouse: 1, market: 0.4, barracks: 0.8, wall: 1.1 },
   raider: { townhall: 0.9, woodcutter: 0.9, claypit: 0.9, ironmine: 1.3, farm: 1.1, warehouse: 0.7, market: 0.1, barracks: 1.4, wall: 0.4 },
+  // Les nobles demandent hôtel de ville et caserne au niveau 10 : le conquérant les monte en priorité.
+  conqueror: { townhall: 1.5, woodcutter: 1, claypit: 1, ironmine: 1.2, farm: 1.2, warehouse: 0.9, market: 0.1, barracks: 1.5, wall: 0.5 },
 };
 
 /** Le prochain bâtiment à monter : le plus en retard par rapport à son poids, sous le plafond, conditions remplies. */
@@ -64,6 +69,9 @@ export function chooseBuilding(profile: NpcProfile, levels: Buildings, cap: numb
   return best;
 }
 
+/** Nobles envoyés avec chaque assaut d'un conquérant. */
+export const NOBLES_PER_CONQUEST = 3;
+
 /** Armée visée par le PNJ au niveau `cap` (les unités dont il n'a pas encore les bâtiments sont ignorées au recrutement). */
 export function armyTarget(profile: NpcProfile, cap: number, difficulty: number): UnitCounts {
   const scale = (n: number) => Math.round(n * cap * difficulty);
@@ -72,6 +80,14 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
     t.spearman = scale(6);
     t.swordsman = scale(2);
     t.scout = 2;
+  } else if (profile === 'conqueror') {
+    t.swordsman = scale(5);
+    t.cavalry = scale(2);
+    t.ram = scale(1);
+    t.spearman = scale(2);
+    t.scout = 4;
+    // Trois nobles suffisent à faire tomber la loyauté d'un village (20 à 35 points chacun).
+    t.noble = cap >= 10 ? NOBLES_PER_CONQUEST : 0;
   } else {
     t.swordsman = scale(6);
     t.cavalry = scale(2);
@@ -118,3 +134,49 @@ export const NPC_FIRST_NAMES = [
   'Ermengarde', 'Fulbert', 'Garin', 'Hadrien', 'Isambard', 'Jocelyn', 'Kenric', 'Landry', 'Mélusine', 'Nivelon',
   'Osbern', 'Perceval', 'Rainier', 'Sibylle', 'Tancrède', 'Ulric', 'Vivien', 'Wilfrid', 'Yvain', 'Zénobie',
 ];
+
+// ---------- Tribus de PNJ ----------
+
+export const NPC_TRIBE_NAMES: { name: string; tag: string }[] = [
+  { name: 'Légion de Fer', tag: 'FER' },
+  { name: 'Ordre du Corbeau', tag: 'COR' },
+  { name: 'Compagnie des Loups', tag: 'LOU' },
+  { name: 'Garde de Brumevent', tag: 'BRU' },
+  { name: 'Fils de la Tempête', tag: 'TEM' },
+  { name: 'Bannière Écarlate', tag: 'ECA' },
+  { name: 'Veilleurs du Nord', tag: 'VEI' },
+  { name: 'Faucons Dorés', tag: 'FAU' },
+];
+
+/** Profils des membres d'une tribu : un chef pillard, un conquérant, puis bâtisseurs et pillards en alternance. */
+export function tribeMemberProfiles(size: number): NpcProfile[] {
+  const rest: NpcProfile[] = ['conqueror', 'builder', 'raider', 'builder'];
+  return Array.from({ length: size }, (_, i) => (i === 0 ? 'raider' : rest[(i - 1) % rest.length]));
+}
+
+export interface TribeRelations {
+  allies: number[];
+  rivals: number[];
+}
+
+/**
+ * Alliances et rivalités entre tribus : elles s'allient deux par deux (blocs), et chaque bloc est rival des blocs voisins.
+ * Une tribu seule dans son bloc n'a pas d'alliée. Avec un seul bloc, personne n'est rival.
+ */
+export function tribeRelations(ids: number[]): Map<number, TribeRelations> {
+  const sorted = [...ids].sort((a, b) => a - b);
+  const blocs = Math.ceil(sorted.length / 2);
+  const bloc = (i: number) => Math.floor(i / 2);
+  const out = new Map<number, TribeRelations>();
+  sorted.forEach((id, i) => {
+    const allies: number[] = [];
+    const rivals: number[] = [];
+    sorted.forEach((other, j) => {
+      if (j === i) return;
+      if (bloc(j) === bloc(i)) allies.push(other);
+      else if (blocs > 1 && (bloc(j) === (bloc(i) + 1) % blocs || bloc(j) === (bloc(i) + blocs - 1) % blocs)) rivals.push(other);
+    });
+    out.set(id, { allies, rivals });
+  });
+  return out;
+}
