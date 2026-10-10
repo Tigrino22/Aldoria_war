@@ -19,6 +19,8 @@ services:
         value: "100"
       - key: BARBARIAN_VILLAGES
         value: "250"
+      - key: NPC_COUNT
+        value: "40"
 
 databases:
   - name: aldoria-db

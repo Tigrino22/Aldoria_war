@@ -2,6 +2,7 @@ import { buildApp } from './app';
 import { pool, tx } from './db';
 import { env } from './env';
 import { processDueEvents } from './game/commands';
+import { ensureNpcs, processNpcs } from './game/npc';
 import { ensureWorld } from './game/world';
 import { withGameLock } from './lock';
 import { migrate } from './migrate';
@@ -9,6 +10,7 @@ import { migrate } from './migrate';
 async function main() {
   await migrate();
   await tx((c) => ensureWorld(c, new Date()));
+  await tx((c) => ensureNpcs(c, new Date()));
 
   const app = await buildApp({ logger: true });
   await app.listen({ port: env.port, host: '0.0.0.0' });
@@ -19,8 +21,20 @@ async function main() {
     withGameLock(() => processDueEvents(new Date())).catch((err) => app.log.error(err));
   }, 250);
 
+  // Le cerveau des PNJ : toutes les 30 secondes, ceux dont l'heure est venue réfléchissent et agissent.
+  const npcTimer =
+    env.npcCount > 0
+      ? setInterval(() => {
+          withGameLock(async () => {
+            await processDueEvents(new Date());
+            await processNpcs(new Date());
+          }).catch((err) => app.log.error(err));
+        }, 30_000)
+      : null;
+
   const stop = async () => {
     clearInterval(timer);
+    if (npcTimer) clearInterval(npcTimer);
     await app.close();
     await pool.end();
     process.exit(0);
