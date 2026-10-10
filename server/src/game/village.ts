@@ -32,6 +32,7 @@ import {
 } from '@aldoria/shared';
 import type { Db } from '../db';
 import { env } from '../env';
+import { barbarianCap, barbarianTier, growBarbarian } from './barbarians';
 import { GameError, notFound } from '../errors';
 
 export interface VillageRow {
@@ -161,10 +162,30 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
     else if (fresh > 0) await c.query('UPDATE recruit_queue SET delivered = $2 WHERE id = $1', [r.id, done]);
   }
 
+  if (v.owner_id === null) await regrowBarbarian(c, v, hours);
+
   v.resources_at = at;
   v.points = villagePoints(v.buildings);
   await saveVillage(c, v);
   return v;
+}
+
+let growthRandom: () => number = Math.random;
+/** Permet aux tests de rendre la croissance des barbares déterministe. */
+export const setGrowthRandom = (fn: () => number) => (growthRandom = fn);
+
+/** Un village barbare pillé ou détruit se reconstruit avec le temps, dans la limite de son plafond. */
+async function regrowBarbarian(c: Db, v: VillageRow, realHours: number) {
+  const gameHours = realHours * env.worldSpeed;
+  if (gameHours <= 0) return;
+  const started = (await c.query("SELECT value FROM world_meta WHERE key = 'started_at'")).rows[0]?.value;
+  const worldDays = started ? ((Date.now() - Date.parse(started)) / 86_400_000) * env.worldSpeed : 0;
+  const cap = barbarianCap(barbarianTier(v.x, v.y, env.mapSize), worldDays);
+  const troops = await getTroops(c, v.id, v.id);
+  const grown = growBarbarian({ buildings: v.buildings, troops }, gameHours, cap, growthRandom);
+  if (!grown.changed) return;
+  v.buildings = grown.buildings;
+  await setTroops(c, v.id, v.id, grown.troops);
 }
 
 // ---------- Création ----------
