@@ -278,4 +278,16 @@ describe('jeu', () => {
     const troops = await tx((c) => getTroops(c, id, id));
     expect(troops.spearman + troops.swordsman).toBeGreaterThan(0);
   });
+
+  it('le profil public liste les villages du joueur, sans tenir compte de la casse', async () => {
+    const a = await register('Bohort');
+    const res = await app.inject({ method: 'GET', url: '/api/players/bOHORT', headers: auth(a.token) });
+    expect(res.statusCode).toBe(200);
+    const p = res.json();
+    expect(p.username).toBe('Bohort');
+    expect(p.villages).toHaveLength(1);
+    expect(p.rank).toBeGreaterThanOrEqual(1);
+    const missing = await app.inject({ method: 'GET', url: '/api/players/Inconnu', headers: auth(a.token) });
+    expect(missing.statusCode).toBe(404);
+  });
 });
