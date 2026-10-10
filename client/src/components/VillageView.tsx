@@ -100,7 +100,9 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
 
 export default function VillageView() {
   const { village: v, world, me, run, refreshMe, setVillage } = useGame();
-  const [selected, setSelected] = useState<BuildingKey | null>(null);
+  const [route, go] = useRoute();
+  // #/village/hotel (menu) ouvre directement la fenêtre de l'hôtel de ville.
+  const [selected, setSelected] = useState<BuildingKey | null>(route[1] === 'hotel' ? 'townhall' : null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
   if (!v) return <p className="muted">Chargement du village…</p>;
@@ -173,7 +175,7 @@ export default function VillageView() {
       </div>
 
       {selected && selected !== 'townhall' && <BuildingPanel v={v} k={selected} onClose={() => setSelected(null)} />}
-      {selected === 'townhall' && <TownHall v={v} onClose={() => setSelected(null)} />}
+      {selected === 'townhall' && <TownHall v={v} onClose={() => (setSelected(null), route[1] === 'hotel' && go('village'))} />}
 
       <Quests />
 
