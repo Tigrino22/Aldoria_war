@@ -182,3 +182,10 @@ export function tribeRelations(ids: number[]): Map<number, TribeRelations> {
   });
   return out;
 }
+
+/** Un PNJ n'attaque sans provocation qu'un joueur dont les points sont entre 70 % et 150 % des siens. */
+export function pointRatioOk(npcPoints: number, targetPoints: number): boolean {
+  if (npcPoints <= 0) return false;
+  const ratio = targetPoints / npcPoints;
+  return ratio >= 0.7 && ratio <= 1.5;
+}
