@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { emptyUnits, normalizeUnits } from '@aldoria/shared';
+import { STARTING_BUILDINGS, emptyUnits, normalizeUnits } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
@@ -70,7 +70,7 @@ describe('tribus de PNJ', () => {
     // Un attaquant extérieur, à portée.
     const humanId = (await pool.query("INSERT INTO players (username, password_hash) VALUES ('Brigand', 'x') RETURNING id")).rows[0].id;
     const hv = await tx((c) =>
-      createVillage(c, { ownerId: humanId, name: 'Repaire', x: va.x + 3, y: va.y + 4, buildings: {} as never, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: NOON }),
+      createVillage(c, { ownerId: humanId, name: 'Repaire', x: va.x + 3, y: va.y + 4, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: NOON }),
     );
     await tx(async (c) => {
       await setTroops(c, hv, hv, { ...emptyUnits(), swordsman: 30 });

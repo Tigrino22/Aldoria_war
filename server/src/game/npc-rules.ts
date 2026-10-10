@@ -128,15 +128,6 @@ export function pickWinningUnits(available: UnitCounts, defenders: UnitCounts, w
   }
   return null;
 }
-
-export const NPC_FIRST_NAMES = [
-  'Aldric', 'Bertrand', 'Clovis', 'Dagobert', 'Evrard', 'Foulques', 'Gontran', 'Hugues', 'Ingeburge', 'Jehan',
-  'Kaelen', 'Lothaire', 'Mathilde', 'Norbert', 'Odon', 'Pepin', 'Quentin', 'Raoul', 'Sigebert', 'Thibaut',
-  'Urbain', 'Valdemar', 'Wulfric', 'Xavier', 'Yolande', 'Zacharie', 'Aliénor', 'Berenger', 'Cunegonde', 'Drogon',
-  'Ermengarde', 'Fulbert', 'Garin', 'Hadrien', 'Isambard', 'Jocelyn', 'Kenric', 'Landry', 'Mélusine', 'Nivelon',
-  'Osbern', 'Perceval', 'Rainier', 'Sibylle', 'Tancrède', 'Ulric', 'Vivien', 'Wilfrid', 'Yvain', 'Zénobie',
-];
-
 // ---------- Tribus de PNJ ----------
 
 export const NPC_TRIBE_NAMES: { name: string; tag: string }[] = [

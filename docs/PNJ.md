@@ -1,6 +1,6 @@
 # Joueurs PNJ
 
-Les PNJ sont de vrais comptes joueurs (`players.is_npc`) sans mot de passe valide, pilotés par le serveur. Leur pseudo se termine par « (PNJ) » : on les reconnaît partout (carte, classement, rapports, profil). Ils utilisent exactement les mêmes fonctions que les joueurs (`enqueueBuild`, `enqueueRecruit`, `sendCommand`), donc les mêmes règles, la même protection débutant et les mêmes alertes d'attaque.
+Les PNJ sont de vrais comptes joueurs (`players.is_npc`) sans mot de passe valide, pilotés par le serveur. Leur pseudo est tiré d'une longue liste de prénoms dans l'esprit du Seigneur des Anneaux et de La Roue du Temps (`npc-names.ts`), sans mention « PNJ » : ils se fondent parmi les joueurs. Un nom déjà pris reçoit un surnom (« Aragorn le Sage »), et les premiers PNJ nommés « … (PNJ) » sont renommés au démarrage. Ils utilisent exactement les mêmes fonctions que les joueurs (`enqueueBuild`, `enqueueRecruit`, `sendCommand`), donc les mêmes règles, la même protection débutant et les mêmes alertes d'attaque.
 
 ## Réglages (variables d'environnement)
 
@@ -42,3 +42,9 @@ Le code est dans `npc-tribes.ts` (défense, alertes, opérations) et `npc.ts`, l
 - **Le type règle seulement l'évolution** (Bâtisseur : économie et défense ; Pillard : fer et armée ; Conquérant : hôtel de ville et caserne en priorité). Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef et les conquérants lancent les attaques), avec les mêmes plafonds.
 - **Conquêtes** : tous les PNJ recrutent 4 nobles à partir du niveau 10 (12 pour un Bâtisseur) et prennent des villages de barbares, de PNJ rivaux ou de joueurs, y compris le dernier village d'un joueur. Pour garder une difficulté modérée : au plus une tentative par joueur et par jour, et jamais d'arrivée pendant les heures calmes.
 - **Arrivées** : un nouveau PNJ solitaire apparaît toutes les 8 heures (3 par jour), jusqu'à `NPC_MAX`.
+
+### Train de nobles, PNJ forts et ratio de points
+
+- **Train de nobles** : un PNJ qui a au moins 4 nobles en stock (6 au plus) lance un assaut qui nettoie la défense, puis ses nobles un par un, à une seconde d'écart, juste derrière. Une seule tentative par jour sur un même joueur ; le train est annulé si le dernier noble arriverait pendant les heures calmes.
+- **PNJ forts** : un PNJ dont l'armée offensive est au complet pour son niveau attend 2 h de jeu (au lieu de 6) entre deux attaques et peut frapper un même joueur plusieurs fois par jour (6 attaques par jour au plus, 4 sur un même joueur).
+- **Ratio de points** : sans provocation, un PNJ ne s'en prend qu'à un joueur dont les points valent de 70 % à 150 % des siens. La riposte contre un joueur qui l'a attaqué (lui, sa tribu ou une alliée) ignore ce ratio.
