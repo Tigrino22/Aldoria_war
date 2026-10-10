@@ -135,7 +135,7 @@ describe('PNJ agressifs', () => {
     const first = await tx((c) => ensureDailyNpc(c, at(9), { perDay: 3, max: 10 }));
     expect(first).not.toBeNull();
     const created = (await pool.query('SELECT username, npc_profile, tribe_id FROM players WHERE id = $1', [first])).rows[0];
-    expect(created.username).toMatch(/\(PNJ\)$/);
+    expect(created.username).not.toMatch(/PNJ/);
     expect(created.tribe_id).toBeNull();
     // Plafond atteint, ou arrivées désactivées : personne.
     const count = (await pool.query('SELECT count(*)::int AS n FROM players WHERE is_npc')).rows[0].n as number;
