@@ -8,6 +8,7 @@ Les PNJ sont de vrais comptes joueurs (`players.is_npc`) sans mot de passe valid
 |---|---|---|
 | `NPC_COUNT` | 40 | Nombre de PNJ. Le serveur en crée jusqu'à ce nombre au démarrage, sans jamais en supprimer. `0` désactive les PNJ. |
 | `NPC_TRIBES` / `NPC_TRIBE_SIZE` | 4 / 5 | Nombre de tribus de PNJ et de membres par tribu (en plus des `NPC_COUNT` solitaires). `NPC_TRIBES=0` les désactive. |
+| `NPC_DAILY` / `NPC_MAX` | 3 / 200 | Nouveaux PNJ solitaires par jour (un toutes les 8 heures réelles) et nombre maximal de PNJ en tout. `NPC_DAILY=0` coupe les arrivées. |
 | `NPC_DIFFICULTY` | 1 | Modérée. 0,5 = facile, 1,5 = difficile (monte plus vite, armées plus grosses). |
 | `NPC_TIMEZONE` | Europe/Paris | Fuseau des heures calmes. |
 | `NPC_QUIET_START` / `NPC_QUIET_END` | 22 / 8 | Heures calmes : les PNJ ne visent aucun joueur (ni attaque ni espionnage), et rien ne doit arriver chez un joueur pendant ces heures. Ils continuent à construire et à recruter, et peuvent piller les barbares. |
@@ -34,3 +35,10 @@ Ce sont de vraies tribus (`tribes.is_npc`) : elles apparaissent au classement et
 - Les heures calmes (22 h à 8 h) valent aussi pour les tribus : aucune attaque ni espionnage ne doit arriver chez un joueur pendant ces heures.
 
 Le code est dans `npc-tribes.ts` (défense, alertes, opérations) et `npc.ts`, les règles pures dans `npc-rules.ts`, les tests dans `server/test/npc-tribes.test.ts`.
+
+## Agressivité, conquêtes et arrivées
+
+- **Représailles** : un PNJ (ou un membre de sa tribu ou d'une tribu alliée) attaqué par un joueur lui en veut pendant 3 jours. Il est réveillé aussitôt, riposte sans attendre le délai habituel entre deux attaques, tous types confondus (même un Bâtisseur), et peut frapper jusqu'à 4 fois par jour, 3 sur le même joueur. La riposte respecte les heures calmes de 22 h à 8 h.
+- **Selon le type** : le Bâtisseur ne s'en prend jamais à un joueur qui ne l'a pas attaqué. Le Pillard et le Conquérant le font (dans une tribu, le chef et les conquérants), avec les plafonds habituels.
+- **Conquêtes** : le Conquérant (20 % des PNJ solitaires, un par tribu) recrute 4 nobles à partir du niveau 10 et prend des villages de barbares, de PNJ rivaux ou de joueurs. Pour les joueurs : jamais leur dernier village, au plus une tentative par joueur et par jour, jamais une arrivée pendant les heures calmes.
+- **Arrivées** : un nouveau PNJ solitaire apparaît toutes les 8 heures (3 par jour), jusqu'à `NPC_MAX`.

@@ -16,8 +16,8 @@ import {
 
 export type NpcProfile = 'builder' | 'raider' | 'conqueror';
 export const NPC_PROFILES: NpcProfile[] = ['builder', 'raider', 'conqueror'];
-/** Les PNJ solitaires ; le conquérant est réservé aux tribus. */
-export const SOLO_PROFILES: NpcProfile[] = ['builder', 'raider'];
+/** Profils tirés au sort pour un PNJ solitaire : 2 bâtisseurs, 2 pillards et 1 conquérant sur 5 en moyenne. */
+export const SOLO_PROFILES: NpcProfile[] = ['builder', 'builder', 'raider', 'raider', 'conqueror'];
 
 export const PROFILE_LABEL: Record<NpcProfile, string> = {
   builder: 'Bâtisseur',
@@ -70,7 +70,7 @@ export function chooseBuilding(profile: NpcProfile, levels: Buildings, cap: numb
 }
 
 /** Nobles envoyés avec chaque assaut d'un conquérant. */
-export const NOBLES_PER_CONQUEST = 3;
+export const NOBLES_PER_CONQUEST = 4;
 
 /** Armée visée par le PNJ au niveau `cap` (les unités dont il n'a pas encore les bâtiments sont ignorées au recrutement). */
 export function armyTarget(profile: NpcProfile, cap: number, difficulty: number): UnitCounts {
@@ -86,7 +86,7 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
     t.ram = scale(1);
     t.spearman = scale(2);
     t.scout = 4;
-    // Trois nobles suffisent à faire tomber la loyauté d'un village (20 à 35 points chacun).
+    // Quatre nobles font tomber la loyauté d'un village dans trois cas sur quatre (20 à 35 points chacun).
     t.noble = cap >= 10 ? NOBLES_PER_CONQUEST : 0;
   } else {
     t.swordsman = scale(6);

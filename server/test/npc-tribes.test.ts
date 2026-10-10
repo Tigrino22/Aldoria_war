@@ -128,7 +128,8 @@ describe('tribus de PNJ', () => {
     await pool.query('UPDATE villages SET loyalty = loyalty WHERE id = $1', [target.id]);
     await pool.query("UPDATE players SET protection_until = NULL");
 
-    // Le chef attaque un joueur et ouvre l'opération.
+    // Le chef attaque un joueur et ouvre l'opération (tirage fixé : il choisit le joueur plutôt qu'un village rival).
+    setNpcRandom(() => 0.1);
     const day = new Date(NOON.getTime() + 60_000);
     await tx((c) => npcThink(c, new Outbox(), leader, day));
     const hits = async () => (await pool.query("SELECT player_id FROM commands WHERE type = 'attack' AND target_village_id = $1", [target.id])).rows.map((r) => r.player_id as number);

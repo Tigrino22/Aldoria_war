@@ -51,7 +51,7 @@ export async function saveTribeState(c: Db, tribe: TribeInfo) {
 export const opWindowMs = () => Math.max(60_000, (15 * 60_000) / Math.sqrt(env.worldSpeed));
 
 /** Une attaque qui n'est pas un simple espionnage. */
-const REAL_ATTACK = `(coalesce((cm.units->>'spearman')::int, 0) + coalesce((cm.units->>'swordsman')::int, 0) + coalesce((cm.units->>'cavalry')::int, 0)
+export const REAL_ATTACK = `(coalesce((cm.units->>'spearman')::int, 0) + coalesce((cm.units->>'swordsman')::int, 0) + coalesce((cm.units->>'cavalry')::int, 0)
   + coalesce((cm.units->>'ram')::int, 0) + coalesce((cm.units->>'noble')::int, 0)) > 0`;
 
 /** Rayon (en cases) dans lequel un PNJ envoie du renfort à une tribu amie. */
@@ -124,5 +124,44 @@ export async function alertTribes(now: Date) {
       ]);
     }
     await pool.query('UPDATE tribes SET npc_state = $2::jsonb WHERE id = $1', [t.id, JSON.stringify({ ...state, alerted: mine })]);
+  }
+}
+
+/** Joueurs qui ont attaqué ce PNJ, sa tribu ou une tribu alliée au cours des 3 derniers jours : le PNJ leur en veut. */
+export async function grudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, now: Date): Promise<number[]> {
+  const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];
+  const { rows } = await c.query(
+    `SELECT DISTINCT cm.player_id FROM commands cm
+     JOIN villages t ON t.id = cm.target_village_id
+     JOIN players a ON a.id = cm.player_id
+     WHERE cm.type = 'attack' AND NOT a.is_npc AND cm.sent_at > $1 AND ${REAL_ATTACK}
+       AND (t.owner_id = $2 OR t.owner_id IN (SELECT id FROM players WHERE tribe_id = ANY($3::int[])))`,
+    [new Date(now.getTime() - 3 * 86_400_000), npcId, friends],
+  );
+  return rows.map((r) => r.player_id as number);
+}
+
+/**
+ * Réveille aussitôt un PNJ solitaire dont un village vient d'être attaqué par un joueur, pour qu'il puisse riposter
+ * sans attendre sa prochaine réflexion. Chaque attaque n'est signalée qu'une fois.
+ */
+export async function alertAttackedNpcs(now: Date) {
+  const { rows } = await pool.query(
+    `SELECT cm.id, o.id AS owner_id, o.npc_state FROM commands cm
+     JOIN villages v ON v.id = cm.target_village_id
+     JOIN players o ON o.id = v.owner_id AND o.is_npc AND o.tribe_id IS NULL
+     JOIN players a ON a.id = cm.player_id AND NOT a.is_npc
+     WHERE cm.type = 'attack' AND NOT cm.processed AND cm.arrive_at > $1 AND ${REAL_ATTACK}`,
+    [now],
+  );
+  for (const r of rows) {
+    const alerted: number[] = r.npc_state?.alerted ?? [];
+    if (alerted.includes(r.id)) continue;
+    const next = { ...(r.npc_state ?? {}), alerted: [...alerted, r.id].slice(-20) };
+    await pool.query('UPDATE players SET npc_state = $2::jsonb, npc_next_action_at = LEAST(npc_next_action_at, $3) WHERE id = $1', [
+      r.owner_id,
+      JSON.stringify(next),
+      now,
+    ]);
   }
 }
