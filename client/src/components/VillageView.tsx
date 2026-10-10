@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BUILDINGS,
   BUILDING_KEYS,
@@ -103,6 +103,10 @@ export default function VillageView() {
   const [route, go] = useRoute();
   // #/village/hotel (menu) ouvre directement la fenêtre de l'hôtel de ville.
   const [selected, setSelected] = useState<BuildingKey | null>(route[1] === 'hotel' ? 'townhall' : null);
+  // Le lien du menu change seulement l'ancre quand on est déjà sur le village : on suit l'ancre.
+  useEffect(() => {
+    if (route[1] === 'hotel') setSelected('townhall');
+  }, [route[1]]);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
   if (!v) return <p className="muted">Chargement du village…</p>;
