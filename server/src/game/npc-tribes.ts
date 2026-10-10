@@ -128,9 +128,9 @@ export async function alertTribes(now: Date) {
 }
 
 /** Durée (en jours réels) pendant laquelle un PNJ en veut à un joueur qui l'a attaqué. */
-export const GRUDGE_DAYS = 7;
+export const GRUDGE_DAYS = 3;
 
-/** Joueurs qui ont attaqué ce PNJ, sa tribu ou une tribu alliée au cours des 7 derniers jours : le PNJ leur en veut. */
+/** Joueurs qui ont attaqué ce PNJ, sa tribu ou une tribu alliée au cours des 3 derniers jours : le PNJ leur en veut. */
 export async function grudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, now: Date): Promise<number[]> {
   const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];
   const { rows } = await c.query(

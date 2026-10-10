@@ -116,12 +116,12 @@ describe('tribus de PNJ', () => {
       // Le chef connaît déjà le village visé.
       await c.query(
         `INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`,
-        [leader, JSON.stringify({ attacker: {}, defender: { village: { id: target.id } }, intel: { resources: {}, buildings: { wall: 0 }, troops: emptyUnits() } }), NOON],
+        [leader, JSON.stringify({ attacker: {}, defender: { village: { id: target.id } }, intel: { resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, buildings: { wall: 0 }, troops: emptyUnits() } }), NOON],
       );
       for (const m of others) {
         await c.query(
           `INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`,
-          [m, JSON.stringify({ attacker: {}, defender: { village: { id: target.id } }, intel: { resources: {}, buildings: { wall: 0 }, troops: emptyUnits() } }), NOON],
+          [m, JSON.stringify({ attacker: {}, defender: { village: { id: target.id } }, intel: { resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, buildings: { wall: 0 }, troops: emptyUnits() } }), NOON],
         );
       }
     });
@@ -176,7 +176,7 @@ describe('tribus de PNJ', () => {
       await setTroops(c, va.id, va.id, { ...emptyUnits(), swordsman: 200, cavalry: 100, scout: 5 });
       await c.query(
         `INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`,
-        [a, JSON.stringify({ attacker: {}, defender: { village: { id: vb.id } }, intel: { resources: {}, buildings: { wall: 0 }, troops: emptyUnits() } }), NIGHT],
+        [a, JSON.stringify({ attacker: {}, defender: { village: { id: vb.id } }, intel: { resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, buildings: { wall: 0 }, troops: emptyUnits() } }), NIGHT],
       );
     });
     setNpcRandom(() => 0.1);

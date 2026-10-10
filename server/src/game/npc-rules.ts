@@ -3,6 +3,7 @@ import {
   BUILDING_KEYS,
   type BuildingKey,
   type Buildings,
+  type Resources,
   type UnitCounts,
   UNIT_KEYS,
   UNITS,
@@ -194,4 +195,37 @@ export function pointRatioOk(npcPoints: number, targetPoints: number): boolean {
   if (npcPoints <= 0) return false;
   const ratio = targetPoints / npcPoints;
   return ratio >= 0.7 && ratio <= 1.5;
+}
+
+/** Capacité de transport (en ressources) d'un groupe d'unités. */
+export function carryOf(units: UnitCounts): number {
+  return UNIT_KEYS.reduce((sum, k) => sum + units[k] * UNITS[k].carry, 0);
+}
+
+/** Butin minimal qui justifie d'envoyer des troupes piller (hors riposte et conquête). */
+export const MIN_LOOT = 200;
+
+/**
+ * Choisit les troupes d'un pillage d'après ce qu'il y a à prendre : la plus petite part de l'armée qui gagne ET peut emporter
+ * l'essentiel du stock, sinon la plus grande part qui gagne (jusqu'à toute l'armée). Renvoie aussi le butin attendu.
+ */
+export function pickRaidUnits(
+  available: UnitCounts,
+  defenders: UnitCounts,
+  wall: number,
+  stock: Resources,
+  minShare = 0,
+): { units: UnitCounts; loot: number } | null {
+  const total = stock.wood + stock.clay + stock.iron + stock.wheat;
+  let best: UnitCounts | null = null;
+  for (const share of [0.25, 0.35, 0.5, 0.7, 1].filter((x) => x >= minShare)) {
+    const units = emptyUnits();
+    for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
+    if (UNIT_KEYS.every((k) => units[k] === 0)) continue;
+    const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
+    if (r.attackPower < ATTACK_MARGIN * r.defensePower) continue;
+    best = units;
+    if (carryOf(units) >= 0.8 * total) break;
+  }
+  return best ? { units: best, loot: Math.min(carryOf(best), total) } : null;
 }
