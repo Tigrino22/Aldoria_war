@@ -201,7 +201,7 @@ textarea { width: 100%; resize: vertical; }
 @media (max-width: 520px) { .building-panel { flex-direction: column; } .building-panel > img { align-self: center; } }
 
 .queue, .list, .building-list, .movements { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.queue li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.queue li { display: grid; grid-template-columns: auto 1fr; grid-auto-flow: column; grid-auto-columns: auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .queue li:last-child, .list li:last-child, .movements li:last-child { border-bottom: 0; }
 .queue progress { width: 90px; accent-color: var(--accent); }
 .building-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 16px; }
@@ -340,3 +340,12 @@ textarea { width: 100%; resize: vertical; }
 .wiki-table .cost { flex-wrap: nowrap; gap: 8px; }
 .wiki-table td.left.small { min-width: 130px; }
 .wiki-table img { max-width: none; flex: none; vertical-align: middle; }
+
+.rank-table tr.late { color: var(--danger); }
+.sim { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel-2); }
+.sim.win { border-color: var(--ok, #4a8); }
+.sim.loss { border-color: var(--danger); }
+.templates { flex-wrap: wrap; gap: 6px; }
+.chip-btn { display: inline-flex; align-items: center; gap: 2px; }
+.inline-res { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; white-space: nowrap; }
+.inline-res.full { color: var(--warn); }

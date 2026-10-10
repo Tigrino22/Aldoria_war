@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { BUILDING_KEYS, RESOURCES, UNIT_KEYS } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
-import type { Db } from '../db';
+import { pool, type Db } from '../db';
 import { GameError, forbidden } from '../errors';
-import { recallTroops, sendCommand, sendTrade } from '../game/commands';
-import { enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
+import { pickIntel } from '../game/intel';
+import { cancelCommand, recallTroops, sendCommand, sendTrade } from '../game/commands';
+import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 const unitsSchema = z.object(Object.fromEntries(UNIT_KEYS.map((k) => [k, z.number().int().min(0).max(1_000_000).optional()])));
@@ -24,6 +25,17 @@ export default async function villageRoutes(app: FastifyInstance) {
     return act(async (c, _o, now) => {
       await ownVillage(c, id, playerId);
       return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  /** Tous les villages du joueur d'un coup, pour la vue d'ensemble. */
+  app.get('/api/overview', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act(async (c, _o, now) => {
+      const { rows } = await c.query('SELECT id FROM villages WHERE owner_id = $1 ORDER BY id', [playerId]);
+      const out = [];
+      for (const r of rows) out.push(await villageState(c, await syncVillage(c, r.id, now), playerId));
+      return out;
     });
   });
 
@@ -53,6 +65,19 @@ export default async function villageRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Le dernier renseignement du joueur sur un village cible, pour simuler une attaque. */
+  app.get('/api/villages/:id/intel', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT type, data, created_at FROM reports
+       WHERE player_id = $1 AND type IN ('scout', 'attack') AND (data->'defender'->'village'->>'id')::int = $2
+       ORDER BY created_at DESC, id DESC LIMIT 10`,
+      [playerId, id],
+    );
+    return pickIntel(rows) ?? { none: true };
+  });
+
   app.post('/api/villages/:id/build', async (req) => {
     const playerId = await requirePlayer(req);
     const { id } = idParam.parse(req.params);
@@ -72,6 +97,37 @@ export default async function villageRoutes(app: FastifyInstance) {
       await ownVillage(c, id, playerId);
       await enqueueRecruit(c, id, unit, count, now);
       return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  const queueParams = z.object({ id: z.coerce.number().int().positive(), queueId: z.coerce.number().int().positive() });
+
+  app.delete('/api/villages/:id/build/:queueId', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id, queueId } = queueParams.parse(req.params);
+    return act(async (c, _o, now) => {
+      await ownVillage(c, id, playerId);
+      await cancelBuild(c, id, queueId, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  app.delete('/api/villages/:id/recruit/:queueId', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id, queueId } = queueParams.parse(req.params);
+    return act(async (c, _o, now) => {
+      await ownVillage(c, id, playerId);
+      await cancelRecruit(c, id, queueId, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  app.delete('/api/commands/:id', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    return act(async (c, outbox, now) => {
+      await cancelCommand(c, outbox, playerId, id, now);
+      return { ok: true };
     });
   });
 

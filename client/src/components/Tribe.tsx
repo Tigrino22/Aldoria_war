@@ -3,6 +3,7 @@ import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
 import { Panel, PlayerLink } from '../ui';
+import TribeTools from './TribeTools';
 
 interface TribeInfo {
   id: number;
@@ -136,6 +137,8 @@ export default function Tribe({ id }: { id?: number }) {
           </table>
         </div>
       </Panel>
+
+      {isMember && <TribeTools />}
 
       {isLeader && (
         <Panel title="Inviter un joueur">

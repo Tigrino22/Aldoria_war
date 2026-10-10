@@ -37,6 +37,7 @@ export interface BuildQueueItem {
   building: BuildingKey;
   level: number;
   finishAt: string;
+  queuedAt: string;
 }
 
 export interface RecruitQueueItem {
@@ -46,6 +47,7 @@ export interface RecruitQueueItem {
   delivered: number;
   startAt: string;
   unitSeconds: number;
+  queuedAt: string;
 }
 
 export interface TroopGroup {
@@ -156,6 +158,24 @@ export interface TradeReportData {
   from: { id: number; name: string; x: number; y: number; playerName: string | null };
   to: { id: number; name: string; x: number; y: number; playerName: string | null };
   resources: Resources;
+}
+
+export interface QuestView {
+  key: string;
+  title: string;
+  description: string;
+  reward: Resources;
+  done: boolean;
+  claimed: boolean;
+}
+
+/** Ce que le joueur sait d'un village cible, d'après son dernier espionnage ou sa dernière attaque. */
+export interface TargetIntel {
+  /** Troupes qui étaient (ou restaient) sur place. */
+  troops: UnitCounts;
+  wall: number;
+  at: string;
+  source: 'scout' | 'attack';
 }
 
 /** Profil public d'un joueur. */
