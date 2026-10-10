@@ -259,6 +259,11 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
             <b>Dissolution :</b> depuis le Point de ralliement, le bouton « Dissoudre » renvoie des soldats stationnés dans le village à la vie civile. L'action est définitive et ne rembourse rien,
             mais le blé qu'ils consommaient est immédiatement libéré. Seules les troupes présentes au village peuvent être dissoutes (pas celles en mouvement ni en renfort chez un autre).
           </li>
+          <li>
+            <b>Assistant de pillage :</b> l'entrée « Assistant de pillage » du menu liste les villages barbares autour de votre village actif (rayon de 10, 20 ou 30 cases). Enregistrez un modèle de troupes, puis envoyez-le
+            en un clic sur un village, ou sur plusieurs villages cochés d'un coup (tant qu'il reste assez de troupes). Une pastille indique le résultat de votre dernière attaque : gris, jamais attaqué ; bleu, espionné ;
+            rouge, attaque perdue ; jaune, victoire avec pertes ; vert, victoire sans perte.
+          </li>
         </ul>
       </>
     ),

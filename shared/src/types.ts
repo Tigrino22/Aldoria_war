@@ -115,6 +115,25 @@ export interface MapVillage {
   tribeTag: string | null;
 }
 
+/** Résultat de la dernière attaque ou du dernier espionnage d'un village barbare (pastille de l'assistant de pillage). */
+export type RaidStatus = 'never' | 'scouted' | 'lost' | 'losses' | 'clean';
+
+export interface RaidTarget {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  points: number;
+  distance: number;
+  status: RaidStatus;
+  /** Date du dernier rapport (attaque ou espionnage), s'il y en a un. */
+  lastAt: string | null;
+  /** Ressources rapportées par la dernière attaque victorieuse. */
+  lastLoot: number;
+  /** Des troupes du village de départ sont déjà en route vers cette cible. */
+  underAttack: boolean;
+}
+
 export interface ReportSummary {
   id: number;
   type: string;

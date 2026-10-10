@@ -18,6 +18,7 @@ import Overview from './Overview';
 import Profile from './Profile';
 import Wiki from './Wiki';
 import Admin from './Admin';
+import Raid from './Raid';
 import { api } from '../api';
 
 // La carte embarque PixiJS : elle n'est chargée qu'à la première ouverture.
@@ -46,6 +47,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Armée',
     items: [
       { path: 'troupes', label: 'Troupes', img: NAV_IMG.troupes },
+      { path: 'pillage', label: 'Assistant de pillage', img: UNIT_IMG.cavalry },
       { path: 'carte', label: 'Carte', img: NAV_IMG.carte },
     ],
   },
@@ -193,6 +195,7 @@ export default function Layout() {
           {page === 'village' && <VillageView />}
           {page === 'caserne' && <Barracks />}
           {page === 'troupes' && <RallyPoint />}
+          {page === 'pillage' && <Raid />}
           {page === 'carte' && (
             <Suspense fallback={<p className="muted">Chargement de la carte…</p>}>
               <MapView focus={route[1]} />
