@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { UNITS, UNIT_KEYS, type RaidStatus, type RaidTarget, type UnitKey } from '@aldoria/shared';
+import { UNITS, UNIT_KEYS, normalizeUnits, resolveCombat, wallDuringCombat, type RaidStatus, type RaidTarget, type UnitKey } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, coords, fmt } from '../format';
 import { useGame, useRoute } from '../game';
@@ -105,6 +105,12 @@ export default function Raid() {
     load();
   };
 
+  // Attaque suicidaire : la défense est connue et le modèle ne la battrait pas.
+  const suicidal = (t: RaidTarget) => {
+    if (!t.intel || !used.length) return false;
+    const attackers = normalizeUnits(model);
+    return !resolveCombat({ attackers, defenders: [t.intel.troops], wallLevel: wallDuringCombat(t.intel.wall, attackers.ram) }).attackerWins;
+  };
   const picked = list.filter((t) => selected.has(t.id));
 
   return (
@@ -146,7 +152,7 @@ export default function Raid() {
               <li key={t.id} className={selected.has(t.id) ? 'sel' : ''}>
                 <input type="checkbox" aria-label={`Sélectionner ${t.name}`} checked={selected.has(t.id)} disabled={t.underAttack} onChange={() => toggle(t.id)} />
                 <div className="raid-who">
-                  <b><i className={`dot ${STATUS[t.status].cls}`} title={STATUS[t.status].label} /> <a href="#/carte" onClick={(e) => { e.preventDefault(); go(`carte/${t.x},${t.y}`); }}>{t.name}</a> <span className="chip">{coords(t)}</span></b>
+                  <b><i className={`dot ${STATUS[t.status].cls}`} title={STATUS[t.status].label} /> <a href="#/carte" onClick={(e) => { e.preventDefault(); go(`carte/${t.x},${t.y}`); }}>{t.name}</a> <span className="chip">{coords(t)}</span>{suicidal(t) && <span className="raid-danger" title="D'après votre dernier renseignement, ce modèle perdrait">Attaque suicidaire</span>}</b>
                   <span className="muted small">
                     {t.distance.toLocaleString('fr-FR')} cases · {fmt(t.points)} pts · {t.lastAt ? `${STATUS[t.status].label}, ${clockTime(t.lastAt)}${t.lastLoot ? ` · ${fmt(t.lastLoot)} pillés` : ''}` : 'Jamais attaqué'}
                   </span>

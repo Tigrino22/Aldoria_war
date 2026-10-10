@@ -24,3 +24,4 @@
 .raid-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 12px; padding: 12px 16px; background: var(--wood); color: var(--wood-ink); border-radius: 12px; }
 .raid-foot .warn { color: #f0c36a; }
 .btn.gold { background: var(--gold); border-color: var(--gold); color: #fff; }
+.raid-danger { margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--danger); }

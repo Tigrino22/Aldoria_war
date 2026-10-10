@@ -4,6 +4,7 @@ import { RESOURCES, UNIT_KEYS, type MapVillage, type RaidStatus, type RaidTarget
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { forbidden } from '../errors';
+import { pickIntel } from '../game/intel';
 
 export default async function mapRoutes(app: FastifyInstance) {
   app.get('/api/map', async (req) => {
@@ -51,15 +52,21 @@ export default async function mapRoutes(app: FastifyInstance) {
     );
     const ids = rows.map((r) => r.id as number);
     const last = new Map<number, { type: string; data: any; at: Date }>();
+    const history = new Map<number, { type: string; data: unknown; created_at: Date }[]>();
     const moving = new Set<number>();
     if (ids.length) {
       const reports = await pool.query(
-        `SELECT DISTINCT ON ((data->'defender'->'village'->>'id')::int) (data->'defender'->'village'->>'id')::int AS target, type, data, created_at
+        `SELECT (data->'defender'->'village'->>'id')::int AS target, type, data, created_at
          FROM reports WHERE player_id = $1 AND type IN ('scout', 'attack') AND (data->'defender'->'village'->>'id')::int = ANY($2::int[])
-         ORDER BY (data->'defender'->'village'->>'id')::int, created_at DESC, id DESC`,
+         ORDER BY created_at DESC, id DESC LIMIT 3000`,
         [playerId, ids],
       );
-      for (const r of reports.rows) last.set(r.target, { type: r.type, data: r.data, at: r.created_at });
+      for (const r of reports.rows) {
+        if (!last.has(r.target)) last.set(r.target, { type: r.type, data: r.data, at: r.created_at });
+        const h = history.get(r.target) ?? [];
+        if (h.length < 10) h.push(r);
+        history.set(r.target, h);
+      }
       const cmds = await pool.query("SELECT DISTINCT target_village_id FROM commands WHERE player_id = $1 AND NOT processed AND type = 'attack' AND target_village_id = ANY($2::int[])", [playerId, ids]);
       for (const r of cmds.rows) moving.add(r.target_village_id);
     }
@@ -74,7 +81,7 @@ export default async function mapRoutes(app: FastifyInstance) {
         status = !d.attackerWins ? 'lost' : lost > 0 ? 'losses' : 'clean';
         if (d.attackerWins && d.loot) loot = RESOURCES.reduce((n, k) => n + (d.loot[k] ?? 0), 0);
       }
-      return { id: r.id, name: r.name, x: r.x, y: r.y, points: r.points, distance: Math.round(r.dist * 10) / 10, status, lastAt: l ? new Date(l.at).toISOString() : null, lastLoot: loot, underAttack: moving.has(r.id) };
+      return { id: r.id, name: r.name, x: r.x, y: r.y, points: r.points, distance: Math.round(r.dist * 10) / 10, status, lastAt: l ? new Date(l.at).toISOString() : null, lastLoot: loot, intel: pickIntel(history.get(r.id) ?? []), underAttack: moving.has(r.id) };
     });
   });
 }

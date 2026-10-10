@@ -130,6 +130,8 @@ export interface RaidTarget {
   lastAt: string | null;
   /** Ressources rapportées par la dernière attaque victorieuse. */
   lastLoot: number;
+  /** Ce que le joueur sait de la défense (dernier espionnage ou dernière attaque dont l'armée a survécu). */
+  intel: TargetIntel | null;
   /** Des troupes du village de départ sont déjà en route vers cette cible. */
   underAttack: boolean;
 }

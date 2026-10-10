@@ -33,7 +33,7 @@ describe('assistant de pillage : villages barbares et pastilles', () => {
 
     const report = (type: string, target: number, wins: boolean, lost: number) =>
       pool.query('INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, $2, $3, $4, now())', [
-        playerId, type, 'x', JSON.stringify({ attackerWins: wins, attacker: { losses: losses(lost) }, defender: { village: { id: target } }, loot: wins ? { wood: 100, clay: 50, iron: 0, wheat: 0 } : null }),
+        playerId, type, 'x', JSON.stringify({ attackerWins: wins, attacker: { losses: losses(lost) }, defender: { village: { id: target }, units: { ...emptyUnits(), spearman: 50 }, losses: null }, wall: 3, loot: wins ? { wood: 100, clay: 50, iron: 0, wheat: 0 } : null }),
       ]);
     await report('scout', ids.scouted, true, 0);
     await report('attack', ids.lost, false, 30);
@@ -49,6 +49,8 @@ describe('assistant de pillage : villages barbares et pastilles', () => {
     expect(byName.Pertes.status).toBe('losses');
     expect(byName.Propre.status).toBe('clean');
     expect(byName.Propre.lastLoot).toBe(150);
+    expect(byName.Perdu.intel).toMatchObject({ wall: 3, troops: { spearman: 50 } });
+    expect(byName.Jamais.intel).toBeNull();
     expect(byName.Loin).toBeUndefined();
     expect(res.json()[0].name).toBe('Jamais');
 
