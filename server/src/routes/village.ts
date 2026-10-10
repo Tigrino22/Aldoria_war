@@ -28,6 +28,17 @@ export default async function villageRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Tous les villages du joueur d'un coup, pour la vue d'ensemble. */
+  app.get('/api/overview', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act(async (c, _o, now) => {
+      const { rows } = await c.query('SELECT id FROM villages WHERE owner_id = $1 ORDER BY id', [playerId]);
+      const out = [];
+      for (const r of rows) out.push(await villageState(c, await syncVillage(c, r.id, now), playerId));
+      return out;
+    });
+  });
+
   app.get('/api/villages/:id/public', async (req) => {
     await requirePlayer(req);
     const { id } = idParam.parse(req.params);

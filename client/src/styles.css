@@ -346,3 +346,5 @@ textarea { width: 100%; resize: vertical; }
 .sim.loss { border-color: var(--danger); }
 .templates { flex-wrap: wrap; gap: 6px; }
 .chip-btn { display: inline-flex; align-items: center; gap: 2px; }
+.inline-res { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; white-space: nowrap; }
+.inline-res.full { color: var(--warn); }

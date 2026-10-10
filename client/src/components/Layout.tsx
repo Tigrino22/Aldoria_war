@@ -11,6 +11,7 @@ import Account from './Account';
 import ResourceBar from './ResourceBar';
 import Tribe from './Tribe';
 import VillageView from './VillageView';
+import Overview from './Overview';
 import Profile from './Profile';
 import Wiki from './Wiki';
 import { api } from '../api';
@@ -69,6 +70,7 @@ export default function Layout() {
             {me.player.tribe && <b> [{me.player.tribe.tag}]</b>}
           </a>
           <span className="muted">{me.player.points.toLocaleString('fr-FR')} pts</span>
+          <a href="#/apercu" className="who-wiki">Villages</a>
           <a href="#/wiki" className="who-wiki">Wiki</a>
           <button className="link" onClick={logout}>Quitter</button>
         </div>
@@ -90,6 +92,7 @@ export default function Layout() {
         {page === 'classement' && <Ranking />}
         {page === 'marche' && <Market focus={route[1]} />}
         {page === 'compte' && <Account />}
+        {page === 'apercu' && <Overview />}
         {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
       </main>
       <nav className="nav">
