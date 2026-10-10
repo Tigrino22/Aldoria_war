@@ -7,6 +7,7 @@ import { fmt } from '../format';
 import { useGame } from '../game';
 import SendTroops from './SendTroops';
 import { PlayerLink } from '../ui';
+import './map.css';
 
 const TILE = 64;
 const COLORS = { own: 0x2f6fdc, tribe: 0x3ca34a, enemy: 0xd0453a };
@@ -16,6 +17,23 @@ function hash(x: number, y: number) {
   let h = (x * 374761393 + y * 668265263) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Préférences d'affichage de la carte, gardées dans le navigateur. */
+function readPref(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(`aldoria.map.${key}`);
+    return v === null ? fallback : v === '1';
+  } catch {
+    return fallback;
+  }
+}
+function writePref(key: string, on: boolean) {
+  try {
+    localStorage.setItem(`aldoria.map.${key}`, on ? '1' : '0');
+  } catch {
+    /* stockage indisponible : la préférence ne sera pas gardée */
+  }
 }
 
 interface PublicInfo {
@@ -31,6 +49,10 @@ export default function MapView({ focus }: { focus?: string }) {
   const [info, setInfo] = useState<PublicInfo | null>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const [jump, setJump] = useState('');
+  const [showGrid, setShowGrid] = useState(() => readPref('grid', true));
+  const [showMini, setShowMini] = useState(() => readPref('mini', true));
+  const showGridRef = useRef(showGrid);
+  showGridRef.current = showGrid;
   const pixi = useRef<{ app: Application; world: Container; layer: Container; textures: Record<string, Texture>; centerOn: (x: number, y: number) => void } | null>(null);
   const villagesRef = useRef<Map<string, MapVillage>>(new Map());
   const selectRef = useRef<(v: MapVillage | null) => void>(() => undefined);
@@ -80,6 +102,32 @@ export default function MapView({ focus }: { focus?: string }) {
       ground.rect(0, 0, size * TILE, size * TILE).stroke({ width: 6, color: 0x3b2a1a, alpha: 0.5 });
       worldC.addChild(ground);
 
+      // Quadrillage lisible : cases bien visibles, trait épais et repère x|y tous les 10 cases (affichable à la demande).
+      const strongGrid = new Container();
+      const lines = new Graphics();
+      for (let i = 0; i <= size; i++) {
+        lines.moveTo(i * TILE, 0).lineTo(i * TILE, size * TILE);
+        lines.moveTo(0, i * TILE).lineTo(size * TILE, i * TILE);
+      }
+      lines.stroke({ width: 1, color: 0xffffff, alpha: 0.2 });
+      for (let i = 0; i <= size; i += 10) {
+        lines.moveTo(i * TILE, 0).lineTo(i * TILE, size * TILE);
+        lines.moveTo(0, i * TILE).lineTo(size * TILE, i * TILE);
+      }
+      lines.stroke({ width: 3, color: 0x2b2018, alpha: 0.4 });
+      strongGrid.addChild(lines);
+      for (let gx = 0; gx < size; gx += 10) {
+        for (let gy = 0; gy < size; gy += 10) {
+          const t = new Text({ text: `${gx}|${gy}`, style: { fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: '700', fill: 0xffffff, stroke: { color: 0x2b2018, width: 3 } } });
+          t.alpha = 0.85;
+          t.position.set(gx * TILE + 6, gy * TILE + 4);
+          strongGrid.addChild(t);
+        }
+      }
+      strongGrid.visible = showGridRef.current;
+      strongGrid.label = 'strong-grid';
+      worldC.addChild(strongGrid);
+
       const deco = new Container();
       for (let x = 0; x < size; x++) {
         for (let y = 0; y < size; y++) {
@@ -92,6 +140,7 @@ export default function MapView({ focus }: { focus?: string }) {
           deco.addChild(s);
         }
       }
+      deco.label = 'deco';
       worldC.addChild(deco);
       const layer = new Container();
       worldC.addChild(layer);
@@ -224,7 +273,7 @@ export default function MapView({ focus }: { focus?: string }) {
     p.layer.removeChildren().forEach((c) => c.destroy({ children: true }));
     // Le décor ne doit pas recouvrir les villages.
     const occupied = new Set(villagesRef.current.keys());
-    const deco = p.world.children[2] as Container;
+    const deco = p.world.getChildByLabel('deco') as Container;
     deco.children.forEach((s) => (s.visible = !occupied.has(s.label)));
 
     const myTribe = me.player.tribe?.id ?? null;
@@ -267,6 +316,46 @@ export default function MapView({ focus }: { focus?: string }) {
     }
   }, [villages, villageId, selected, me.player.id, me.player.tribe]);
 
+  useEffect(() => {
+    const grid = pixi.current?.world.getChildByLabel('strong-grid');
+    if (grid) grid.visible = showGrid;
+  }, [showGrid, villages]);
+
+  const miniRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!showMini) return;
+    let raf = 0;
+    const draw = () => {
+      raf = requestAnimationFrame(draw);
+      const cv = miniRef.current;
+      const p = pixi.current;
+      if (!cv || !p) return;
+      const g = cv.getContext('2d')!;
+      const W = cv.width;
+      const k = W / world.mapSize;
+      g.fillStyle = '#5d8a3a'; g.fillRect(0, 0, W, W);
+      g.fillStyle = 'rgba(0,0,0,.12)';
+      for (let i = 0; i <= world.mapSize; i += 10) { g.fillRect(i * k, 0, 1, W); g.fillRect(0, i * k, W, 1); }
+      const myTribe = me.player.tribe?.id ?? null;
+      for (const v of villagesRef.current.values()) {
+        g.fillStyle = !v.ownerId ? '#a39886' : v.ownerId === me.player.id ? '#2f6fdc' : myTribe && v.tribeId === myTribe ? '#3ca34a' : '#d0453a';
+        const big = v.ownerId ? 3 : 2;
+        g.fillRect(v.x * k - big / 2, v.y * k - big / 2, big + 1, big + 1);
+        if (v.ownerId === me.player.id) { g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.strokeRect(v.x * k - 4, v.y * k - 4, 8, 8); }
+      }
+      const sc = p.world.scale.x * TILE;
+      const x0 = (-p.world.x / sc) * k, y0 = (-p.world.y / sc) * k;
+      const w = (p.app.screen.width / sc) * k, h = (p.app.screen.height / sc) * k;
+      g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(x0, y0, w, h);
+      g.strokeStyle = '#f2c230'; g.lineWidth = 2; g.strokeRect(x0, y0, w, h);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, [showMini, world.mapSize, me.player.id, me.player.tribe]);
+  const miniClick = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    centerOn(((e.clientX - r.left) / r.width) * world.mapSize, ((e.clientY - r.top) / r.height) * world.mapSize);
+  };
   const centerOn = (x: number, y: number) => pixi.current?.centerOn(x, y);
 
   return (
@@ -291,11 +380,25 @@ export default function MapView({ focus }: { focus?: string }) {
             Case {hover.x}|{hover.y}
           </span>
         )}
+        <button className={`btn small ${showGrid ? 'primary' : ''}`} aria-pressed={showGrid} onClick={() => (writePref('grid', !showGrid), setShowGrid(!showGrid))}>
+          Quadrillage
+        </button>
+        <button className={`btn small ${showMini ? 'primary' : ''}`} aria-pressed={showMini} onClick={() => (writePref('mini', !showMini), setShowMini(!showMini))}>
+          Mini-map
+        </button>
         <span className="legend">
           <i style={{ background: '#2f6fdc' }} /> vous <i style={{ background: '#3ca34a' }} /> tribu <i style={{ background: '#d0453a' }} /> autres <i style={{ background: '#a39886' }} /> barbares
         </span>
       </div>
-      <div className="map-canvas" ref={hostRef} />
+      <div className="map-wrap">
+        <div className="map-canvas" ref={hostRef} />
+        {showMini && (
+          <div className="minimap">
+            <canvas ref={miniRef} width={200} height={200} onPointerDown={miniClick} onPointerMove={(e) => e.buttons === 1 && miniClick(e)} />
+            <span>Carte du monde · {world.mapSize}×{world.mapSize}</span>
+          </div>
+        )}
+      </div>
       {selected && (
         <aside className="map-popup">
           <header>
