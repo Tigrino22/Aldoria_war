@@ -2,11 +2,11 @@ import type { CommandView } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime } from '../format';
 import { useGame } from '../game';
-import { Countdown, Panel, UnitList } from '../ui';
+import { CancelButton, Countdown, Panel, UnitList } from '../ui';
 
 const TYPE_LABEL = { attack: 'Attaque', support: 'Renfort', return: 'Retour', trade: 'Marchands', trade_return: 'Retour des marchands' } as const;
 
-function Movement({ c, direction }: { c: CommandView; direction: 'in' | 'out' }) {
+function Movement({ c, direction, onCancel }: { c: CommandView; direction: 'in' | 'out'; onCancel?: () => void }) {
   const other = direction === 'in' ? c.origin : c.target;
   const hostile = direction === 'in' && c.type === 'attack';
   return (
@@ -21,6 +21,7 @@ function Movement({ c, direction }: { c: CommandView; direction: 'in' | 'out' })
         <Countdown to={c.arriveAt} />
         <span className="muted small">{clockTime(c.arriveAt)}</span>
       </span>
+      {onCancel && (c.type === 'attack' || c.type === 'support') && <CancelButton movement since={c.sentAt} onCancel={onCancel} />}
     </li>
   );
 }
@@ -28,6 +29,12 @@ function Movement({ c, direction }: { c: CommandView; direction: 'in' | 'out' })
 export default function RallyPoint() {
   const { village: v, run, refreshVillage } = useGame();
   if (!v) return <p className="muted">Chargement…</p>;
+
+  const cancelMove = (id: number) =>
+    run(async () => {
+      await api(`/api/commands/${id}`, { method: 'DELETE' });
+      await refreshVillage();
+    });
 
   const recall = (stationedId: number, homeId: number) =>
     run(async () => {
@@ -52,7 +59,7 @@ export default function RallyPoint() {
 
       <Panel title="Mouvements sortants">
         {v.outgoing.length ? (
-          <ul className="movements">{v.outgoing.map((c) => <Movement key={c.id} c={c} direction="out" />)}</ul>
+          <ul className="movements">{v.outgoing.map((c) => <Movement key={c.id} c={c} direction="out" onCancel={() => cancelMove(c.id)} />)}</ul>
         ) : (
           <p className="muted">Aucune troupe en route.</p>
         )}

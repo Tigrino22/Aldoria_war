@@ -37,6 +37,7 @@ export interface BuildQueueItem {
   building: BuildingKey;
   level: number;
   finishAt: string;
+  queuedAt: string;
 }
 
 export interface RecruitQueueItem {
@@ -46,6 +47,7 @@ export interface RecruitQueueItem {
   delivered: number;
   startAt: string;
   unitSeconds: number;
+  queuedAt: string;
 }
 
 export interface TroopGroup {

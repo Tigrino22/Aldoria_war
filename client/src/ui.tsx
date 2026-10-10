@@ -1,4 +1,6 @@
 import {
+  CANCEL_GRACE_SECONDS,
+  CANCEL_REFUND_SHARE,
   RESOURCES,
   RESOURCE_NAMES,
   UNITS,
@@ -75,5 +77,23 @@ export function Panel({ title, children, actions }: { title: string; children: R
       </header>
       {children}
     </section>
+  );
+}
+
+/** Bouton d'annulation : le texte dit si le remboursement est total ou partiel. */
+export function CancelButton({ since, onCancel, movement = false }: { since: string; onCancel: () => void; movement?: boolean }) {
+  const now = useNow();
+  const elapsed = (now - Date.parse(since)) / 1000;
+  const full = elapsed <= CANCEL_GRACE_SECONDS;
+  if (movement && !full) return null;
+  const hint = movement
+    ? 'Les troupes font demi-tour'
+    : full
+      ? 'Remboursement total'
+      : `Remboursement de ${Math.round(CANCEL_REFUND_SHARE * 100)} %`;
+  return (
+    <button className="btn small ghost" title={hint} onClick={onCancel}>
+      Annuler{!movement && ` (${full ? 'remb. total' : `${Math.round(CANCEL_REFUND_SHARE * 100)} %`})`}
+    </button>
   );
 }

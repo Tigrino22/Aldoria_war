@@ -1,6 +1,8 @@
 import {
   BUILDINGS,
   BuildingKey,
+  CANCEL_GRACE_SECONDS,
+  CANCEL_REFUND_SHARE,
   Buildings,
   HIDDEN_SHARE,
   MERCHANT_CAPACITY,
@@ -182,3 +184,6 @@ export function buildingStage(level: number): 0 | 1 | 2 | 3 {
   if (level <= 13) return 2;
   return 3;
 }
+
+/** Part des ressources rendue quand on annule une file : tout pendant le délai de grâce, ensuite une partie. */
+export const refundShare = (secondsSinceQueued: number) => (secondsSinceQueued <= CANCEL_GRACE_SECONDS ? 1 : CANCEL_REFUND_SHARE);
