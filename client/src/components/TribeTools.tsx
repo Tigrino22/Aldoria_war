@@ -3,7 +3,7 @@ import { UNITS, UNIT_KEYS, type UnitKey, emptyUnits, travelTime, distance } from
 import { api } from '../api';
 import { clockTime, duration } from '../format';
 import { useGame } from '../game';
-import { Countdown, Panel } from '../ui';
+import { Countdown, Panel, PlayerLink } from '../ui';
 
 interface Threat {
   id: number;
@@ -38,7 +38,7 @@ function Threats() {
           {threats.map((t) => (
             <li key={t.id} className="movement hostile">
               <span>
-                {t.origin.ownerName ?? 'Barbares'} ({t.origin.x}|{t.origin.y}) vise {t.target.ownerName} ·{' '}
+                {t.origin.ownerName ? <PlayerLink name={t.origin.ownerName} /> : 'Barbares'} ({t.origin.x}|{t.origin.y}) vise <PlayerLink name={t.target.ownerName} /> ·{' '}
                 <a href={`#/carte/${t.target.x},${t.target.y}`}>
                   {t.target.name} ({t.target.x}|{t.target.y})
                 </a>
@@ -132,7 +132,7 @@ function Planner() {
                 .sort((a, b) => a.depart - b.depart)
                 .map(({ v, dist, travel, depart }) => (
                   <tr key={v.id} className={depart < Date.now() ? 'late' : ''}>
-                    <td>{v.ownerName}</td>
+                    <td><PlayerLink name={v.ownerName} /></td>
                     <td>{v.name} ({v.x}|{v.y})</td>
                     <td>{dist.toFixed(1)}</td>
                     <td>{duration(travel)}</td>

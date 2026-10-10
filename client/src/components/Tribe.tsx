@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
-import { Panel } from '../ui';
+import { Panel, PlayerLink } from '../ui';
 import TribeTools from './TribeTools';
 
 interface TribeInfo {
@@ -116,7 +116,7 @@ export default function Tribe({ id }: { id?: number }) {
             <tbody>
               {tribe.members.map((m) => (
                 <tr key={m.id}>
-                  <td>{m.username}{m.id === tribe.leaderId && <span className="chip">chef</span>}</td>
+                  <td><PlayerLink name={m.username} />{m.id === tribe.leaderId && <span className="chip">chef</span>}</td>
                   <td>{m.villages}</td>
                   <td>{fmt(m.points)}</td>
                   {isLeader && (
