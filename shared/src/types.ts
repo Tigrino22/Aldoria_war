@@ -189,6 +189,8 @@ export interface PlayerProfile {
   points: number;
   rank: number;
   tribe: { id: number; tag: string; name: string } | null;
+  /** « can » : le chef de tribu qui consulte peut inviter ce joueur ; « pending » : invitation déjà envoyée ; sinon « none ». */
+  invite: 'none' | 'can' | 'pending';
   villages: { id: number; name: string; x: number; y: number; points: number }[];
 }
 
