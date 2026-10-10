@@ -97,3 +97,9 @@ export function CancelButton({ since, onCancel, movement = false }: { since: str
     </button>
   );
 }
+
+/** Nom de joueur cliquable qui mène à son profil. */
+export function PlayerLink({ name }: { name: string | null | undefined }) {
+  if (!name) return null;
+  return <a href={`#/joueur/${encodeURIComponent(name)}`}>{name}</a>;
+}

@@ -159,3 +159,15 @@ export interface TradeReportData {
   to: { id: number; name: string; x: number; y: number; playerName: string | null };
   resources: Resources;
 }
+
+/** Profil public d'un joueur. */
+export interface PlayerProfile {
+  id: number;
+  username: string;
+  createdAt: string;
+  protected: boolean;
+  points: number;
+  rank: number;
+  tribe: { id: number; tag: string; name: string } | null;
+  villages: { id: number; name: string; x: number; y: number; points: number }[];
+}

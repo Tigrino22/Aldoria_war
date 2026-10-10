@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { clockTime } from '../format';
 import { useGame, useRoute } from '../game';
-import { Panel } from '../ui';
+import { Panel, PlayerLink } from '../ui';
 
 interface MessageSummary {
   id: number;
@@ -13,7 +13,7 @@ interface MessageSummary {
   to: string | null;
 }
 
-export default function Messages({ id }: { id?: number }) {
+export default function Messages({ id, to }: { id?: number; to?: string }) {
   const { run, refreshMe, toast } = useGame();
   const [, go] = useRoute();
   const [box, setBox] = useState<'in' | 'out'>('in');
@@ -24,6 +24,9 @@ export default function Messages({ id }: { id?: number }) {
   useEffect(() => {
     run(async () => setList(await api(`/api/messages?box=${box}`)));
   }, [box, run, id]);
+  useEffect(() => {
+    if (to) setCompose({ to, subject: '', body: '' });
+  }, [to]);
   useEffect(() => {
     setMsg(null);
     if (id) run(async () => { setMsg(await api(`/api/messages/${id}`)); refreshMe(); });
@@ -41,6 +44,7 @@ export default function Messages({ id }: { id?: number }) {
               toast('Message envoyé');
               setCompose(null);
               setBox('out');
+              if (to) go('messages');
             });
           }}
         >
@@ -73,7 +77,7 @@ export default function Messages({ id }: { id?: number }) {
         }
       >
         <p className="muted small">
-          De {msg.from ?? 'joueur supprimé'} à {msg.to} · {clockTime(msg.createdAt)}
+          De {msg.from ? <PlayerLink name={msg.from} /> : 'joueur supprimé'} à <PlayerLink name={msg.to} /> · {clockTime(msg.createdAt)}
         </p>
         <p className="message-body">{msg.body}</p>
       </Panel>

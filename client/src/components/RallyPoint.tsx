@@ -2,7 +2,7 @@ import type { CommandView } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime } from '../format';
 import { useGame } from '../game';
-import { CancelButton, Countdown, Panel, UnitList } from '../ui';
+import { CancelButton, Countdown, Panel, PlayerLink, UnitList } from '../ui';
 
 const TYPE_LABEL = { attack: 'Attaque', support: 'Renfort', return: 'Retour', trade: 'Marchands', trade_return: 'Retour des marchands' } as const;
 
@@ -14,7 +14,7 @@ function Movement({ c, direction, onCancel }: { c: CommandView; direction: 'in' 
       <span className="mv-type">{TYPE_LABEL[c.type]}</span>
       <span>
         {direction === 'in' ? 'de' : 'vers'} <a href={`#/carte/${other.x},${other.y}`}>{other.name} ({other.x}|{other.y})</a>
-        {other.ownerName && <span className="muted"> · {other.ownerName}</span>}
+        {other.ownerName && <span className="muted"> · <PlayerLink name={other.ownerName} /></span>}
       </span>
       <UnitList units={c.units} empty="" />
       <span className="mv-time">
@@ -71,7 +71,7 @@ export default function RallyPoint() {
             {v.supportHere.map((g) => (
               <li key={g.villageId} className="movement">
                 <span>
-                  {g.villageName} ({g.x}|{g.y}) {g.ownerName && <span className="muted">· {g.ownerName}</span>}
+                  {g.villageName} ({g.x}|{g.y}) {g.ownerName && <span className="muted">· <PlayerLink name={g.ownerName} /></span>}
                 </span>
                 <UnitList units={g.units} />
                 <button className="btn small" onClick={() => recall(v.id, g.villageId)}>Renvoyer</button>
@@ -89,7 +89,7 @@ export default function RallyPoint() {
             {v.supportAway.map((g) => (
               <li key={g.villageId} className="movement">
                 <span>
-                  {g.villageName} ({g.x}|{g.y}) {g.ownerName && <span className="muted">· {g.ownerName}</span>}
+                  {g.villageName} ({g.x}|{g.y}) {g.ownerName && <span className="muted">· <PlayerLink name={g.ownerName} /></span>}
                 </span>
                 <UnitList units={g.units} />
                 <button className="btn small" onClick={() => recall(g.villageId, v.id)}>Rappeler</button>

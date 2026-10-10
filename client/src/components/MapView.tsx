@@ -6,6 +6,7 @@ import { MAP_IMG } from '../assets';
 import { fmt } from '../format';
 import { useGame } from '../game';
 import SendTroops from './SendTroops';
+import { PlayerLink } from '../ui';
 
 const TILE = 64;
 const COLORS = { own: 0x2f6fdc, tribe: 0x3ca34a, enemy: 0xd0453a };
@@ -304,7 +305,7 @@ export default function MapView({ focus }: { focus?: string }) {
                 {selected.name}
               </h3>
               <p className="muted small">
-                ({selected.x}|{selected.y}) · {fmt(selected.points)} points · {selected.ownerName ?? 'Village barbare'}
+                ({selected.x}|{selected.y}) · {fmt(selected.points)} points · {selected.ownerName ? <PlayerLink name={selected.ownerName} /> : 'Village barbare'}
                 {info?.protected && ' · sous protection'}
               </p>
             </div>
