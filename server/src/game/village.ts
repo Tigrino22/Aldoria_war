@@ -17,6 +17,7 @@ import {
   buildingCost,
   buildingTime,
   canAfford,
+  refundShare,
   emptyUnits,
   meetsRequirements,
   merchantCount,
@@ -248,12 +249,47 @@ export async function enqueueBuild(c: Db, villageId: number, key: BuildingKey, n
   pay(v, buildingCost(key, level));
   const startAt = queue.length ? new Date(queue[queue.length - 1].finish_at) : now;
   const finishAt = new Date(startAt.getTime() + buildingTime(key, level, effective.townhall, env.worldSpeed) * 1000);
-  await c.query('INSERT INTO build_queue (village_id, building, level, finish_at) VALUES ($1, $2, $3, $4)', [
+  await c.query('INSERT INTO build_queue (village_id, building, level, finish_at, queued_at) VALUES ($1, $2, $3, $4, $5)', [
     villageId,
     key,
     level,
     finishAt,
+    now,
   ]);
+  await saveVillage(c, v);
+}
+
+/** Rend une partie du coût, sans dépasser la capacité de l'entrepôt. */
+function refund(v: VillageRow, cost: Resources, share: number) {
+  const cap = warehouseCapacity(v.buildings.warehouse);
+  for (const r of RESOURCES) v[r] = Math.max(v[r], Math.min(cap, v[r] + Math.floor(cost[r] * share)));
+}
+
+/** Annule la dernière construction de la file (les précédentes ne sont pas affectées) et rembourse. */
+export async function cancelBuild(c: Db, villageId: number, queueId: number, now: Date) {
+  const v = await syncVillage(c, villageId, now);
+  const queue = (await c.query('SELECT * FROM build_queue WHERE village_id = $1 ORDER BY finish_at, id', [villageId])).rows;
+  const item = queue.find((q) => q.id === queueId);
+  if (!item) throw new GameError('Cette construction est déjà terminée ou annulée');
+  if (queue[queue.length - 1].id !== queueId) throw new GameError('Annulez d\'abord la construction suivante dans la file');
+  const share = refundShare((now.getTime() - new Date(item.queued_at).getTime()) / 1000);
+  refund(v, buildingCost(item.building as BuildingKey, item.level), share);
+  await c.query('DELETE FROM build_queue WHERE id = $1', [queueId]);
+  await saveVillage(c, v);
+}
+
+/** Annule la dernière commande de recrutement : les soldats déjà prêts restent, le reste est remboursé. */
+export async function cancelRecruit(c: Db, villageId: number, queueId: number, now: Date) {
+  const v = await syncVillage(c, villageId, now);
+  const queue = (await c.query('SELECT * FROM recruit_queue WHERE village_id = $1 ORDER BY start_at, id', [villageId])).rows;
+  const item = queue.find((q) => q.id === queueId);
+  if (!item) throw new GameError('Ce recrutement est déjà terminé ou annulé');
+  if (queue[queue.length - 1].id !== queueId) throw new GameError("Annulez d'abord le recrutement suivant dans la file");
+  const remaining = item.count - item.delivered;
+  const share = refundShare((now.getTime() - new Date(item.queued_at).getTime()) / 1000);
+  refund(v, scaleResources(UNITS[item.unit as UnitKey].cost, remaining), share);
+  if (item.delivered > 0) await c.query('UPDATE recruit_queue SET count = delivered WHERE id = $1', [queueId]);
+  else await c.query('DELETE FROM recruit_queue WHERE id = $1', [queueId]);
   await saveVillage(c, v);
 }
 
@@ -279,12 +315,13 @@ export async function enqueueRecruit(c: Db, villageId: number, unit: UnitKey, co
   );
   const lastEnd = last.rows[0]?.end_at ? new Date(last.rows[0].end_at) : now;
   const startAt = lastEnd > now ? lastEnd : now;
-  await c.query('INSERT INTO recruit_queue (village_id, unit, count, start_at, unit_seconds) VALUES ($1, $2, $3, $4, $5)', [
+  await c.query('INSERT INTO recruit_queue (village_id, unit, count, start_at, unit_seconds, queued_at) VALUES ($1, $2, $3, $4, $5, $6)', [
     villageId,
     unit,
     count,
     startAt,
     unitSeconds,
+    now,
   ]);
   await saveVillage(c, v);
 }
@@ -348,7 +385,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     capacity: warehouseCapacity(v.buildings.warehouse),
     syncedAt: new Date(v.resources_at).toISOString(),
     buildings: v.buildings,
-    buildQueue: buildQueue.map((q) => ({ id: q.id, building: q.building, level: q.level, finishAt: new Date(q.finish_at).toISOString() })),
+    buildQueue: buildQueue.map((q) => ({ id: q.id, building: q.building, level: q.level, finishAt: new Date(q.finish_at).toISOString(), queuedAt: new Date(q.queued_at).toISOString() })),
     recruitQueue: recruitQueue.map((q) => ({
       id: q.id,
       unit: q.unit,
@@ -356,6 +393,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
       delivered: q.delivered,
       startAt: new Date(q.start_at).toISOString(),
       unitSeconds: q.unit_seconds,
+      queuedAt: new Date(q.queued_at).toISOString(),
     })),
     upkeep,
     troopsHome: await getTroops(c, v.id, v.id),

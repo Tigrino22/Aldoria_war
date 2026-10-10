@@ -4,8 +4,8 @@ import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
-import { processDueEvents, sendCommand, sendTrade, setRandom } from '../src/game/commands';
-import { createVillage, enqueueBuild, enqueueRecruit, getTroops, syncVillage } from '../src/game/village';
+import { cancelCommand, processDueEvents, sendCommand, sendTrade, setRandom } from '../src/game/commands';
+import { cancelBuild, cancelRecruit, createVillage, enqueueBuild, enqueueRecruit, getTroops, syncVillage } from '../src/game/village';
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 const HOUR = 3_600_000;
@@ -267,6 +267,77 @@ describe('jeu', () => {
     expect(v.owner_id).toBeNull();
     const after = await app.inject({ method: 'GET', url: '/api/me', headers: auth(token) });
     expect(after.statusCode).toBe(401);
+  });
+
+  it('annuler une construction rembourse tout au début, puis 80 %, et seulement la dernière de la file', async () => {
+    const owner = await makePlayer('Indécis');
+    const t0 = new Date('2030-01-01T00:00:00Z');
+    const id = await tx((c) =>
+      createVillage(c, { ownerId: owner, name: 'Hésitation', x: 230, y: 230, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 1000, clay: 1000, iron: 1000, wheat: 1000 }, at: t0 }),
+    );
+    await tx((c) => enqueueBuild(c, id, 'woodcutter', t0));
+    await tx((c) => enqueueBuild(c, id, 'claypit', t0));
+    const first = (await pool.query('SELECT id FROM build_queue WHERE village_id = $1 AND building = $2', [id, 'woodcutter'])).rows[0].id;
+    const last = (await pool.query('SELECT id FROM build_queue WHERE village_id = $1 AND building = $2', [id, 'claypit'])).rows[0].id;
+    await expect(tx((c) => cancelBuild(c, id, first, t0))).rejects.toThrow(/suivante/);
+
+    // Argilière niveau 2 : 81 de bois. Remboursement total dans les 2 premières minutes.
+    const quick = new Date(t0.getTime() + 60_000);
+    const beforeQuick = (await tx((c) => syncVillage(c, id, quick))).wood;
+    await tx((c) => cancelBuild(c, id, last, quick));
+    const afterQuick = (await pool.query('SELECT wood FROM villages WHERE id = $1', [id])).rows[0].wood;
+    expect(Math.round(afterQuick - beforeQuick)).toBe(81);
+
+    // Bûcheron niveau 2 : 63 de bois, rendus à 80 % après le délai de grâce.
+    const late = new Date(t0.getTime() + 4 * 60_000);
+    const before = (await tx((c) => syncVillage(c, id, late))).wood;
+    await tx((c) => cancelBuild(c, id, first, late));
+    const after = (await pool.query('SELECT wood FROM villages WHERE id = $1', [id])).rows[0].wood;
+    expect(Math.round(after - before)).toBe(Math.floor(63 * 0.8));
+    expect(await pool.query('SELECT 1 FROM build_queue WHERE village_id = $1', [id])).toHaveProperty('rowCount', 0);
+  });
+
+  it('annuler un recrutement garde les soldats déjà prêts et rend le reste', async () => {
+    const owner = await makePlayer('Prudent');
+    const t0 = new Date('2030-01-01T00:00:00Z');
+    const id = await tx((c) =>
+      createVillage(c, { ownerId: owner, name: 'Recul', x: 231, y: 230, buildings: { ...STARTING_BUILDINGS, barracks: 1, farm: 5 }, resources: { wood: 900, clay: 900, iron: 900, wheat: 900 }, at: t0 }),
+    );
+    await tx((c) => enqueueRecruit(c, id, 'spearman', 10, t0));
+    const queueId = (await pool.query('SELECT id FROM recruit_queue WHERE village_id = $1', [id])).rows[0].id;
+    // Après 2 soldats prêts et le délai de grâce dépassé : 8 soldats annulés, remboursés à 80 %.
+    const at = new Date(t0.getTime() + 180_000 * 2 + 130_000);
+    const before = await tx((c) => syncVillage(c, id, at));
+    await tx((c) => cancelRecruit(c, id, queueId, at));
+    const after = (await pool.query('SELECT iron FROM villages WHERE id = $1', [id])).rows[0].iron;
+    expect(Math.round(after - before.iron)).toBe(Math.floor(10 * 8 * 0.8));
+    await tx((c) => syncVillage(c, id, new Date(at.getTime() + HOUR)));
+    expect((await tx((c) => getTroops(c, id, id))).spearman).toBe(2);
+    expect((await pool.query('SELECT 1 FROM recruit_queue WHERE village_id = $1', [id])).rowCount).toBe(0);
+  });
+
+  it('une attaque annulée à temps fait demi-tour, plus tard elle ne peut plus l’être', async () => {
+    const a = await makePlayer('Hésitant');
+    const b = await makePlayer('Épargné');
+    const t0 = new Date(Date.now() - HOUR);
+    const home = await tx((c) =>
+      createVillage(c, { ownerId: a, name: 'Départ', x: 232, y: 230, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), swordsman: 20 } }),
+    );
+    const target = await tx((c) =>
+      createVillage(c, { ownerId: b, name: 'But', x: 236, y: 230, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0 }),
+    );
+    const sent = await tx((c) => sendCommand(c, new Outbox(), a, home, { type: 'attack', targetId: target, units: { swordsman: 10 } }, t0));
+    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(10);
+    const cmdId = sent.id;
+    await expect(tx((c) => cancelCommand(c, new Outbox(), b, cmdId, new Date(t0.getTime() + 30_000)))).rejects.toThrow(/pas à vous/);
+    await tx((c) => cancelCommand(c, new Outbox(), a, cmdId, new Date(t0.getTime() + 30_000)));
+    // Retour en 30 s : les 10 épéistes sont de retour sans combat.
+    await processDueEvents(new Date(t0.getTime() + 61_000));
+    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(20);
+    expect((await pool.query("SELECT count(*)::int AS n FROM reports WHERE player_id = $1", [b])).rows[0].n).toBe(0);
+
+    const second = await tx((c) => sendCommand(c, new Outbox(), a, home, { type: 'attack', targetId: target, units: { swordsman: 5 } }, t0));
+    await expect(tx((c) => cancelCommand(c, new Outbox(), a, second.id, new Date(t0.getTime() + 200_000)))).rejects.toThrow(/secondes/);
   });
 
   it('un village barbare pillé retrouve des troupes avec le temps', async () => {
