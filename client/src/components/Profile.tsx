@@ -6,7 +6,7 @@ import { useGame } from '../game';
 import { Panel } from '../ui';
 
 export default function Profile({ name }: { name: string }) {
-  const { me, run } = useGame();
+  const { me, run, toast } = useGame();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -37,9 +37,26 @@ export default function Profile({ name }: { name: string }) {
       title={profile.username}
       actions={
         !mine && (
-          <a className="btn small primary" href={`#/messages/ecrire/${encodeURIComponent(profile.username)}`}>
-            Écrire
-          </a>
+          <div className="row">
+            {profile.invite === 'can' && (
+              <button
+                className="btn small"
+                onClick={() =>
+                  run(async () => {
+                    await api('/api/tribes/invite', { body: { username: profile.username } });
+                    toast(`Invitation envoyée à ${profile.username}`);
+                    setProfile({ ...profile, invite: 'pending' });
+                  })
+                }
+              >
+                Inviter dans ma tribu
+              </button>
+            )}
+            {profile.invite === 'pending' && <span className="chip">Invitation envoyée</span>}
+            <a className="btn small primary" href={`#/messages/ecrire/${encodeURIComponent(profile.username)}`}>
+              Écrire
+            </a>
+          </div>
         )
       }
     >

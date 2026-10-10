@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { PlayerProfile } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
@@ -7,7 +8,7 @@ import { GameError, forbidden, notFound } from '../errors';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
-async function tribeOf(c: Db, playerId: number) {
+async function tribeOf(c: Pick<Db, 'query'>, playerId: number) {
   const { rows } = await c.query('SELECT p.tribe_id, t.leader_id FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE p.id = $1', [
     playerId,
   ]);
@@ -274,11 +275,11 @@ export default async function socialRoutes(app: FastifyInstance) {
 
   // ---------- Profils ----------
   app.get('/api/players/:name', async (req) => {
-    await requirePlayer(req);
+    const viewerId = await requirePlayer(req);
     const { name } = z.object({ name: z.string().trim().min(1).max(60) }).parse(req.params);
     const p = (
       await pool.query(
-        `SELECT p.id, p.username, p.created_at, p.protection_until, t.id AS tribe_id, t.tag, t.name AS tribe_name
+        `SELECT p.id, p.username, p.is_npc, p.created_at, p.protection_until, t.id AS tribe_id, t.tag, t.name AS tribe_name
          FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE lower(p.username) = lower($1)`,
         [name],
       )
@@ -296,9 +297,19 @@ export default async function socialRoutes(app: FastifyInstance) {
         [points],
       )
     ).rows[0].rank as number;
+    // Le chef d'une tribu peut inviter un joueur sans tribu depuis son profil ; seul lui voit ce bouton.
+    let invite: PlayerProfile['invite'] = 'none';
+    if (p.id !== viewerId && !p.is_npc && !p.tribe_id) {
+      const viewer = await tribeOf(pool, viewerId);
+      if (viewer.tribeId && viewer.isLeader) {
+        const pending = (await pool.query('SELECT 1 FROM tribe_invites WHERE tribe_id = $1 AND player_id = $2', [viewer.tribeId, p.id])).rowCount;
+        invite = pending ? 'pending' : 'can';
+      }
+    }
     return {
       id: p.id,
       username: p.username,
+      invite,
       createdAt: p.created_at,
       protected: !!p.protection_until && new Date(p.protection_until) > new Date(),
       points,
