@@ -8,3 +8,4 @@
 .offer-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .offer-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
 .offer-form input { width: 100px; }
+.offer-rate { font-size: 12px; font-weight: 600; white-space: nowrap; }

@@ -24,9 +24,10 @@ export default function Market({ focus }: { focus?: string }) {
   const [, go] = useRoute();
   const now = useNow();
   const [villages, setVillages] = useState<MapVillage[]>([]);
-  const [coords, setCoords] = useState(focus?.replace(',', '|') ?? '');
+  const [coords, setCoords] = useState(focus && focus !== 'offres' ? focus.replace(',', '|') : '');
   const [amounts, setAmounts] = useState<Partial<Record<Resource, string>>>({});
-  const [tab, setTab] = useState<'send' | 'offers'>('send');
+  const tab: 'send' | 'offers' = focus === 'offres' ? 'offers' : 'send';
+  const setTab = (t: 'send' | 'offers') => go(t === 'offers' ? 'marche/offres' : 'marche');
   const [offers, setOffers] = useState<{ offers: MarketOfferView[]; mine: MarketOfferView[] } | null>(null);
   const [filter, setFilter] = useState<Resource | null>(null);
   const [form, setForm] = useState<{ give: Resource; giveAmount: string; want: Resource; wantAmount: string }>({ give: 'wood', giveAmount: '', want: 'clay', wantAmount: '' });
@@ -34,8 +35,8 @@ export default function Market({ focus }: { focus?: string }) {
   const hasMarket = (v?.buildings.market ?? 0) > 0;
   const loadOffers = useCallback(() => run(async () => setOffers(await api(`/api/villages/${villageId}/market/offers`))), [run, villageId]);
   useEffect(() => {
-    if (tab === 'offers' && villageId && hasMarket) loadOffers();
-  }, [tab, villageId, hasMarket, loadOffers]);
+    if (tab === 'offers' && villageId) loadOffers();
+  }, [tab, villageId, loadOffers]);
 
   useEffect(() => {
     run(async () => setVillages(await api<MapVillage[]>('/api/map')));
@@ -48,15 +49,6 @@ export default function Market({ focus }: { focus?: string }) {
   }, [coords, villages]);
 
   if (!v) return <p className="muted">Chargement…</p>;
-  if (v.buildings.market === 0) {
-    return (
-      <Panel title="Marché">
-        <p className="muted">Construisez d'abord un marché dans votre village (hôtel de ville niveau 3 et entrepôt niveau 2).</p>
-        <button className="btn" onClick={() => go('village')}>Retour au village</button>
-      </Panel>
-    );
-  }
-
   const res = liveResources(v, now);
   const cargo = Object.fromEntries(RESOURCES.map((r) => [r, Math.max(0, Math.floor(Number(amounts[r] || 0)))])) as Resources;
   const needed = merchantsNeeded(cargo);
@@ -97,6 +89,19 @@ export default function Market({ focus }: { focus?: string }) {
     </div>
   );
 
+  const noMarket = v.buildings.market === 0;
+  if (noMarket && tab === 'send') {
+    return (
+      <div className="stack">
+        {tabs}
+        <Panel title="Marché">
+          <p className="muted">Construisez d'abord un marché dans votre village (hôtel de ville niveau 3 et entrepôt niveau 2). Vous pouvez déjà consulter les offres en cours dans l'onglet « Offres ».</p>
+          <button className="btn" onClick={() => go('village')}>Retour au village</button>
+        </Panel>
+      </div>
+    );
+  }
+
   if (tab === 'offers') {
     const shown = (offers?.offers ?? []).filter((o) => !filter || o.give.resource === filter);
     const giveAmount = Math.floor(Number(form.giveAmount) || 0);
@@ -132,11 +137,14 @@ export default function Market({ focus }: { focus?: string }) {
         await refreshVillage();
         await loadOffers();
       });
+    // Taux affiché sur la même ligne : combien l'acheteur doit rendre pour 1 unité reçue.
+    const ratio = (o: MarketOfferView) => (o.want.amount / o.give.amount).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
     const Deal = ({ o }: { o: MarketOfferView }) => (
       <span className="offer-deal">
         <span className="inline-res"><ResIcon r={o.give.resource} size={22} /><b>{fmt(o.give.amount)}</b></span>
         <span className="arrow" aria-label="contre">⇄</span>
         <span className="inline-res"><ResIcon r={o.want.resource} size={22} /><b>{fmt(o.want.amount)}</b></span>
+        <span className="chip offer-rate" title="Ressource demandée pour 1 ressource reçue">1 : {ratio(o)}</span>
       </span>
     );
     const left = (iso: string) => duration(Math.max(0, (Date.parse(iso) - now) / 1000));
@@ -172,7 +180,7 @@ export default function Market({ focus }: { focus?: string }) {
                       <span className="muted small">{o.villageName} · {o.distance} cases · expire dans {left(o.expiresAt)}</span>
                     </span>
                     <Deal o={o} />
-                    <button className="btn primary small" disabled={!can} title={can ? undefined : "Vous n'avez pas assez de ressources"} onClick={() => accept(o)}>
+                    <button className="btn primary small" disabled={!can || noMarket} title={noMarket ? "Construisez d'abord un marché" : can ? undefined : "Vous n'avez pas assez de ressources"} onClick={() => accept(o)}>
                       Accepter
                     </button>
                   </li>
@@ -202,7 +210,7 @@ export default function Market({ focus }: { focus?: string }) {
                 <input type="number" min={0} inputMode="numeric" value={form.wantAmount} onChange={(e) => setForm({ ...form, wantAmount: e.target.value })} />
               </span>
             </label>
-            <button className="btn primary" disabled={!!formError} onClick={publish}>
+            <button className="btn primary" disabled={!!formError || noMarket} title={noMarket ? "Construisez d'abord un marché" : undefined} onClick={publish}>
               Publier l'offre
             </button>
           </div>

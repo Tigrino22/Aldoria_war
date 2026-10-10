@@ -37,6 +37,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'village/hotel', label: 'Hôtel de ville', img: buildingImg('townhall', 15) },
       { path: 'caserne', label: 'Caserne', img: NAV_IMG.caserne },
       { path: 'marche', label: 'Marché', img: buildingImg('market', 15) },
+      { path: 'marche/offres', label: 'Offres du marché', img: buildingImg('market', 15) },
       { path: 'apercu', label: 'Mes villages', img: MAP_IMG.village3 },
     ],
   },
