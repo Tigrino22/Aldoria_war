@@ -5,8 +5,8 @@ import { act } from '../act';
 import { requirePlayer } from '../auth';
 import type { Db } from '../db';
 import { GameError, forbidden } from '../errors';
-import { recallTroops, sendCommand, sendTrade } from '../game/commands';
-import { enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
+import { cancelCommand, recallTroops, sendCommand, sendTrade } from '../game/commands';
+import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 const unitsSchema = z.object(Object.fromEntries(UNIT_KEYS.map((k) => [k, z.number().int().min(0).max(1_000_000).optional()])));
@@ -24,6 +24,17 @@ export default async function villageRoutes(app: FastifyInstance) {
     return act(async (c, _o, now) => {
       await ownVillage(c, id, playerId);
       return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  /** Tous les villages du joueur d'un coup, pour la vue d'ensemble. */
+  app.get('/api/overview', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act(async (c, _o, now) => {
+      const { rows } = await c.query('SELECT id FROM villages WHERE owner_id = $1 ORDER BY id', [playerId]);
+      const out = [];
+      for (const r of rows) out.push(await villageState(c, await syncVillage(c, r.id, now), playerId));
+      return out;
     });
   });
 
@@ -72,6 +83,37 @@ export default async function villageRoutes(app: FastifyInstance) {
       await ownVillage(c, id, playerId);
       await enqueueRecruit(c, id, unit, count, now);
       return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  const queueParams = z.object({ id: z.coerce.number().int().positive(), queueId: z.coerce.number().int().positive() });
+
+  app.delete('/api/villages/:id/build/:queueId', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id, queueId } = queueParams.parse(req.params);
+    return act(async (c, _o, now) => {
+      await ownVillage(c, id, playerId);
+      await cancelBuild(c, id, queueId, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  app.delete('/api/villages/:id/recruit/:queueId', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id, queueId } = queueParams.parse(req.params);
+    return act(async (c, _o, now) => {
+      await ownVillage(c, id, playerId);
+      await cancelRecruit(c, id, queueId, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  app.delete('/api/commands/:id', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    return act(async (c, outbox, now) => {
+      await cancelCommand(c, outbox, playerId, id, now);
+      return { ok: true };
     });
   });
 

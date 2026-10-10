@@ -14,7 +14,7 @@ import {
 import { api } from '../api';
 import { duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
-import { Cost, Countdown, liveResources, Panel, UnitIcon } from '../ui';
+import { CancelButton, Cost, Countdown, liveResources, Panel, UnitIcon } from '../ui';
 
 export default function Barracks() {
   const { village: v, world, setVillage, run } = useGame();
@@ -127,7 +127,7 @@ export default function Barracks() {
           <p className="muted">Aucun recrutement en cours.</p>
         ) : (
           <ul className="queue">
-            {v.recruitQueue.map((q) => {
+            {v.recruitQueue.map((q, i) => {
               const end = Date.parse(q.startAt) + q.count * q.unitSeconds * 1000;
               const done = Math.min(q.count, Math.max(0, Math.floor((now - Date.parse(q.startAt)) / 1000 / q.unitSeconds)));
               return (
@@ -138,6 +138,12 @@ export default function Barracks() {
                   </span>
                   <progress max={q.count} value={done} />
                   <Countdown to={end} />
+                  {i === v.recruitQueue.length - 1 && (
+                    <CancelButton
+                      since={q.queuedAt}
+                      onCancel={() => run(async () => setVillage(await api(`/api/villages/${v.id}/recruit/${q.id}`, { method: 'DELETE' })))}
+                    />
+                  )}
                 </li>
               );
             })}

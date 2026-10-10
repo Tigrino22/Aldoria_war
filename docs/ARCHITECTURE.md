@@ -57,3 +57,10 @@ vêtements reçoivent des plis et un matelassage en relief (bruit 3D), maillés 
 
 Les migrations SQL sont dans `server/migrations/`, appliquées dans l'ordre par `npm run db:migrate` (et au démarrage du serveur).
 Pour une évolution du schéma, ajoutez un fichier `002_….sql` ; ne modifiez jamais une migration déjà appliquée.
+
+## Barbares qui repoussent
+
+Un village sans propriétaire se reconstruit à chaque synchronisation (`regrowBarbarian` dans `village.ts`, règles pures dans
+`game/barbarians.ts`) : sa garnison regagne 4 % de sa cible par heure de jeu et un niveau de bâtiment arrive toutes les 25 heures
+de jeu en moyenne. Le plafond dépend de la distance au centre et monte d'un niveau tous les 10 jours de jeu, jusqu'au niveau 20.
+Les villages pillés redeviennent donc des cibles, et les barbares restent à la hauteur du monde.

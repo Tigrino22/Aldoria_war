@@ -1,5 +1,6 @@
 import {
   AttackReportData,
+  CANCEL_GRACE_SECONDS,
   CommandType,
   LOYALTY_AFTER_CONQUEST,
   NOBLE_LOYALTY_MAX,
@@ -156,6 +157,34 @@ export async function recallTroops(c: Db, outbox: Outbox, playerId: number, stat
   });
   outbox.push(home.owner_id, { type: 'village', villageId: homeId });
   outbox.push(stationed.owner_id, { type: 'village', villageId: stationedId });
+}
+
+/**
+ * Annule une attaque ou un renfort juste après son envoi : les troupes font demi-tour et mettent,
+ * pour rentrer, le temps déjà parcouru. Impossible passé le délai de grâce.
+ */
+export async function cancelCommand(c: Db, outbox: Outbox, playerId: number, commandId: number, now: Date) {
+  const { rows } = await c.query('SELECT * FROM commands WHERE id = $1 FOR UPDATE', [commandId]);
+  const cmd = rows[0];
+  if (!cmd || cmd.processed) throw new GameError('Ce mouvement est déjà arrivé ou annulé');
+  if (cmd.type !== 'attack' && cmd.type !== 'support') throw new GameError('Ce mouvement ne peut pas être annulé');
+  if (cmd.player_id !== playerId) throw forbidden("Ce mouvement n'est pas à vous");
+  const elapsed = (now.getTime() - new Date(cmd.sent_at).getTime()) / 1000;
+  if (elapsed > CANCEL_GRACE_SECONDS) throw new GameError(`On ne peut annuler un mouvement que dans les ${CANCEL_GRACE_SECONDS} premières secondes`);
+  await c.query('UPDATE commands SET processed = true WHERE id = $1', [commandId]);
+  await insertCommand(c, {
+    type: 'return',
+    originId: cmd.target_village_id,
+    targetId: cmd.home_village_id,
+    homeId: cmd.home_village_id,
+    playerId,
+    units: normalizeUnits(cmd.units),
+    sentAt: now,
+    arriveAt: new Date(now.getTime() + Math.max(1, Math.round(elapsed)) * 1000),
+  });
+  outbox.push(playerId, { type: 'village', villageId: cmd.home_village_id });
+  const target = await loadVillage(c, cmd.target_village_id);
+  if (target.owner_id && target.owner_id !== playerId) outbox.push(target.owner_id, { type: 'village', villageId: target.id });
 }
 
 /** Envoie un convoi de marchands chargé de ressources vers un village de joueur. */
