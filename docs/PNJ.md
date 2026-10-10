@@ -19,7 +19,7 @@ Les PNJ sont de vrais comptes joueurs (`players.is_npc`) sans mot de passe valid
 - **Construire** : deux profils, Bâtisseur (économie, muraille) et Pillard (fer, caserne). Le niveau visé suit l'âge du monde : niveau 2 au départ, +1 tous les 2 jours de jeu (×difficulté), plafonné à 20.
 - **Recruter** : armée visée proportionnelle à ce niveau, dans la limite du blé produit.
 - **Attaquer** : le PNJ espionne d'abord sa cible (le joueur voit passer les éclaireurs), puis envoie la plus petite armée qui dépasse 1,3 fois la défense estimée. Rayon de 20 cases. Les Bâtisseurs ne visent que les barbares ; les Pillards visent aussi les joueurs.
-- **Plafonds** : aucune limite journalière d'attaques sur les joueurs : seuls comptent le ratio de points (70 à 150 %, sauf riposte) et les heures calmes. Délais : 6 heures de jeu entre deux attaques armées d'un même PNJ, 4 heures de jeu entre deux espionnages. Les joueurs sous protection débutant ne sont jamais visés.
+- **Plafonds** : aucune limite journalière d'attaques sur les joueurs : seuls comptent le ratio de points (70 à 150 %, sauf riposte) et les heures calmes. Aucun délai fixe entre deux attaques : un PNJ calcule le butin. Il espionne la cible (4 heures de jeu au plus entre deux espionnages) et ne pille que s'il y a de quoi remplir ses sacs (au moins 200 ressources) ; il envoie la plus petite part de l'armée qui gagne et emporte l'essentiel du stock, et toute l'armée si nécessaire. Après un pillage, le rapport d'espionnage est périmé : il faut espionner de nouveau. Les joueurs sous protection débutant ne sont jamais visés.
 - Un PNJ qui perd tous ses villages repart ailleurs sur la carte après 2 heures de jeu.
 
 Le code est dans `server/src/game/npc.ts` (base de données) et `npc-rules.ts` (règles pures, testées dans `server/test/npc.test.ts`).
@@ -38,7 +38,7 @@ Le code est dans `npc-tribes.ts` (défense, alertes, opérations) et `npc.ts`, l
 
 ## Agressivité, conquêtes et arrivées
 
-- **Représailles** : un PNJ (ou un membre de sa tribu ou d'une tribu alliée) attaqué par un joueur lui en veut pendant 7 jours. Il frappe fort (au moins 70 % de son armée offensive), enchaîne jusqu'à trois attaques par réflexion sur des villages différents de l'agresseur, et repense quatre fois plus vite tant qu'il lui en veut. Toute sa tribu et ses alliées font de même. Il est réveillé aussitôt, riposte sans attendre le délai habituel entre deux attaques, tous types confondus (même un Bâtisseur) et peut frapper le même joueur autant de fois que nécessaire. La riposte respecte les heures calmes de 22 h à 8 h.
+- **Représailles** : un PNJ (ou un membre de sa tribu ou d'une tribu alliée) attaqué par un joueur lui en veut pendant 3 jours. Il frappe fort (au moins 70 % de son armée offensive), enchaîne jusqu'à trois attaques par réflexion sur des villages différents de l'agresseur, et repense quatre fois plus vite tant qu'il lui en veut. Toute sa tribu et ses alliées font de même. Il est réveillé aussitôt, riposte sans calcul de butin, tous types confondus (même un Bâtisseur) et peut frapper le même joueur autant de fois que nécessaire. La riposte respecte les heures calmes de 22 h à 8 h.
 - **Le type règle seulement l'évolution** (Bâtisseur : économie et défense ; Pillard : fer et armée ; Conquérant : hôtel de ville et caserne en priorité). Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef et les conquérants lancent les attaques).
 - **Conquêtes** : tous les PNJ recrutent 4 nobles à partir du niveau 10 (12 pour un Bâtisseur) et prennent des villages de barbares, de PNJ rivaux ou de joueurs, y compris le dernier village d'un joueur. Aucune limite de tentatives par jour ; jamais d'arrivée pendant les heures calmes.
 - **Arrivées** : un nouveau PNJ solitaire apparaît toutes les 8 heures (3 par jour), jusqu'à `NPC_MAX`.
@@ -46,7 +46,7 @@ Le code est dans `npc-tribes.ts` (défense, alertes, opérations) et `npc.ts`, l
 ### Train de nobles, PNJ forts et ratio de points
 
 - **Train de nobles** : un PNJ qui a au moins 4 nobles en stock (6 au plus) lance un assaut qui nettoie la défense, puis ses nobles un par un, à une seconde d'écart, juste derrière. Le train est annulé si le dernier noble arriverait pendant les heures calmes.
-- **PNJ forts** : un PNJ dont l'armée offensive est au complet pour son niveau attend 2 h de jeu (au lieu de 6) entre deux attaques et peut frapper un même joueur autant de fois qu'il veut.
+- **Force de frappe** : plus de notion de « PNJ fort » ni de délai : seule compte la taille de l'armée disponible face au butin.
 - **Ratio de points** : sans provocation, un PNJ ne s'en prend qu'à un joueur dont les points valent de 70 % à 150 % des siens. La riposte contre un joueur qui l'a attaqué (lui, sa tribu ou une alliée) ignore ce ratio.
 
 ### Tous les PNJ ont une tribu

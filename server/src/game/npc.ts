@@ -26,7 +26,9 @@ import {
   isQuiet,
   nextRecruit,
   npcCap,
+  pickRaidUnits,
   pickWinningUnits,
+  MIN_LOOT,
   tribeMemberProfiles,
   tribeRelations,
   type NpcProfile,
@@ -47,10 +49,6 @@ const RAID_RADIUS = 20;
 /** Nombre maximal de nobles dans un train. */
 const MAX_TRAIN = 6;
 const DAY_MS = 86_400_000;
-/** Délai minimal (en heures de jeu) entre deux attaques armées d'un même PNJ, pour qu'il ne vide pas les barbares à lui seul. */
-const RAID_COOLDOWN_GAME_HOURS = 6;
-/** Délai (en heures de jeu) d'un PNJ fort entre deux attaques. */
-const STRONG_COOLDOWN_GAME_HOURS = 2;
 /** Délai minimal (en heures de jeu) entre deux missions d'espionnage d'un même PNJ. */
 const SCOUT_COOLDOWN_GAME_HOURS = 4;
 
@@ -244,7 +242,16 @@ async function freshScoutIntel(c: Db, npcId: number, villageId: number, now: Dat
   // Un renseignement reste valable une heure réelle (moins quand le monde va vite).
   const maxAge = (60 * 60_000) / Math.min(env.worldSpeed, 6);
   if (now.getTime() - new Date(row.created_at).getTime() > maxAge) return null;
-  return { troops: normalizeUnits(data.intel.troops), wall: data.intel.buildings.wall ?? 0 };
+  // Si le PNJ a frappé ce village depuis le rapport, les ressources indiquées ne valent plus rien : il faut espionner de nouveau.
+  const raided = (
+    await c.query(
+      `SELECT 1 FROM commands WHERE player_id = $1 AND target_village_id = $2 AND type = 'attack' AND sent_at >= $3
+       AND coalesce((units->>'swordsman')::int, 0) + coalesce((units->>'cavalry')::int, 0) > 0 LIMIT 1`,
+      [npcId, villageId, row.created_at],
+    )
+  ).rows;
+  if (raided.length) return null;
+  return { troops: normalizeUnits(data.intel.troops), wall: data.intel.buildings.wall ?? 0, resources: data.intel.resources };
 }
 
 interface Candidate {
@@ -287,22 +294,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const home = await getTroops(c, villageId, villageId);
   const attackers: UnitCounts = { ...emptyUnits(), swordsman: home.swordsman, cavalry: home.cavalry, ram: home.ram };
   if (attackers.swordsman + attackers.cavalry < 5) return;
-  const last = (
-    await c.query(
-      `SELECT max(sent_at) AS at FROM commands
-       WHERE player_id = $1 AND type = 'attack' AND coalesce((units->>'swordsman')::int, 0) + coalesce((units->>'cavalry')::int, 0) > 0`,
-      [npcId],
-    )
-  ).rows[0].at;
   const grudges = await grudgesOf(c, npcId, tribe, now);
-  // Un PNJ « fort » (armée offensive au complet pour son niveau) enchaîne les attaques : délai plus court, plafonds plus hauts.
-  const wanted = armyTarget(profile, cap, env.npcDifficulty);
-  const strong = attackers.swordsman + attackers.cavalry >= Math.max(20, wanted.swordsman + wanted.cavalry);
-  const cooldownHours = strong ? STRONG_COOLDOWN_GAME_HOURS : RAID_COOLDOWN_GAME_HOURS;
-  const onCooldown = !!last && now.getTime() - new Date(last).getTime() < (cooldownHours * 3_600_000) / env.worldSpeed;
-  // La riposte ne respecte pas le délai entre deux attaques : un PNJ attaqué se venge sans attendre.
-  if (onCooldown && grudges.length === 0) return;
-
   const quiet = isQuietAt(now);
   const arrivalOf = (units: UnitCounts, to: { x: number; y: number }) => new Date(now.getTime() + travelTime(units, village, to, env.worldSpeed) * 1000);
   /**
@@ -351,10 +343,10 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   // Sans provocation, un PNJ ne s'attaque qu'à un joueur de sa taille : entre 70 % et 150 % de ses points.
   const myPoints = (await c.query('SELECT coalesce(sum(points), 0)::int AS p FROM villages WHERE owner_id = $1', [npcId])).rows[0].p as number;
   const sameSize = humans.filter((t) => pointRatioOk(myPoints, t.ownerPoints));
-  const aggressive = !quiet && isLeader && opCooldownOk && !onCooldown ? sameSize : [];
+  const aggressive = !quiet && isLeader && opCooldownOk ? sameSize : [];
   const players = [...new Set([...revenge, ...aggressive])];
   // Les PNJ en guerre préfèrent frapper les villages rivaux plutôt que les barbares.
-  const prey = onCooldown ? [] : rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
+  const prey = rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
   const revengePool = players.filter((t) => revenge.includes(t));
   const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < 0.4) ? players : prey;
   if (pool.length === 0) return;
@@ -377,12 +369,15 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units: scouts }, now);
       return;
     }
+    // Les troupes dépendent du butin : assez pour gagner et emporter l'essentiel du stock, toute l'armée s'il le faut.
     // Pour se venger, un PNJ frappe fort : au moins 70 % de son armée offensive.
     const avenging = hostileToPlayer && grudges.includes(target.ownerId!);
-    const picked = pickWinningUnits(attackers, intel.troops, intel.wall, avenging ? 0.7 : 0);
-    if (!picked) return;
-    const units = picked;
+    const raid = pickRaidUnits(attackers, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
+    if (!raid) return;
+    const units = raid.units;
     const nobles = trainSize();
+    // Hors riposte et conquête, un pillage ne vaut le déplacement que s'il y a de quoi remplir les sacs.
+    if (!avenging && nobles === 0 && raid.loot < MIN_LOOT) return;
     // Tous les envois arrivent à la suite : l'assaut d'abord, puis un noble par seconde.
     const single = { ...emptyUnits(), noble: 1 };
     const naturals = [arrivalOf(units, target), ...(nobles ? [arrivalOf(single, target)] : [])];

@@ -30,7 +30,7 @@ async function villageOf(owner: number, x: number, y: number, units: Partial<Uni
 async function scouted(npc: number, target: number, at: Date) {
   await pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`, [
     npc,
-    JSON.stringify({ attacker: {}, defender: { village: { id: target } }, intel: { resources: {}, buildings: { wall: 0 }, troops: emptyUnits() } }),
+    JSON.stringify({ attacker: {}, defender: { village: { id: target } }, intel: { resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, buildings: { wall: 0 }, troops: emptyUnits() } }),
     at,
   ]);
 }
@@ -161,7 +161,7 @@ describe('PNJ agressifs', () => {
   it('aucune limite journalière : un PNJ attaqué frappe le même joueur autant de fois que nécessaire', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'raider'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
-    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 5000, scout: 3 })));
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 100000, scout: 3 })));
     const foe = await makePlayer('Adversaire');
     const base = await villageOf(foe, home.x + 2, home.y + 1, { swordsman: 20 });
     await pool.query('UPDATE players SET protection_until = NULL');
@@ -179,7 +179,7 @@ describe('PNJ agressifs', () => {
   it('un PNJ attaqué enchaîne les ripostes sur plusieurs villages de l’agresseur dès sa première réflexion', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'builder'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
-    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 5000, scout: 3 })));
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 20000, scout: 3 })));
     const foe = await makePlayer('Rancunier');
     const a = await villageOf(foe, home.x + 2, home.y + 1, { swordsman: 20 });
     const b = await villageOf(foe, home.x + 4, home.y + 1);
@@ -192,6 +192,34 @@ describe('PNJ agressifs', () => {
     expect(angry).toBe(true);
     const hit = (await pool.query("SELECT DISTINCT target_village_id FROM commands WHERE player_id = $1 AND type = 'attack'", [npc])).rows;
     expect(hit.length).toBe(3);
+  });
+
+  it('sans provocation, un PNJ ne pille que si le butin vaut le déplacement, et reprend des renseignements après avoir frappé', async () => {
+    const { pickRaidUnits, MIN_LOOT } = await import('../src/game/npc-rules');
+    const army = troops({ swordsman: 100 });
+    const empty = { wood: 0, clay: 0, iron: 0, wheat: 0 };
+    expect(pickRaidUnits(army, emptyUnits(), 0, empty)!.loot).toBeLessThan(MIN_LOOT);
+    // Beaucoup à emporter : il engage plus de monde, jusqu'à toute l'armée.
+    const rich = pickRaidUnits(army, emptyUnits(), 0, { wood: 4000, clay: 4000, iron: 4000, wheat: 4000 })!;
+    expect(rich.units.swordsman).toBe(100);
+    const modest = pickRaidUnits(army, emptyUnits(), 0, { wood: 100, clay: 100, iron: 100, wheat: 100 })!;
+    expect(modest.units.swordsman).toBeLessThan(100);
+
+    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
+    const other = await makePlayer('Voisin');
+    const v = await villageOf(other, home.x + 2, home.y + 2);
+    await pool.query('UPDATE players SET protection_until = NULL');
+    const t = new Date(NOON.getTime() + 75 * HOUR);
+    // Village vide de ressources : aucun pillage, même avec un renseignement frais.
+    await pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`, [
+      npc,
+      JSON.stringify({ attacker: {}, defender: { village: { id: v } }, intel: { resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, buildings: { wall: 0 }, troops: emptyUnits() } }),
+      t,
+    ]);
+    await tx((c) => npcThink(c, new Outbox(), npc, t));
+    expect(await attacksOn(npc, v)).toHaveLength(0);
   });
 
   it('trois nouveaux PNJ par jour, un toutes les 8 heures, jusqu’au plafond', async () => {
