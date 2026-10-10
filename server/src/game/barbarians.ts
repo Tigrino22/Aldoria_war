@@ -1,4 +1,4 @@
-import { BUILDING_KEYS, type Buildings, type UnitCounts, emptyUnits } from '@aldoria/shared';
+import { BUILDING_KEYS, type Buildings, type UnitCounts } from '@aldoria/shared';
 
 /** Niveau de développement d'un village barbare : plus il est loin du centre, plus il est fort. */
 export function barbarianTier(x: number, y: number, mapSize: number): number {
@@ -11,13 +11,6 @@ export function barbarianCap(tier: number, worldDays: number): number {
   return Math.min(20, tier + Math.floor(Math.max(0, worldDays) / 10));
 }
 
-/** Garnison qu'un village barbare retrouve peu à peu quand il a été pillé. */
-export function barbarianTroopTarget(cap: number): UnitCounts {
-  return { ...emptyUnits(), spearman: cap * 8, swordsman: cap * 3 };
-}
-
-/** Part de la garnison cible regagnée par heure de jeu. */
-export const BARBARIAN_TROOP_REGEN_PER_HOUR = 0.04;
 /** Niveaux de bâtiment gagnés par heure de jeu, tous bâtiments confondus. */
 export const BARBARIAN_BUILD_PER_HOUR = 0.04;
 
@@ -28,8 +21,8 @@ function stochasticRound(value: number, rng: () => number): number {
 }
 
 /**
- * Fait repousser un village barbare sur `gameHours` heures de jeu : la garnison revient vers sa cible
- * et quelques bâtiments montent, sans dépasser le plafond du village. Pur : le hasard est injecté.
+ * Fait repousser un village barbare sur `gameHours` heures de jeu : quelques bâtiments montent, sans dépasser le plafond du village.
+ * Il ne produit aucune unité. Pur : le hasard est injecté.
  */
 export function growBarbarian(
   state: { buildings: Buildings; troops: UnitCounts },
@@ -41,17 +34,6 @@ export function growBarbarian(
   const troops = { ...state.troops };
   let changed = false;
   if (gameHours <= 0) return { buildings, troops, changed };
-
-  const target = barbarianTroopTarget(cap);
-  for (const unit of ['spearman', 'swordsman'] as const) {
-    const deficit = target[unit] - troops[unit];
-    if (deficit <= 0) continue;
-    const gain = Math.min(deficit, stochasticRound(gameHours * Math.max(0.5, target[unit] * BARBARIAN_TROOP_REGEN_PER_HOUR), rng));
-    if (gain > 0) {
-      troops[unit] += gain;
-      changed = true;
-    }
-  }
 
   // Le marché n'existe pas chez les barbares ; la caserne et la muraille suivent le même plafond que le reste.
   const growable = BUILDING_KEYS.filter((k) => k !== 'market');

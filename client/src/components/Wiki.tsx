@@ -340,7 +340,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           recrutent pas et ne vous attaquent jamais : ce sont des cibles idéales pour piller, ou pour une première conquête.
         </p>
         <p>
-          Les villages barbares pillés se reconstruisent : leur garnison se reforme peu à peu et ils gagnent des niveaux avec le temps. Les plus lointains sont aussi les mieux défendus.
+          Les villages barbares ne recrutent pas : une garnison vaincue ne revient pas, mais leurs bâtiments gagnent des niveaux avec le temps. Les plus lointains sont aussi les mieux défendus.
         </p>
         <p>Touchez un village sur la carte pour voir son propriétaire, ses points et lui envoyer des troupes ou des marchands. Le pseudo d'un joueur ouvre son profil et la liste de ses villages.</p>
       </>
