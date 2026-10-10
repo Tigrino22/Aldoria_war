@@ -14,7 +14,7 @@ interface MessageSummary {
 }
 
 export default function Messages({ id, to }: { id?: number; to?: string }) {
-  const { run, refreshMe, toast } = useGame();
+  const { me, run, refreshMe, toast } = useGame();
   const [, go] = useRoute();
   const [box, setBox] = useState<'in' | 'out'>('in');
   const [list, setList] = useState<MessageSummary[]>([]);
@@ -70,9 +70,13 @@ export default function Messages({ id, to }: { id?: number; to?: string }) {
         actions={
           <div className="row">
             <button className="btn small ghost" onClick={() => go('messages')}>Retour</button>
-            {msg.from && (
-              <button className="btn small" onClick={() => setCompose({ to: msg.from, subject: `Re: ${msg.subject}`, body: '' })}>Répondre</button>
-            )}
+            {/* On répond toujours à l'interlocuteur : si le message vient de moi, c'est son destinataire. */}
+            {(() => {
+              const other = msg.from === me.player.username ? msg.to : msg.from;
+              return other ? (
+                <button className="btn small" onClick={() => setCompose({ to: other, subject: `Re: ${msg.subject.replace(/^Re: /, '')}`, body: '' })}>Répondre</button>
+              ) : null;
+            })()}
           </div>
         }
       >
