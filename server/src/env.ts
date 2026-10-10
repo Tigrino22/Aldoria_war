@@ -21,6 +21,10 @@ export const env = {
   // PNJ : nombre de joueurs PNJ (0 pour les désactiver), difficulté (1 = modérée, 0,5 = facile, 1,5 = difficile),
   // et heures calmes pendant lesquelles ils n'attaquent pas les joueurs.
   npcCount: count('NPC_COUNT', 40),
+  npcTribes: count('NPC_TRIBES', 4),
+  npcTribeSize: count('NPC_TRIBE_SIZE', 5),
+  npcDaily: count('NPC_DAILY', 3),
+  npcMax: count('NPC_MAX', 200),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',
   npcQuietStart: count('NPC_QUIET_START', 22),

@@ -200,6 +200,7 @@ export default async function socialRoutes(app: FastifyInstance) {
       tag: t.tag,
       description: t.description,
       leaderId: t.leader_id,
+      isNpc: t.is_npc,
       members,
       invites,
       points: members.reduce((s, m) => s + m.points, 0),
@@ -223,8 +224,9 @@ export default async function socialRoutes(app: FastifyInstance) {
     return act(async (c, outbox) => {
       const { tribeId, isLeader } = await tribeOf(c, playerId);
       if (!tribeId || !isLeader) throw forbidden('Seul le chef de tribu peut inviter');
-      const { rows } = await c.query('SELECT id, tribe_id FROM players WHERE lower(username) = lower($1)', [username]);
+      const { rows } = await c.query('SELECT id, tribe_id, is_npc FROM players WHERE lower(username) = lower($1)', [username]);
       if (!rows[0]) throw new GameError('Ce joueur n’existe pas');
+      if (rows[0].is_npc) throw new GameError('Les PNJ ne rejoignent pas les tribus des joueurs');
       if (rows[0].tribe_id === tribeId) throw new GameError('Ce joueur est déjà dans la tribu');
       await c.query('INSERT INTO tribe_invites (tribe_id, player_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [tribeId, rows[0].id]);
       outbox.push(rows[0].id, { type: 'me' });

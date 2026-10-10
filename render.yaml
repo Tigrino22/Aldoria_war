@@ -21,6 +21,10 @@ services:
         value: "250"
       - key: NPC_COUNT
         value: "40"
+      - key: NPC_TRIBES
+        value: "4"
+      - key: NPC_TRIBE_SIZE
+        value: "5"
 
 databases:
   - name: aldoria-db
