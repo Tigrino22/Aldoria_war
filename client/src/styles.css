@@ -341,6 +341,7 @@ textarea { width: 100%; resize: vertical; }
 .wiki-table td.left.small { min-width: 130px; }
 .wiki-table img { max-width: none; flex: none; vertical-align: middle; }
 
+.rank-table tr.late { color: var(--danger); }
 .sim { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel-2); }
 .sim.win { border-color: var(--ok, #4a8); }
 .sim.loss { border-color: var(--danger); }
