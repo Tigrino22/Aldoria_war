@@ -340,3 +340,11 @@ textarea { width: 100%; resize: vertical; }
 .wiki-table .cost { flex-wrap: nowrap; gap: 8px; }
 .wiki-table td.left.small { min-width: 130px; }
 .wiki-table img { max-width: none; flex: none; vertical-align: middle; }
+
+.sim { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--panel-2); }
+.sim.win { border-color: var(--ok, #4a8); }
+.sim.loss { border-color: var(--danger); }
+.templates { flex-wrap: wrap; gap: 6px; }
+.chip-btn { display: inline-flex; align-items: center; gap: 2px; }
+.inline-res { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; white-space: nowrap; }
+.inline-res.full { color: var(--warn); }

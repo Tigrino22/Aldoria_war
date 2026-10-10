@@ -169,6 +169,15 @@ export interface QuestView {
   claimed: boolean;
 }
 
+/** Ce que le joueur sait d'un village cible, d'après son dernier espionnage ou sa dernière attaque. */
+export interface TargetIntel {
+  /** Troupes qui étaient (ou restaient) sur place. */
+  troops: UnitCounts;
+  wall: number;
+  at: string;
+  source: 'scout' | 'attack';
+}
+
 /** Profil public d'un joueur. */
 export interface PlayerProfile {
   id: number;
