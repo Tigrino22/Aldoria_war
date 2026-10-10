@@ -117,9 +117,9 @@ export function nextRecruit(
 /** Marge de sécurité demandée avant d'attaquer : la force d'attaque doit dépasser 1,3 fois la défense estimée. */
 export const ATTACK_MARGIN = 1.3;
 
-/** Plus petite part de l'armée disponible qui bat la défense estimée avec la marge voulue, ou null si même toute l'armée ne suffit pas. */
-export function pickWinningUnits(available: UnitCounts, defenders: UnitCounts, wall: number): UnitCounts | null {
-  for (const share of [0.25, 0.35, 0.5, 0.7, 1]) {
+/** Plus petite part de l'armée disponible (au moins `minShare`) qui bat la défense estimée avec la marge voulue, ou null si même toute l'armée ne suffit pas. */
+export function pickWinningUnits(available: UnitCounts, defenders: UnitCounts, wall: number, minShare = 0): UnitCounts | null {
+  for (const share of [0.25, 0.35, 0.5, 0.7, 1].filter((x) => x >= minShare)) {
     const units = emptyUnits();
     for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
     if (UNIT_KEYS.every((k) => units[k] === 0)) continue;

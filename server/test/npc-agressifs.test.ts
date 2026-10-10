@@ -95,7 +95,7 @@ describe('PNJ agressifs', () => {
     expect((await attacksOn(npc, farm)).filter((u) => (u.swordsman ?? 0) > 0)).toHaveLength(1);
   });
 
-  it('tout PNJ avec des nobles tente de conquérir un joueur, même son dernier village, une fois par jour au plus', async () => {
+  it('tout PNJ avec des nobles tente de conquérir un joueur, même son dernier village', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'builder'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     const army = { swordsman: 120, ram: 5, noble: 6 };
@@ -127,8 +127,6 @@ describe('PNJ agressifs', () => {
     expect(arrivals[0].units.swordsman).toBeGreaterThan(0);
     const gaps = arrivals.slice(1, 5).map((r, i) => new Date(r.arrive_at).getTime() - new Date(arrivals[i].arrive_at).getTime());
     expect(gaps.every((g) => g === 1000)).toBe(true);
-    // Au plus une tentative par jour sur un même joueur : 6 tours espacés de 7 h font au plus 2 trains.
-    expect(nobles.length).toBeLessThanOrEqual(2 * 6);
   });
 
   it('un PNJ n’attaque sans provocation qu’un joueur de 70 % à 150 % de ses points, sauf s’il a été attaqué', async () => {
@@ -163,7 +161,7 @@ describe('PNJ agressifs', () => {
   it('aucune limite journalière : un PNJ attaqué frappe le même joueur autant de fois que nécessaire', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'raider'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
-    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 400, scout: 3 })));
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 5000, scout: 3 })));
     const foe = await makePlayer('Adversaire');
     const base = await villageOf(foe, home.x + 2, home.y + 1, { swordsman: 20 });
     await pool.query('UPDATE players SET protection_until = NULL');
@@ -176,6 +174,24 @@ describe('PNJ agressifs', () => {
       await pool.query("UPDATE commands SET processed = true WHERE player_id = $1", [npc]);
     }
     expect((await attacksOn(npc, base)).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('un PNJ attaqué enchaîne les ripostes sur plusieurs villages de l’agresseur dès sa première réflexion', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 5000, scout: 3 })));
+    const foe = await makePlayer('Rancunier');
+    const a = await villageOf(foe, home.x + 2, home.y + 1, { swordsman: 20 });
+    const b = await villageOf(foe, home.x + 4, home.y + 1);
+    const c2 = await villageOf(foe, home.x + 6, home.y + 1);
+    await pool.query('UPDATE players SET protection_until = NULL');
+    const t = new Date(NOON.getTime() + 75 * HOUR);
+    for (const v of [a, b, c2]) await scouted(npc, v, t);
+    await tx((c) => sendCommand(c, new Outbox(), foe, a, { type: 'attack', targetId: home.id, units: { swordsman: 20 } }, t));
+    const angry = await tx((c) => npcThink(c, new Outbox(), npc, new Date(t.getTime() + 1000)));
+    expect(angry).toBe(true);
+    const hit = (await pool.query("SELECT DISTINCT target_village_id FROM commands WHERE player_id = $1 AND type = 'attack'", [npc])).rows;
+    expect(hit.length).toBe(3);
   });
 
   it('trois nouveaux PNJ par jour, un toutes les 8 heures, jusqu’au plafond', async () => {

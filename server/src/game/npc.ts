@@ -377,7 +377,9 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units: scouts }, now);
       return;
     }
-    const picked = pickWinningUnits(attackers, intel.troops, intel.wall);
+    // Pour se venger, un PNJ frappe fort : au moins 70 % de son armée offensive.
+    const avenging = hostileToPlayer && grudges.includes(target.ownerId!);
+    const picked = pickWinningUnits(attackers, intel.troops, intel.wall, avenging ? 0.7 : 0);
     if (!picked) return;
     const units = picked;
     const nobles = trainSize();
@@ -444,9 +446,10 @@ async function economyStep(c: Db, npcId: number, profile: NpcProfile, villageId:
 }
 
 /** Une séance de réflexion : respawn si besoin, construction, recrutement, puis éventuellement une attaque. */
-export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date) {
+/** Fait réfléchir un PNJ. Renvoie vrai s'il en veut à un joueur (il repensera alors plus vite). */
+export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date): Promise<boolean> {
   const npc = (await c.query('SELECT id, username, npc_profile, npc_state FROM players WHERE id = $1 AND is_npc FOR UPDATE', [npcId])).rows[0];
-  if (!npc) return;
+  if (!npc) return false;
   const profile = (NPC_PROFILES.includes(npc.npc_profile) ? npc.npc_profile : 'builder') as NpcProfile;
   const villages = (await c.query('SELECT id FROM villages WHERE owner_id = $1 ORDER BY id', [npcId])).rows;
 
@@ -458,18 +461,28 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date) 
       await spawnNpcVillage(c, npcId, npc.username, now);
       await c.query("UPDATE players SET npc_state = '{}'::jsonb WHERE id = $1", [npcId]);
     }
-    return;
+    return false;
   }
 
   const cap = npcCap(await worldDays(c, now), env.npcDifficulty);
   const tribe = await npcTribeOf(c, npcId);
+  let angry = false;
   for (const v of villages.slice(0, 3)) {
     await economyStep(c, npcId, profile, v.id, cap, now);
     if (tribe) await defendStep(c, outbox, npcId, v.id, tribe, now);
-    await attackStep(c, outbox, npcId, profile, v.id, cap, tribe, now);
+    // Un PNJ en colère enchaîne jusqu'à trois attaques par réflexion, sur des villages différents de l'agresseur.
+    const angryHere = (await grudgesOf(c, npcId, tribe, now)).length > 0;
+    angry ||= angryHere;
+    for (let k = 0; k < (angryHere ? 3 : 1); k++) {
+      const before = (await c.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'attack'", [npcId])).rows[0].n as number;
+      await attackStep(c, outbox, npcId, profile, v.id, cap, tribe, now);
+      const after = (await c.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'attack'", [npcId])).rows[0].n as number;
+      if (after === before) break;
+    }
   }
   // Les rapports d'un PNJ ne servent qu'à ses décisions récentes.
   await c.query("DELETE FROM reports WHERE player_id = $1 AND created_at < $2", [npcId, new Date(now.getTime() - 2 * DAY_MS)]);
+  return angry;
 }
 
 /** Fait réfléchir tous les PNJ dont l'heure est venue. À appeler sous le verrou du jeu. */
@@ -482,13 +495,14 @@ export async function processNpcs(now: Date, limit = 25): Promise<number> {
   ).rows;
   for (const { id } of due) {
     const outbox = new Outbox();
+    let angry = false;
     try {
-      await tx((c) => npcThink(c, outbox, id, now));
+      angry = await tx((c) => npcThink(c, outbox, id, now));
       outbox.flush();
     } catch (err) {
       console.error(`PNJ ${id} : réflexion échouée`, err);
     }
-    await pool.query('UPDATE players SET npc_next_action_at = $2 WHERE id = $1', [id, new Date(now.getTime() + delayMs())]);
+    await pool.query('UPDATE players SET npc_next_action_at = $2 WHERE id = $1', [id, new Date(now.getTime() + (angry ? Math.max(30_000, delayMs() / 4) : delayMs()))]);
   }
   return due.length;
 }
