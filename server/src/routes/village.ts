@@ -6,7 +6,7 @@ import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
 import { GameError, forbidden } from '../errors';
 import { pickIntel } from '../game/intel';
-import { cancelCommand, recallTroops, sendCommand, sendTrade } from '../game/commands';
+import { cancelCommand, disbandTroops, recallTroops, sendCommand, sendTrade } from '../game/commands';
 import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -166,6 +166,16 @@ export default async function villageRoutes(app: FastifyInstance) {
       .parse(req.body);
     return act(async (c, outbox, now) => {
       await sendTrade(c, outbox, playerId, id, body, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  app.post('/api/villages/:id/disband', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const { unit, count } = z.object({ unit: z.enum(UNIT_KEYS), count: z.number().int().positive() }).parse(req.body);
+    return act(async (c, outbox, now) => {
+      await disbandTroops(c, outbox, playerId, id, unit, count, now);
       return villageState(c, await syncVillage(c, id, now), playerId);
     });
   });
