@@ -181,3 +181,9 @@ Valeurs dans `server/src/game/market-rules.ts`, à ajuster librement.
 | PNJ pillards | commercent une réflexion sur trois |
 
 Les ressources offertes sont retirées du village à la publication et rendues à l'annulation ou à l'expiration. À l'acceptation, deux convois de marchands partent, un dans chaque sens ; chaque côté doit avoir assez de marchands libres.
+
+## Administration
+
+Page `#/admin` (menu « Aide » > « Administration »), en lecture seule : activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), joueurs et PNJ, offres du marché, totaux et paramètres du monde.
+
+Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).

@@ -68,6 +68,7 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
     villages,
     unreadReports: counts.reports,
     unreadMessages: counts.messages,
+    isAdmin: env.adminUsernames.includes(String(p.username).toLowerCase()),
     invites: invites.map((i) => ({ id: i.id, tribeId: i.tribe_id, tribeName: i.name, tribeTag: i.tag })),
   };
 }

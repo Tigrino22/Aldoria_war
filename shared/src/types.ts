@@ -29,6 +29,8 @@ export interface MeResponse {
   villages: VillageListItem[];
   unreadReports: number;
   unreadMessages: number;
+  /** Accès à la page d'administration (variable ADMIN_USERNAMES du serveur). */
+  isAdmin: boolean;
   invites: { id: number; tribeId: number; tribeName: string; tribeTag: string }[];
 }
 

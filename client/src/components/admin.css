@@ -1,0 +1,13 @@
+.admin-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.admin-kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.admin-kpi i { display: block; font-style: normal; color: var(--muted); font-size: 12px; }
+.admin-kpi b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.admin-scroll { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th { text-align: left; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.admin-table td { padding: 8px; border-bottom: 1px solid var(--line); }
+.admin-table tr:last-child td { border-bottom: 0; }
+.admin-table .t { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.admin-table .chip { margin-left: 6px; font-size: 10px; padding: 0 7px; }
+.admin-chips { margin-block: 6px; }
+@media (max-width: 640px) { .admin-table .hide-m { display: none; } }
