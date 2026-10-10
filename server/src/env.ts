@@ -23,6 +23,8 @@ export const env = {
   npcCount: count('NPC_COUNT', 40),
   npcTribes: count('NPC_TRIBES', 4),
   npcTribeSize: count('NPC_TRIBE_SIZE', 5),
+  npcDaily: count('NPC_DAILY', 3),
+  npcMax: count('NPC_MAX', 200),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',
   npcQuietStart: count('NPC_QUIET_START', 22),

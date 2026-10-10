@@ -29,7 +29,7 @@ import {
   tribeRelations,
   type NpcProfile,
 } from './npc-rules';
-import { alertTribes, defendStep, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
+import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
 import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, syncVillage } from './village';
 
 let rng: () => number = Math.random;
@@ -45,6 +45,9 @@ const RAID_RADIUS = 20;
 /** Au plus 2 attaques par PNJ et par jour sur des joueurs, et 1 attaque par jour (tous PNJ confondus) sur un même joueur. */
 const MAX_PLAYER_RAIDS_PER_NPC_PER_DAY = 2;
 const MAX_RAIDS_PER_TARGET_PER_DAY = 1;
+/** Un PNJ qui se venge peut frapper plus souvent : 4 attaques par jour sur des joueurs, 3 sur le même. */
+const MAX_REVENGE_RAIDS_PER_NPC_PER_DAY = 4;
+const MAX_REVENGE_RAIDS_PER_TARGET_PER_DAY = 3;
 const DAY_MS = 86_400_000;
 /** Délai minimal (en heures de jeu) entre deux attaques armées d'un même PNJ, pour qu'il ne vide pas les barbares à lui seul. */
 const RAID_COOLDOWN_GAME_HOURS = 6;
@@ -121,6 +124,17 @@ export async function ensureNpcs(c: Db, now: Date) {
   await renameLegacyNpcs(c);
   const have = (await c.query('SELECT count(*)::int AS n FROM players WHERE is_npc AND tribe_id IS NULL')).rows[0].n as number;
   for (let i = have; i < env.npcCount; i++) await createNpc(c, now);
+}
+
+/** Un nouveau PNJ solitaire arrive tous les `24 h / NPC_DAILY`, sans dépasser `NPC_MAX` PNJ en tout. Renvoie son identifiant s'il y en a un. */
+export async function ensureDailyNpc(c: Db, now: Date, opts: { perDay?: number; max?: number } = {}): Promise<number | null> {
+  const perDay = opts.perDay ?? env.npcDaily;
+  const max = opts.max ?? env.npcMax;
+  if (perDay <= 0) return null;
+  const { rows } = await c.query('SELECT count(*)::int AS n, max(created_at) AS last FROM players WHERE is_npc');
+  if (rows[0].n >= max) return null;
+  if (rows[0].last && now.getTime() - new Date(rows[0].last).getTime() < DAY_MS / perDay) return null;
+  return createNpc(c, now);
 }
 
 /**
@@ -251,12 +265,28 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       [npcId],
     )
   ).rows[0].at;
-  if (last && now.getTime() - new Date(last).getTime() < (RAID_COOLDOWN_GAME_HOURS * 3_600_000) / env.worldSpeed) return;
+  const grudges = await grudgesOf(c, npcId, tribe, now);
+  const onCooldown = !!last && now.getTime() - new Date(last).getTime() < (RAID_COOLDOWN_GAME_HOURS * 3_600_000) / env.worldSpeed;
+  // La riposte ne respecte pas le délai entre deux attaques : un PNJ attaqué se venge sans attendre.
+  if (onCooldown && grudges.length === 0) return;
 
   const quiet = isQuietAt(now);
   const arrivalOf = (units: UnitCounts, to: { x: number; y: number }) => new Date(now.getTime() + travelTime(units, village, to, env.worldSpeed) * 1000);
-  const withNobles = (units: UnitCounts, hostile: boolean): UnitCounts =>
-    profile === 'conqueror' && !hostile && home.noble >= NOBLES_PER_CONQUEST ? { ...units, noble: NOBLES_PER_CONQUEST } : units;
+  /** Tout PNJ qui a des nobles les emmène, même contre le dernier village d'un joueur, mais pas plus d'une tentative par jour sur un même joueur. */
+  const withNobles = async (units: UnitCounts, owner: number | null, rival: boolean): Promise<UnitCounts> => {
+    if (home.noble < NOBLES_PER_CONQUEST) return units;
+    if (owner !== null && !rival) {
+      const recent = (
+        await c.query(
+          `SELECT 1 FROM commands cm JOIN villages t ON t.id = cm.target_village_id
+           WHERE t.owner_id = $1 AND cm.type = 'attack' AND cm.sent_at > $2 AND coalesce((cm.units->>'noble')::int, 0) > 0 LIMIT 1`,
+          [owner, new Date(now.getTime() - DAY_MS)],
+        )
+      ).rows;
+      if (recent.length) return units;
+    }
+    return { ...units, noble: NOBLES_PER_CONQUEST };
+  };
 
   // 1. Une opération de la tribu est en cours : on tente de s'y joindre.
   const op = tribe?.state.op;
@@ -286,18 +316,26 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const all = await candidates(c, npcId, village, now, tribe?.state.rivals ?? []);
   const barbarians = all.filter((t) => t.ownerId === null);
   const rivalVillages = all.filter((t) => t.rival);
-  const isLeader = !tribe || tribe.leaderId === npcId;
+  // Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef ou le conquérant) : leur type ne règle que leur évolution.
+  // Celui qui a été attaqué riposte en plus, sans attendre.
+  const isLeader = !tribe || tribe.leaderId === npcId || profile === 'conqueror';
   const opCooldownOk = !tribe || !tribe.state.lastOpAt || now.getTime() - Date.parse(tribe.state.lastOpAt) >= (12 * 3_600_000) / env.worldSpeed;
-  let players = profile !== 'builder' && !quiet && isLeader && opCooldownOk ? all.filter((t) => t.ownerId !== null && !t.rival) : [];
-  if (players.length && (await raidsOnPlayersByNpc(c, npcId, now)) >= MAX_PLAYER_RAIDS_PER_NPC_PER_DAY) players = [];
+  const humans = all.filter((t) => t.ownerId !== null && !t.rival);
+  const revenge = quiet ? [] : humans.filter((t) => grudges.includes(t.ownerId!));
+  const aggressive = !quiet && isLeader && opCooldownOk && !onCooldown ? humans : [];
+  let players = [...new Set([...revenge, ...aggressive])];
+  const playerRaids = players.length ? await raidsOnPlayersByNpc(c, npcId, now) : 0;
+  if (playerRaids >= (revenge.length ? MAX_REVENGE_RAIDS_PER_NPC_PER_DAY : MAX_PLAYER_RAIDS_PER_NPC_PER_DAY)) players = [];
   // Les PNJ en guerre préfèrent frapper les villages rivaux plutôt que les barbares.
-  const prey = rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
-  const pool = players.length && (prey.length === 0 || rng() < 0.4) ? players : prey;
+  const prey = onCooldown ? [] : rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
+  const revengePool = players.filter((t) => revenge.includes(t));
+  const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < 0.4) ? players : prey;
   if (pool.length === 0) return;
   const target = pool.map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
 
   const hostileToPlayer = target.ownerId !== null && !target.rival;
-  if (hostileToPlayer && (await raidsOnOwner(c, target.ownerId!, now)) >= MAX_RAIDS_PER_TARGET_PER_DAY) return;
+  const avenging = hostileToPlayer && grudges.includes(target.ownerId!);
+  if (hostileToPlayer && (await raidsOnOwner(c, target.ownerId!, now)) >= (avenging ? MAX_REVENGE_RAIDS_PER_TARGET_PER_DAY : MAX_RAIDS_PER_TARGET_PER_DAY)) return;
   // L'arrivée d'une attaque ou d'un espion chez un joueur ne doit jamais tomber pendant les heures calmes.
   const arrivesQuiet = (units: UnitCounts) => hostileToPlayer && isQuietAt(arrivalOf(units, target));
 
@@ -316,11 +354,11 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     }
     const picked = pickWinningUnits(attackers, intel.troops, intel.wall);
     if (!picked) return;
-    const units = withNobles(picked, hostileToPlayer);
+    const units = await withNobles(picked, target.ownerId, target.rival);
     if (arrivesQuiet(units)) return;
     await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units }, now);
     // Le chef d'une tribu qui frappe un joueur ouvre une opération : les autres membres ont une fenêtre pour le rejoindre.
-    if (tribe && hostileToPlayer) {
+    if (tribe && hostileToPlayer && !(tribe.state.op && Date.parse(tribe.state.op.landBy) > now.getTime())) {
       const landAt = arrivalOf(units, target);
       tribe.state.op = {
         targetId: target.id,
@@ -402,6 +440,8 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date) 
 /** Fait réfléchir tous les PNJ dont l'heure est venue. À appeler sous le verrou du jeu. */
 export async function processNpcs(now: Date, limit = 25): Promise<number> {
   await alertTribes(now);
+  await alertAttackedNpcs(now);
+  await tx((c) => ensureDailyNpc(c, now));
   const due = (
     await pool.query('SELECT id FROM players WHERE is_npc AND npc_next_action_at <= $1 ORDER BY npc_next_action_at LIMIT $2', [now, limit])
   ).rows;
