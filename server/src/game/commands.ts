@@ -49,7 +49,7 @@ async function playerName(c: Db, id: number | null): Promise<string | null> {
   return rows[0]?.username ?? null;
 }
 
-async function insertCommand(
+export async function insertCommand(
   c: Db,
   cmd: {
     type: CommandType;

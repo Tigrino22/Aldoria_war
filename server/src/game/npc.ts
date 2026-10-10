@@ -8,6 +8,7 @@ import {
   emptyUnits,
   normalizeUnits,
   travelTime,
+  warehouseCapacity,
 } from '@aldoria/shared';
 import { pool, tx, type Db } from '../db';
 import { env } from '../env';
@@ -34,7 +35,9 @@ import {
   type NpcProfile,
 } from './npc-rules';
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
-import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, syncVillage } from './village';
+import { acceptOffer, createOffer, expireOffers } from './market';
+import { MAX_NPC_OFFERS, NPC_TRADE_RADIUS, npcAccepts, planOffer } from './market-rules';
+import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, resourcesOf, syncVillage } from './village';
 
 let rng: () => number = Math.random;
 /** Permet aux tests de rendre les décisions des PNJ déterministes. */
@@ -440,6 +443,43 @@ async function economyStep(c: Db, npcId: number, profile: NpcProfile, villageId:
   }
 }
 
+/**
+ * Marché : un PNJ en équilibre ses ressources. Il accepte d'abord une offre proche qui lui apporte ce qui lui manque
+ * contre son excédent ; sinon il publie lui-même une offre (deux au maximum). Les pillards commercent moins souvent.
+ */
+async function marketStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, villageId: number, now: Date) {
+  const v = await syncVillage(c, villageId, now);
+  if (v.buildings.market < 1) return;
+  if (profile === 'raider' && rng() > 1 / 3) return;
+  const npc = { stock: resourcesOf(v), capacity: warehouseCapacity(v.buildings.warehouse) };
+
+  const { rows } = await c.query(
+    `SELECT o.id, o.give_resource, o.give_amount, o.want_resource, o.want_amount, (o.give_amount::float / o.want_amount) AS rate
+     FROM market_offers o JOIN villages ov ON ov.id = o.village_id
+     WHERE o.status = 'open' AND o.expires_at > $1 AND o.player_id <> $2 AND (ov.x - $3)^2 + (ov.y - $4)^2 <= $5
+     ORDER BY rate DESC, o.id LIMIT 20`,
+    [now, npcId, v.x, v.y, NPC_TRADE_RADIUS * NPC_TRADE_RADIUS],
+  );
+  for (const o of rows) {
+    const offer = { give: o.give_resource, giveAmount: o.give_amount, want: o.want_resource, wantAmount: o.want_amount };
+    if (!npcAccepts(npc, offer)) continue;
+    try {
+      await acceptOffer(c, outbox, npcId, villageId, o.id, now);
+      return;
+    } catch (err) {
+      if (!(err instanceof GameError)) throw err;
+    }
+  }
+
+  const plan = planOffer(npc, profile);
+  if (!plan) return;
+  try {
+    await createOffer(c, outbox, npcId, villageId, plan, now, MAX_NPC_OFFERS);
+  } catch (err) {
+    if (!(err instanceof GameError)) throw err;
+  }
+}
+
 /** Une séance de réflexion : respawn si besoin, construction, recrutement, puis éventuellement une attaque. */
 /** Fait réfléchir un PNJ. Renvoie vrai s'il en veut à un joueur (il repensera alors plus vite). */
 export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date): Promise<boolean> {
@@ -464,6 +504,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   let angry = false;
   for (const v of villages.slice(0, 3)) {
     await economyStep(c, npcId, profile, v.id, cap, now);
+    await marketStep(c, outbox, npcId, profile, v.id, now);
     if (tribe) await defendStep(c, outbox, npcId, v.id, tribe, now);
     // Un PNJ en colère enchaîne jusqu'à trois attaques par réflexion, sur des villages différents de l'agresseur.
     const angryHere = (await grudgesOf(c, npcId, tribe, now)).length > 0;
@@ -485,6 +526,11 @@ export async function processNpcs(now: Date, limit = 25): Promise<number> {
   await alertTribes(now);
   await alertAttackedNpcs(now);
   await tx((c) => ensureDailyNpc(c, now));
+  {
+    const outbox = new Outbox();
+    await tx((c) => expireOffers(c, outbox, now));
+    outbox.flush();
+  }
   const due = (
     await pool.query('SELECT id FROM players WHERE is_npc AND npc_next_action_at <= $1 ORDER BY npc_next_action_at LIMIT $2', [now, limit])
   ).rows;
