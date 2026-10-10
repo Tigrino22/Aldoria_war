@@ -12,6 +12,7 @@ import ResourceBar from './ResourceBar';
 import Tribe from './Tribe';
 import VillageView from './VillageView';
 import Overview from './Overview';
+import Profile from './Profile';
 import Wiki from './Wiki';
 import { api } from '../api';
 
@@ -85,7 +86,8 @@ export default function Layout() {
           </Suspense>
         )}
         {page === 'rapports' && <Reports id={route[1] ? Number(route[1]) : undefined} />}
-        {page === 'messages' && <Messages id={route[1] ? Number(route[1]) : undefined} />}
+        {page === 'messages' && <Messages id={route[1] && route[1] !== 'ecrire' ? Number(route[1]) : undefined} to={route[1] === 'ecrire' && route[2] ? decodeURIComponent(route[2]) : undefined} />}
+        {page === 'joueur' && route[1] && <Profile name={decodeURIComponent(route[1])} />}
         {page === 'tribu' && <Tribe id={route[1] ? Number(route[1]) : undefined} />}
         {page === 'classement' && <Ranking />}
         {page === 'marche' && <Market focus={route[1]} />}
