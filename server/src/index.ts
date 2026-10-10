@@ -6,9 +6,11 @@ import { assignTriblessNpcs, ensureNpcTribes, ensureNpcs, processNpcs } from './
 import { ensureWorld } from './game/world';
 import { withGameLock } from './lock';
 import { migrate } from './migrate';
+import { loadSettings } from './settings';
 
 async function main() {
   await migrate();
+  await loadSettings();
   await tx((c) => ensureWorld(c, new Date()));
   await tx((c) => ensureNpcs(c, new Date()));
   await tx((c) => ensureNpcTribes(c, new Date()));

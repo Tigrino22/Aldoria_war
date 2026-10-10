@@ -6,6 +6,8 @@ import { pool } from '../db';
 import { env } from '../env';
 import { forbidden } from '../errors';
 import { isQuiet } from '../game/npc-rules';
+import { GameError } from '../errors';
+import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
 /** Réservé aux pseudos listés dans ADMIN_USERNAMES : vérifié à chaque requête, côté serveur. */
 async function requireAdmin(req: FastifyRequest) {
@@ -188,6 +190,26 @@ export default async function adminRoutes(app: FastifyInstance) {
     ).rows[0];
 
     return { villages: n, troops, resources, buildings, activity: { hour: a.hour, day: a.day, week: a.week, signups: a.signups } };
+  });
+
+  /** Réglages du monde modifiables, avec leur valeur actuelle et leur valeur d'origine. */
+  const settingsView = () =>
+    SETTINGS.map((def) => ({ key: def.key, label: def.label, help: def.help, type: def.type, min: def.min ?? null, max: def.max ?? null, value: settingValue(def.key), default: settingDefault(def.key) }));
+
+  app.get('/api/admin/settings', async (req) => {
+    await requireAdmin(req);
+    return settingsView();
+  });
+
+  /** Enregistre un ou plusieurs réglages ; une valeur `null` rétablit la valeur d'origine. */
+  app.put('/api/admin/settings', async (req) => {
+    await requireAdmin(req);
+    const values = z.record(z.string(), z.union([z.string(), z.number(), z.null()])).parse(req.body);
+    const unknown = Object.keys(values).find((k) => !SETTINGS.some((s) => s.key === k));
+    if (unknown) throw new GameError(`Réglage inconnu : ${unknown}`);
+    const error = await saveSettings(values as Partial<Record<SettingDef['key'], unknown>>);
+    if (error) throw new GameError(error);
+    return settingsView();
   });
 
   /** Totaux du monde et paramètres actifs. */

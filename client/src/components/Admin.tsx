@@ -52,6 +52,16 @@ interface AdminStats {
   buildings: { building: BuildingKey; average: number }[];
   activity: { hour: number; day: number; week: number; signups: number };
 }
+interface AdminSetting {
+  key: string;
+  label: string;
+  help: string;
+  type: 'number' | 'integer' | 'text';
+  min: number | null;
+  max: number | null;
+  value: number | string;
+  default: number | string;
+}
 interface AdminWorld {
   totals: Record<string, number>;
   settings: Record<string, string | number>;
@@ -78,7 +88,7 @@ const STATUS_LABEL: Record<string, string> = { open: 'Ouverte', accepted: 'Accep
 
 /** Page d'administration (lecture seule), réservée aux pseudos de ADMIN_USERNAMES. */
 export default function Admin() {
-  const { run } = useGame();
+  const { run, toast } = useGame();
   const [tab, setTab] = useState<Tab>('npc');
   const [hours, setHours] = useState(24);
   const [kind, setKind] = useState<Kind>('all');
@@ -87,6 +97,8 @@ export default function Admin() {
   const [offers, setOffers] = useState<AdminOffer[] | null>(null);
   const [world, setWorld] = useState<AdminWorld | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [settings, setSettings] = useState<AdminSetting[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [showNpc, setShowNpc] = useState(true);
 
   const load = useCallback(
@@ -105,6 +117,18 @@ export default function Admin() {
     const t = setInterval(load, 20_000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Les réglages ne sont chargés qu'une fois : l'actualisation automatique n'écrase pas la saisie en cours.
+  useEffect(() => {
+    if (tab === 'world' && !settings) run(async () => setSettings(await api<AdminSetting[]>('/api/admin/settings')));
+  }, [tab, settings, run]);
+
+  const saveSettings = (values: Record<string, string | null>, done: string) =>
+    run(async () => {
+      setSettings(await api<AdminSetting[]>('/api/admin/settings', { method: 'PUT', body: values }));
+      setDraft({});
+      toast(done);
+    });
 
   const tabs: [Tab, string][] = [
     ['npc', 'PNJ'],
@@ -390,6 +414,53 @@ export default function Admin() {
           <div className="admin-kpis">
             {world && Object.entries(world.totals).map(([k, v]) => <Kpi key={k} label={TOTAL_LABEL[k.toLowerCase()] ?? k} value={v} />)}
           </div>
+          <Panel
+            title="Réglages du monde"
+            actions={
+              <button className="btn small primary" disabled={Object.keys(draft).length === 0} onClick={() => saveSettings(draft, 'Réglages enregistrés')}>
+                Enregistrer
+              </button>
+            }
+          >
+            {!settings ? (
+              <p className="muted">Chargement…</p>
+            ) : (
+              <div className="admin-settings">
+                {settings.map((st) => {
+                  const shown = draft[st.key] ?? String(st.value);
+                  const changed = String(st.value) !== String(st.default);
+                  return (
+                    <label key={st.key} className="admin-setting">
+                      <span>
+                        <b>{st.label}</b>
+                        <i className="muted small">
+                          {st.help}
+                          {st.min !== null && st.max !== null && ` · ${st.min} à ${st.max}`}
+                          {changed && ` · valeur d'origine : ${st.default}`}
+                        </i>
+                      </span>
+                      <span className="row">
+                        <input
+                          type={st.type === 'text' ? 'text' : 'number'}
+                          step={st.type === 'integer' ? 1 : 0.05}
+                          min={st.min ?? undefined}
+                          max={st.max ?? undefined}
+                          value={shown}
+                          onChange={(e) => setDraft({ ...draft, [st.key]: e.target.value })}
+                        />
+                        {changed && (
+                          <button type="button" className="btn small ghost" onClick={() => saveSettings({ [st.key]: null }, 'Valeur d’origine rétablie')}>
+                            Rétablir
+                          </button>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+                <p className="muted small">Les changements s'appliquent tout de suite. La vitesse du monde et la taille de la carte se règlent sur Render : les modifier en cours de partie fausserait les constructions et les trajets en cours.</p>
+              </div>
+            )}
+          </Panel>
           <Panel title="Paramètres actifs">
             {!world ? (
               <p className="muted">Chargement…</p>
