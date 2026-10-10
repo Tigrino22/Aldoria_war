@@ -8,6 +8,7 @@ export default defineConfig({
       WORLD_SPEED: '1',
       MAP_SIZE: '50',
       BARBARIAN_VILLAGES: '5',
+      NPC_COUNT: '6',
     },
   },
 });
