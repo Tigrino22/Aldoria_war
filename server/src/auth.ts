@@ -33,7 +33,14 @@ export async function playerFromToken(token: string | undefined | null): Promise
     `SELECT player_id FROM sessions WHERE token = $1 AND created_at > now() - make_interval(days => $2)`,
     [token, SESSION_DAYS],
   );
-  return rows[0]?.player_id ?? null;
+  const id: number | null = rows[0]?.player_id ?? null;
+  // Dernière activité, utile à l'administration : au plus une écriture par minute et par joueur.
+  if (id) {
+    pool
+      .query("UPDATE players SET last_seen_at = now() WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '1 minute')", [id])
+      .catch(() => {});
+  }
+  return id;
 }
 
 export function bearer(req: FastifyRequest): string | undefined {

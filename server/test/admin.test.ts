@@ -41,5 +41,10 @@ describe('administration', () => {
     const players = (await app.inject({ method: 'GET', url: '/api/admin/players', headers: boss })).json();
     expect(players.some((p: { isNpc: boolean }) => p.isNpc)).toBe(true);
     expect((await app.inject({ method: 'GET', url: '/api/admin/npc', headers: boss })).json().stats.npcCount).toBeGreaterThan(0);
+
+    // La dernière activité des joueurs est enregistrée.
+    await new Promise((r) => setTimeout(r, 100));
+    const seen = (await app.inject({ method: 'GET', url: '/api/admin/players', headers: boss })).json().find((p: { username: string }) => p.username === 'Curieux');
+    expect(seen.lastSeen).not.toBeNull();
   });
 });

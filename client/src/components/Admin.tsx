@@ -32,7 +32,7 @@ interface AdminPlayer {
   villages: number;
   points: number;
   createdAt: string;
-  lastLogin: string | null;
+  lastSeen: string | null;
 }
 interface AdminOffer {
   id: number;
@@ -209,7 +209,7 @@ export default function Admin() {
                     <th>Tribu</th>
                     <th>Villages</th>
                     <th>Points</th>
-                    <th className="hide-m">Dernière connexion</th>
+                    <th className="hide-m">Dernière activité</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -224,7 +224,7 @@ export default function Admin() {
                         <td>{p.tribe ? `[${p.tribe}]` : '—'}</td>
                         <td>{p.villages}</td>
                         <td>{fmt(p.points)}</td>
-                        <td className="t hide-m">{p.lastLogin ? clockTime(p.lastLogin) : '—'}</td>
+                        <td className="t hide-m">{p.isNpc ? '—' : p.lastSeen ? clockTime(p.lastSeen) : 'jamais'}</td>
                       </tr>
                     ))}
                 </tbody>
