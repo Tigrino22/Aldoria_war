@@ -20,7 +20,7 @@ import {
   armyTarget,
   pointRatioOk,
   NPC_PROFILES,
-  NPC_TRIBE_NAMES,
+  npcTribeNameCandidates,
   SOLO_PROFILES,
   chooseBuilding,
   isQuiet,
@@ -130,7 +130,7 @@ export async function renameLegacyNpcs(c: Db) {
 /** Complète la population de PNJ solitaires jusqu'à `NPC_COUNT` (sans jamais en retirer). Les membres de tribus comptent à part. */
 export async function ensureNpcs(c: Db, now: Date) {
   await renameLegacyNpcs(c);
-  const have = (await c.query('SELECT count(*)::int AS n FROM players WHERE is_npc AND tribe_id IS NULL')).rows[0].n as number;
+  const have = (await c.query(env.npcTribeMax > 0 ? 'SELECT count(*)::int AS n FROM players WHERE is_npc' : 'SELECT count(*)::int AS n FROM players WHERE is_npc AND tribe_id IS NULL')).rows[0].n as number;
   for (let i = have; i < env.npcCount; i++) await createNpc(c, now);
 }
 
@@ -142,7 +142,75 @@ export async function ensureDailyNpc(c: Db, now: Date, opts: { perDay?: number; 
   const { rows } = await c.query('SELECT count(*)::int AS n, max(created_at) AS last FROM players WHERE is_npc');
   if (rows[0].n >= max) return null;
   if (rows[0].last && now.getTime() - new Date(rows[0].last).getTime() < DAY_MS / perDay) return null;
-  return createNpc(c, now);
+  const id = await createNpc(c, now);
+  await assignNpcToTribe(c, id);
+  return id;
+}
+
+const TRIBE_DESCRIPTION = 'Une compagnie soudée : ses membres se défendent les uns les autres.';
+
+/** Crée une tribu de PNJ au nom encore libre. */
+async function createNpcTribe(c: Db): Promise<number> {
+  const free: { name: string; tag: string }[] = [];
+  for (const cand of npcTribeNameCandidates()) {
+    const taken = await c.query('SELECT 1 FROM tribes WHERE lower(name) = lower($1) OR lower(tag) = lower($2)', [cand.name, cand.tag]);
+    if (!taken.rows.length) free.push(cand);
+  }
+  let pick = free.length ? free[Math.floor(rng() * free.length)] : null;
+  if (!pick) {
+    const n = (await c.query('SELECT count(*)::int AS n FROM tribes')).rows[0].n as number;
+    pick = { name: `Compagnie ${n + 1}`, tag: `C${n + 1}`.slice(0, 6) };
+  }
+  const { rows } = await c.query('INSERT INTO tribes (name, tag, is_npc, description) VALUES ($1, $2, true, $3) RETURNING id', [pick.name, pick.tag, TRIBE_DESCRIPTION]);
+  return rows[0].id;
+}
+
+/** Redistribue alliances et rivalités entre toutes les tribus de PNJ (appelé quand leur nombre change). */
+export async function refreshTribeRelations(c: Db) {
+  await c.query("UPDATE tribes SET description = $1 WHERE is_npc AND description LIKE 'Tribu de personnages non joueurs%'", [TRIBE_DESCRIPTION]);
+  const ids = (await c.query('SELECT id FROM tribes WHERE is_npc ORDER BY id')).rows.map((r) => r.id as number);
+  const relations = tribeRelations(ids);
+  for (const id of ids) {
+    const rel = relations.get(id)!;
+    await c.query("UPDATE tribes SET npc_state = npc_state || jsonb_build_object('allies', $2::jsonb, 'rivals', $3::jsonb) WHERE id = $1", [
+      id,
+      JSON.stringify(rel.allies),
+      JSON.stringify(rel.rivals),
+    ]);
+  }
+}
+
+/**
+ * Fait entrer un PNJ sans tribu dans la tribu de PNJ la moins peuplée qui a encore de la place, ou fonde une nouvelle tribu s'il n'y en a pas.
+ * Les tribus restent ainsi de taille comparable, et le premier membre d'une tribu en devient le chef.
+ */
+export async function assignNpcToTribe(c: Db, npcId: number, max: number = env.npcTribeMax): Promise<number | null> {
+  if (max <= 0) return null;
+  const open = (
+    await c.query(
+      `SELECT t.id, t.leader_id, count(p.id)::int AS n FROM tribes t LEFT JOIN players p ON p.tribe_id = t.id
+       WHERE t.is_npc GROUP BY t.id HAVING count(p.id) < $1 ORDER BY count(p.id), t.id LIMIT 1`,
+      [max],
+    )
+  ).rows[0];
+  let tribeId: number;
+  let created = false;
+  if (open) tribeId = open.id;
+  else {
+    tribeId = await createNpcTribe(c);
+    created = true;
+  }
+  await c.query('UPDATE players SET tribe_id = $2 WHERE id = $1', [npcId, tribeId]);
+  if (created || !open?.leader_id) await c.query('UPDATE tribes SET leader_id = $2 WHERE id = $1 AND leader_id IS NULL', [tribeId, npcId]);
+  if (created) await refreshTribeRelations(c);
+  return tribeId;
+}
+
+/** Place tous les PNJ encore sans tribu (les anciens PNJ solitaires comme les nouveaux arrivants). */
+export async function assignTriblessNpcs(c: Db, max: number = env.npcTribeMax) {
+  if (max <= 0) return;
+  const rows = (await c.query('SELECT id FROM players WHERE is_npc AND tribe_id IS NULL ORDER BY id')).rows;
+  for (const { id } of rows) await assignNpcToTribe(c, id, max);
 }
 
 /**
@@ -154,20 +222,7 @@ export async function ensureNpcTribes(c: Db, now: Date, opts: { tribes?: number;
   const size = opts.size ?? env.npcTribeSize;
   const existing = (await c.query('SELECT id FROM tribes WHERE is_npc ORDER BY id')).rows.map((r) => r.id as number);
   const ids = [...existing];
-  for (let i = existing.length; i < wanted; i++) {
-    const pick = NPC_TRIBE_NAMES[i % NPC_TRIBE_NAMES.length];
-    const lap = Math.floor(i / NPC_TRIBE_NAMES.length);
-    const name = lap ? `${pick.name} ${lap + 1}` : pick.name;
-    const tag = lap ? `${pick.tag}${lap + 1}` : pick.tag;
-    const taken = await c.query('SELECT 1 FROM tribes WHERE lower(name) = lower($1) OR lower(tag) = lower($2)', [name, tag]);
-    if (taken.rows.length) continue;
-    const { rows } = await c.query('INSERT INTO tribes (name, tag, is_npc, description) VALUES ($1, $2, true, $3) RETURNING id', [
-      name,
-      tag,
-      'Tribu de personnages non joueurs : ils bâtissent, pillent et se défendent entre eux. Seuls leurs membres peuvent la rejoindre.',
-    ]);
-    ids.push(rows[0].id);
-  }
+  for (let i = existing.length; i < wanted; i++) ids.push(await createNpcTribe(c));
   for (const id of ids) {
     const members = (await c.query('SELECT count(*)::int AS n FROM players WHERE tribe_id = $1', [id])).rows[0].n as number;
     const profiles = tribeMemberProfiles(size);
@@ -178,14 +233,7 @@ export async function ensureNpcTribes(c: Db, now: Date, opts: { tribes?: number;
     }
     if (leader) await c.query('UPDATE tribes SET leader_id = $2 WHERE id = $1', [id, leader]);
   }
-  const relations = tribeRelations(ids);
-  for (const id of ids) {
-    const rel = relations.get(id)!;
-    await c.query(
-      "UPDATE tribes SET npc_state = npc_state || jsonb_build_object('allies', $2::jsonb, 'rivals', $3::jsonb) WHERE id = $1",
-      [id, JSON.stringify(rel.allies), JSON.stringify(rel.rivals)],
-    );
-  }
+  await refreshTribeRelations(c);
 }
 
 // ---------- Réflexion ----------

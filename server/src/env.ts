@@ -23,6 +23,8 @@ export const env = {
   npcCount: count('NPC_COUNT', 40),
   npcTribes: count('NPC_TRIBES', 4),
   npcTribeSize: count('NPC_TRIBE_SIZE', 5),
+  /** Effectif maximal d'une tribu de PNJ : tout PNJ sans tribu en rejoint une (0 = les PNJ restent solitaires). */
+  npcTribeMax: count('NPC_TRIBE_MAX', 7),
   npcDaily: count('NPC_DAILY', 3),
   npcMax: count('NPC_MAX', 200),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
