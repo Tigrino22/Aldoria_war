@@ -127,7 +127,10 @@ export async function alertTribes(now: Date) {
   }
 }
 
-/** Joueurs qui ont attaqué ce PNJ, sa tribu ou une tribu alliée au cours des 3 derniers jours : le PNJ leur en veut. */
+/** Durée (en jours réels) pendant laquelle un PNJ en veut à un joueur qui l'a attaqué. */
+export const GRUDGE_DAYS = 7;
+
+/** Joueurs qui ont attaqué ce PNJ, sa tribu ou une tribu alliée au cours des 7 derniers jours : le PNJ leur en veut. */
 export async function grudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, now: Date): Promise<number[]> {
   const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];
   const { rows } = await c.query(
@@ -136,7 +139,7 @@ export async function grudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, n
      JOIN players a ON a.id = cm.player_id
      WHERE cm.type = 'attack' AND NOT a.is_npc AND cm.sent_at > $1 AND ${REAL_ATTACK}
        AND (t.owner_id = $2 OR t.owner_id IN (SELECT id FROM players WHERE tribe_id = ANY($3::int[])))`,
-    [new Date(now.getTime() - 3 * 86_400_000), npcId, friends],
+    [new Date(now.getTime() - GRUDGE_DAYS * 86_400_000), npcId, friends],
   );
   return rows.map((r) => r.player_id as number);
 }
