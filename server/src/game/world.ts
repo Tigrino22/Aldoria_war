@@ -1,6 +1,7 @@
 import { BUILDING_KEYS, Buildings, emptyUnits, STARTING_BUILDINGS } from '@aldoria/shared';
 import type { Db } from '../db';
 import { env } from '../env';
+import { barbarianTier } from './barbarians';
 import { createVillage } from './village';
 
 const BARBARIAN_NAMES = ['Ruines', 'Hameau abandonné', 'Vieux moulin', 'Camp barbare', 'Bourg en friche', 'Tour isolée'];
@@ -46,8 +47,7 @@ export async function ensureWorld(c: Db, now: Date) {
     const y = randInt(0, size - 1);
     if (!(await isFree(c, x, y))) continue;
     // Plus on s'éloigne du centre, plus les villages barbares sont développés.
-    const dist = Math.hypot(x - size / 2, y - size / 2) / (size / 2);
-    const top = Math.max(1, Math.round(2 + dist * 6));
+    const top = barbarianTier(x, y, size);
     const buildings: Buildings = { ...STARTING_BUILDINGS };
     for (const k of BUILDING_KEYS) buildings[k] = k === 'market' ? 0 : randInt(k === 'barracks' || k === 'wall' ? 0 : 1, top);
     const stock = randInt(200, 400 + top * 150);
