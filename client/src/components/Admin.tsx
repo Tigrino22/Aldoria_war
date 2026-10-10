@@ -291,7 +291,7 @@ export default function Admin() {
             <Kpi label="Troupes au total" value={stats?.troops.reduce((t, x) => t + x.total, 0)} />
             <Kpi label="Moyenne par village" value={stats && stats.villages ? Math.round(stats.troops.reduce((t, x) => t + x.total, 0) / stats.villages) : undefined} />
           </div>
-          <Panel title="Troupes dans le monde" actions={<span className="muted small">anonyme</span>}>
+          <Panel title="Troupes dans le monde" actions={<span className="muted small">anonyme · au village, en route et en recrutement</span>}>
             {!stats ? (
               <p className="muted">Chargement…</p>
             ) : (

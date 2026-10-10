@@ -48,6 +48,20 @@ describe('administration', () => {
     expect(stats.resources).toHaveLength(4);
     expect(JSON.stringify(stats)).not.toContain('Patron');
 
+    // Les troupes des joueurs comptent : au village, en route et recrutées mais pas encore livrées.
+    const bossVillage = (await pool.query("SELECT v.id FROM villages v JOIN players p ON p.id = v.owner_id WHERE p.username = 'Patron'")).rows[0].id as number;
+    await pool.query("INSERT INTO troops (village_id, home_village_id, units) VALUES ($1, $1, '{\"spearman\": 30}')", [bossVillage]);
+    await pool.query(
+      `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, sent_at, arrive_at)
+       VALUES ('attack', $1, $1, $1, NULL, '{"spearman": 5}', now(), now() + interval '1 hour')`,
+      [bossVillage],
+    );
+    await pool.query("INSERT INTO recruit_queue (village_id, unit, count, delivered, start_at, unit_seconds) VALUES ($1, 'swordsman', 10, 0, now() - interval '1 hour', 60)", [bossVillage]);
+    const again = (await app.inject({ method: 'GET', url: '/api/admin/stats', headers: boss })).json();
+    const row = (u: string) => again.troops.find((t: { unit: string }) => t.unit === u);
+    expect(row('spearman').players).toBe(35);
+    expect(row('swordsman').players).toBe(10);
+
     // La dernière activité des joueurs est enregistrée.
     await new Promise((r) => setTimeout(r, 100));
     const seen = (await app.inject({ method: 'GET', url: '/api/admin/players', headers: boss })).json().find((p: { username: string }) => p.username === 'Curieux');

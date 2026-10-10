@@ -139,20 +139,29 @@ export default async function adminRoutes(app: FastifyInstance) {
     const villages = (await pool.query('SELECT buildings, wood, clay, iron, wheat FROM villages WHERE owner_id IS NOT NULL')).rows;
     const n = villages.length;
 
-    const troopRows = (
-      await pool.query(
-        `SELECT u.key, coalesce(sum(u.value::int), 0)::bigint AS total,
-                coalesce(sum(u.value::int) FILTER (WHERE p.is_npc), 0)::bigint AS npc
-         FROM troops t JOIN villages hv ON hv.id = t.home_village_id JOIN players p ON p.id = hv.owner_id,
-              jsonb_each_text(t.units) u
-         GROUP BY u.key`,
-      )
-    ).rows;
+    // Toutes les troupes du monde : au village, en route (attaques, renforts, retours) et recrutées mais pas encore livrées
+    // (la file de recrutement d'un village n'est livrée qu'à sa prochaine synchronisation).
+    const tally = Object.fromEntries(UNIT_KEYS.map((u) => [u, { players: 0, npc: 0 }])) as Record<(typeof UNIT_KEYS)[number], { players: number; npc: number }>;
+    const add = (unit: string, count: number, isNpc: boolean) => {
+      if (!(unit in tally) || !(count > 0)) return;
+      tally[unit as keyof typeof tally][isNpc ? 'npc' : 'players'] += count;
+    };
+    const stationed = await pool.query(
+      `SELECT t.units, p.is_npc FROM troops t JOIN villages hv ON hv.id = t.home_village_id JOIN players p ON p.id = hv.owner_id
+       UNION ALL
+       SELECT cm.units, p.is_npc FROM commands cm JOIN villages hv ON hv.id = cm.home_village_id JOIN players p ON p.id = hv.owner_id
+       WHERE NOT cm.processed AND cm.type IN ('attack', 'support', 'return')`,
+    );
+    for (const row of stationed.rows) for (const [unit, count] of Object.entries(row.units as Record<string, number>)) add(unit, Number(count), row.is_npc);
+    const queued = await pool.query(
+      `SELECT q.unit, greatest(0, least(q.count, floor(extract(epoch FROM now() - q.start_at) / q.unit_seconds + 1e-9))) - q.delivered AS fresh, p.is_npc
+       FROM recruit_queue q JOIN villages v ON v.id = q.village_id JOIN players p ON p.id = v.owner_id`,
+    );
+    for (const row of queued.rows) add(row.unit, Number(row.fresh), row.is_npc);
     const troops = UNIT_KEYS.map((unit) => {
-      const r = troopRows.find((x) => x.key === unit);
-      const total = Number(r?.total ?? 0);
-      const npc = Number(r?.npc ?? 0);
-      return { unit, total, players: total - npc, npc, perVillage: n ? total / n : 0 };
+      const { players, npc } = tally[unit];
+      const total = players + npc;
+      return { unit, total, players, npc, perVillage: n ? total / n : 0 };
     });
 
     const stock = Object.fromEntries(RESOURCES.map((r) => [r, villages.reduce((sum, v) => sum + Number(v[r]), 0)]));
