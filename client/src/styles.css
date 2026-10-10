@@ -349,3 +349,26 @@ textarea { width: 100%; resize: vertical; }
 .chip-btn { display: inline-flex; align-items: center; gap: 2px; }
 .inline-res { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; white-space: nowrap; }
 .inline-res.full { color: var(--warn); }
+
+/* Fenêtre de l'hôtel de ville */
+.modal-backdrop { position: fixed; inset: 0; z-index: 100000; background: rgb(20 14 8 / 0.62); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.townhall {
+  width: min(980px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--panel); border: 2px solid var(--gold); border-radius: var(--radius);
+  padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.45);
+}
+.th-head { display: flex; align-items: center; gap: 14px; }
+.th-title { flex: 1; min-width: 0; }
+.th-title h2 { margin: 0; font-family: var(--display); }
+.th-title p { margin: 2px 0 0; }
+.th-stock { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 8px 12px; background: var(--panel-2); border-radius: 8px; }
+.th-stock .inline-res { display: inline-flex; align-items: center; gap: 4px; }
+.townhall h3 { margin: 0 0 6px; font-family: var(--display); font-size: 16px; }
+.th-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.th-card { display: flex; gap: 10px; padding: 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+.th-card.building { border-color: var(--gold); }
+.th-card > img { flex: none; align-self: flex-start; }
+.th-card-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.th-card-body h4 { margin: 0; font-size: 15px; }
+.th-card-body p { margin: 0; }
+.th-card-body .btn { align-self: flex-start; margin-top: 2px; }
+@media (max-width: 520px) { .townhall { padding: 12px; } .th-grid { grid-template-columns: 1fr; } }
