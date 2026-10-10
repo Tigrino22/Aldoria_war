@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { BUILDING_KEYS, productionRates, RESOURCES, UNIT_KEYS, type Buildings } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { env } from '../env';
@@ -130,6 +131,54 @@ export default async function adminRoutes(app: FastifyInstance) {
       createdAt: o.created_at,
       expiresAt: o.expires_at,
     }));
+  });
+
+  /** Statistiques anonymes : troupes, ressources, bâtiments et activité, sans aucun nom de joueur. */
+  app.get('/api/admin/stats', async (req) => {
+    await requireAdmin(req);
+    const villages = (await pool.query('SELECT buildings, wood, clay, iron, wheat FROM villages WHERE owner_id IS NOT NULL')).rows;
+    const n = villages.length;
+
+    const troopRows = (
+      await pool.query(
+        `SELECT u.key, coalesce(sum(u.value::int), 0)::bigint AS total,
+                coalesce(sum(u.value::int) FILTER (WHERE p.is_npc), 0)::bigint AS npc
+         FROM troops t JOIN villages hv ON hv.id = t.home_village_id JOIN players p ON p.id = hv.owner_id,
+              jsonb_each_text(t.units) u
+         GROUP BY u.key`,
+      )
+    ).rows;
+    const troops = UNIT_KEYS.map((unit) => {
+      const r = troopRows.find((x) => x.key === unit);
+      const total = Number(r?.total ?? 0);
+      const npc = Number(r?.npc ?? 0);
+      return { unit, total, players: total - npc, npc, perVillage: n ? total / n : 0 };
+    });
+
+    const stock = Object.fromEntries(RESOURCES.map((r) => [r, villages.reduce((sum, v) => sum + Number(v[r]), 0)]));
+    const production = Object.fromEntries(RESOURCES.map((r) => [r, 0])) as Record<(typeof RESOURCES)[number], number>;
+    for (const v of villages) {
+      const rates = productionRates(v.buildings as Buildings, 0, env.worldSpeed);
+      for (const r of RESOURCES) production[r] += rates[r];
+    }
+    const resources = RESOURCES.map((resource) => ({ resource, total: stock[resource], perVillage: n ? stock[resource] / n : 0, perHour: production[resource] }));
+
+    const buildings = BUILDING_KEYS.map((building) => ({
+      building,
+      average: n ? villages.reduce((sum, v) => sum + Number(v.buildings[building] ?? 0), 0) / n : 0,
+    }));
+
+    const a = (
+      await pool.query(
+        `SELECT count(*) FILTER (WHERE last_seen_at > now() - interval '1 hour')::int AS hour,
+                count(*) FILTER (WHERE last_seen_at > now() - interval '24 hours')::int AS day,
+                count(*) FILTER (WHERE last_seen_at > now() - interval '7 days')::int AS week,
+                count(*) FILTER (WHERE created_at > now() - interval '7 days')::int AS signups
+         FROM players WHERE NOT is_npc`,
+      )
+    ).rows[0];
+
+    return { villages: n, troops, resources, buildings, activity: { hour: a.hour, day: a.day, week: a.week, signups: a.signups } };
   });
 
   /** Totaux du monde et paramètres actifs. */
