@@ -93,7 +93,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { rows } = await pool.query(
       `SELECT p.id, p.username, p.is_npc, p.npc_profile, p.created_at, t.tag AS tribe_tag,
               count(v.id)::int AS villages, coalesce(sum(v.points), 0)::int AS points,
-              (SELECT max(s.created_at) FROM sessions s WHERE s.player_id = p.id) AS last_login
+              p.last_seen_at AS last_seen
        FROM players p LEFT JOIN villages v ON v.owner_id = p.id LEFT JOIN tribes t ON t.id = p.tribe_id
        GROUP BY p.id, t.tag ORDER BY points DESC, p.id LIMIT 300`,
     );
@@ -106,7 +106,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       villages: r.villages,
       points: r.points,
       createdAt: r.created_at,
-      lastLogin: r.last_login,
+      lastSeen: r.last_seen,
     }));
   });
 
