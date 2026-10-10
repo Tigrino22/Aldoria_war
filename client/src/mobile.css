@@ -1,0 +1,35 @@
+/* Mobile précis (≤ 640 px) : décor en pleine largeur, en-tête compact, cibles tactiles de 44 px, fiche de bâtiment courte. */
+@media (max-width: 640px) {
+  .content { padding: 10px 0 16px; gap: 12px; }
+  .content > * { margin-inline: 12px; }
+  .content > .village { margin-inline: 0; }
+  .village > .building-panel, .village > .panel, .village > .stack, .village > .alert { margin-inline: 12px; }
+
+  .village-title { padding-inline: 12px; gap: 6px; }
+  .village-title h1 { font-size: 19px; }
+  .village-title .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -12px; padding-inline: 12px; }
+  .village-title .chips .chip { flex: none; margin-left: 0; }
+
+  .scene { border-radius: 0; border-inline: 0; max-width: none; }
+  .spot-label { font-size: 9px; padding: 0 5px; }
+
+  /* Ressources : le rythme par heure reste visible. */
+  .resbar { padding: 4px 12px 6px; min-height: 0; }
+  .res .rate { display: block; font-size: 10px; }
+
+  /* Fiche de bâtiment : collée au-dessus de la navigation, description masquée. */
+  .building-panel { position: sticky; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); z-index: 15; flex-direction: row; align-items: flex-start; padding: 12px; gap: 10px; border-radius: 16px; box-shadow: 0 -8px 24px rgb(0 0 0 / 0.3); }
+  .building-panel > img { width: 64px; height: 64px; align-self: flex-start; }
+  .bp-body { gap: 4px; font-size: 14px; }
+  .bp-body > p.muted { display: none; }
+  .bp-body .btn.primary { align-self: stretch; text-align: center; }
+  .bp-cost .cost { font-size: 13px; gap: 8px; }
+
+  /* Zones tactiles. */
+  .btn { min-height: 44px; }
+  .btn.small { min-height: 38px; }
+  .nav button { min-height: 52px; }
+}
+
+/* Les bâtiments du décor (z-index élevés) ne doivent pas passer au-dessus de la barre de ressources collante. */
+.scene { isolation: isolate; }
