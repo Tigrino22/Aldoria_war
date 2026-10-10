@@ -268,12 +268,10 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
 
   const quiet = isQuietAt(now);
   const arrivalOf = (units: UnitCounts, to: { x: number; y: number }) => new Date(now.getTime() + travelTime(units, village, to, env.worldSpeed) * 1000);
-  /** Un conquérant emmène ses nobles, mais ne prend jamais le dernier village d'un joueur ni plus d'un village par jour au même joueur. */
+  /** Tout PNJ qui a des nobles les emmène, même contre le dernier village d'un joueur, mais pas plus d'une tentative par jour sur un même joueur. */
   const withNobles = async (units: UnitCounts, owner: number | null, rival: boolean): Promise<UnitCounts> => {
-    if (profile !== 'conqueror' || home.noble < NOBLES_PER_CONQUEST) return units;
+    if (home.noble < NOBLES_PER_CONQUEST) return units;
     if (owner !== null && !rival) {
-      const left = (await c.query('SELECT count(*)::int AS n FROM villages WHERE owner_id = $1', [owner])).rows[0].n as number;
-      if (left <= 1) return units;
       const recent = (
         await c.query(
           `SELECT 1 FROM commands cm JOIN villages t ON t.id = cm.target_village_id
@@ -314,13 +312,13 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const all = await candidates(c, npcId, village, now, tribe?.state.rivals ?? []);
   const barbarians = all.filter((t) => t.ownerId === null);
   const rivalVillages = all.filter((t) => t.rival);
-  // Selon son type, un PNJ s'en prend aux joueurs sans avoir été provoqué : le pillard et le conquérant (dans une tribu, le chef ou le conquérant),
-  // jamais le bâtisseur. Celui qui a été attaqué riposte, quel que soit son type.
+  // Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef ou le conquérant) : leur type ne règle que leur évolution.
+  // Celui qui a été attaqué riposte en plus, sans attendre.
   const isLeader = !tribe || tribe.leaderId === npcId || profile === 'conqueror';
   const opCooldownOk = !tribe || !tribe.state.lastOpAt || now.getTime() - Date.parse(tribe.state.lastOpAt) >= (12 * 3_600_000) / env.worldSpeed;
   const humans = all.filter((t) => t.ownerId !== null && !t.rival);
   const revenge = quiet ? [] : humans.filter((t) => grudges.includes(t.ownerId!));
-  const aggressive = profile !== 'builder' && !quiet && isLeader && opCooldownOk && !onCooldown ? humans : [];
+  const aggressive = !quiet && isLeader && opCooldownOk && !onCooldown ? humans : [];
   let players = [...new Set([...revenge, ...aggressive])];
   const playerRaids = players.length ? await raidsOnPlayersByNpc(c, npcId, now) : 0;
   if (playerRaids >= (revenge.length ? MAX_REVENGE_RAIDS_PER_NPC_PER_DAY : MAX_PLAYER_RAIDS_PER_NPC_PER_DAY)) players = [];

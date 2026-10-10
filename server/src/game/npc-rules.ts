@@ -78,8 +78,9 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
   const t = emptyUnits();
   if (profile === 'builder') {
     t.spearman = scale(6);
-    t.swordsman = scale(2);
+    t.swordsman = scale(3);
     t.scout = 2;
+    t.noble = cap >= 12 ? NOBLES_PER_CONQUEST : 0;
   } else if (profile === 'conqueror') {
     t.swordsman = scale(5);
     t.cavalry = scale(2);
@@ -93,6 +94,7 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
     t.cavalry = scale(2);
     t.spearman = scale(2);
     t.scout = 4;
+    t.noble = cap >= 10 ? NOBLES_PER_CONQUEST : 0;
   }
   return t;
 }

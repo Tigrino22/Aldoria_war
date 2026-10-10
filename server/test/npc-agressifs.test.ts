@@ -49,7 +49,7 @@ describe('PNJ agressifs', () => {
     await pool.end();
   });
 
-  it('un bâtisseur reste pacifique, mais riposte contre un joueur qui l’a attaqué, sans attendre le délai entre deux attaques', async () => {
+  it('un bâtisseur riposte contre un joueur qui l’a attaqué, sans attendre le délai entre deux attaques', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'builder'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
@@ -58,9 +58,6 @@ describe('PNJ agressifs', () => {
     await villageOf(player, home.x + 3, home.y + 1);
     await scouted(npc, base, NOON);
     await pool.query('UPDATE players SET protection_until = NULL');
-
-    await tx((c) => npcThink(c, new Outbox(), npc, NOON));
-    expect(await attacksOn(npc, base)).toHaveLength(0);
 
     await tx((c) => sendCommand(c, new Outbox(), player, base, { type: 'attack', targetId: home.id, units: { swordsman: 20 } }, NOON));
     await alertAttackedNpcs(NOON);
@@ -98,8 +95,8 @@ describe('PNJ agressifs', () => {
     expect((await attacksOn(npc, farm)).filter((u) => (u.swordsman ?? 0) > 0)).toHaveLength(1);
   });
 
-  it('un conquérant emmène des nobles contre un joueur, sauf si c’est son dernier village', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'conqueror'));
+  it('tout PNJ avec des nobles tente de conquérir un joueur, même son dernier village, une fois par jour au plus', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     const army = { swordsman: 120, ram: 5, noble: 6 };
     await tx((c) => setTroops(c, home.id, home.id, troops(army)));
@@ -121,8 +118,10 @@ describe('PNJ agressifs', () => {
     const onOnly = await attacksOn(npc, only);
     const onFirst = await attacksOn(npc, first);
     expect(onOnly.length + onFirst.length).toBeGreaterThan(0);
-    expect(onOnly.every((u) => (u.noble ?? 0) === 0)).toBe(true);
-    expect(onFirst.every((u) => (u.noble ?? 0) === 0 || u.noble === 4)).toBe(true);
+    expect(onOnly.some((u) => u.noble === 4)).toBe(true);
+    // Au plus une tentative de conquête par jour sur un même joueur : 6 tours espacés de 7 h font au plus 2 tentatives par joueur.
+    expect(onOnly.filter((u) => (u.noble ?? 0) > 0).length).toBeLessThanOrEqual(2);
+    expect(onFirst.filter((u) => (u.noble ?? 0) > 0).length).toBeLessThanOrEqual(2);
   });
 
   it('trois nouveaux PNJ par jour, un toutes les 8 heures, jusqu’au plafond', async () => {
