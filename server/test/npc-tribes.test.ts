@@ -192,4 +192,24 @@ describe('tribus de PNJ', () => {
     expect(n).toBeGreaterThan(0);
     expect(await getTroops(pool as never, 1, 1)).toBeDefined();
   });
+
+  it('les PNJ sans tribu rejoignent la tribu la moins peuplée, ou en fondent une quand toutes sont pleines', async () => {
+    const { assignTriblessNpcs, ensureNpcTribes } = await import('../src/game/npc');
+    let seed = 5;
+    setNpcRandom(() => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296));
+    await pool.query('UPDATE players SET tribe_id = NULL WHERE is_npc');
+    await pool.query('DELETE FROM players WHERE is_npc');
+    await pool.query('DELETE FROM tribes WHERE is_npc');
+    await tx((c) => ensureNpcTribes(c, new Date(), { tribes: 2, size: 3 }));
+    for (let i = 0; i < 7; i++) await tx((c) => createNpc(c, new Date()));
+    await tx((c) => assignTriblessNpcs(c, 5));
+    expect((await pool.query('SELECT count(*)::int AS n FROM players WHERE is_npc AND tribe_id IS NULL')).rows[0].n).toBe(0);
+    const sizes = (await pool.query('SELECT count(p.id)::int AS n, t.leader_id FROM tribes t JOIN players p ON p.tribe_id = t.id WHERE t.is_npc GROUP BY t.id, t.leader_id')).rows;
+    expect(sizes.length).toBe(3);
+    expect(Math.max(...sizes.map((r) => r.n))).toBeLessThanOrEqual(5);
+    expect(sizes.every((r) => r.leader_id)).toBe(true);
+    const tribes = (await pool.query('SELECT description, npc_state FROM tribes WHERE is_npc')).rows;
+    expect(tribes.every((t) => !/non joueurs|PNJ/.test(t.description))).toBe(true);
+    expect(tribes.every((t) => Array.isArray(t.npc_state.allies))).toBe(true);
+  });
 });

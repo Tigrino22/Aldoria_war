@@ -48,3 +48,10 @@ Le code est dans `npc-tribes.ts` (défense, alertes, opérations) et `npc.ts`, l
 - **Train de nobles** : un PNJ qui a au moins 4 nobles en stock (6 au plus) lance un assaut qui nettoie la défense, puis ses nobles un par un, à une seconde d'écart, juste derrière. Une seule tentative par jour sur un même joueur ; le train est annulé si le dernier noble arriverait pendant les heures calmes.
 - **PNJ forts** : un PNJ dont l'armée offensive est au complet pour son niveau attend 2 h de jeu (au lieu de 6) entre deux attaques et peut frapper un même joueur plusieurs fois par jour (6 attaques par jour au plus, 4 sur un même joueur).
 - **Ratio de points** : sans provocation, un PNJ ne s'en prend qu'à un joueur dont les points valent de 70 % à 150 % des siens. La riposte contre un joueur qui l'a attaqué (lui, sa tribu ou une alliée) ignore ce ratio.
+
+### Tous les PNJ ont une tribu
+
+- `NPC_TRIBE_MAX` (7 par défaut, 0 pour que les PNJ restent solitaires) : effectif maximal d'une tribu de PNJ.
+- Au démarrage, tout PNJ sans tribu (les anciens solitaires comme les nouveaux arrivants) entre dans la tribu de PNJ la moins peuplée qui a de la place ; si toutes sont pleines, une nouvelle tribu est fondée avec un nom tiré d'une liste (« Ordre du Cormoran », etc.) et le premier membre en devient le chef. Alliances et rivalités sont redistribuées à chaque nouvelle tribu.
+- Équilibrage : des tribus de 5 à 7 membres, des renforts mutuels, des opérations coordonnées menées par le chef ou un conquérant, et toujours les plafonds par PNJ, le ratio de points et les heures calmes. Une attaque contre un membre mobilise donc toute la tribu et ses alliées.
+- Les tribus de PNJ ne portent aucune mention « PNJ » côté joueur (description neutre).

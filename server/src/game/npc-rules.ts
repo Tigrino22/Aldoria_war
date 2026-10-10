@@ -141,6 +141,21 @@ export const NPC_TRIBE_NAMES: { name: string; tag: string }[] = [
   { name: 'Faucons Dorés', tag: 'FAU' },
 ];
 
+const TRIBE_PREFIXES = ['Compagnie', 'Ordre', 'Légion', 'Garde', 'Fils', 'Veilleurs', 'Lames', 'Confrérie', 'Maison', 'Clan', 'Cercle', 'Hérauts'];
+const TRIBE_SUFFIXES = ['du Cormoran', 'de l’Aube', 'des Cendres', 'du Lion Pâle', 'de la Marche', 'du Gué Noir', 'des Sept Tours', 'de Valcrête', 'du Chêne Gris', 'de l’Étoile', 'du Dernier Feu', 'des Hautes Landes'];
+
+/** Noms de tribu possibles : les huit d'origine, puis toutes les combinaisons « Ordre du Cormoran », etc. Le tag reprend les trois premières lettres du dernier mot. */
+export function npcTribeNameCandidates(): { name: string; tag: string }[] {
+  const out = [...NPC_TRIBE_NAMES];
+  for (const p of TRIBE_PREFIXES) {
+    for (const x of TRIBE_SUFFIXES) {
+      const last = x.split(' ').pop()!.normalize('NFD').replace(/[^A-Za-z]/g, '');
+      out.push({ name: `${p} ${x}`, tag: `${p[0]}${last.slice(0, 2)}`.toUpperCase() });
+    }
+  }
+  return out;
+}
+
 /** Profils des membres d'une tribu : un chef pillard, un conquérant, puis bâtisseurs et pillards en alternance. */
 export function tribeMemberProfiles(size: number): NpcProfile[] {
   const rest: NpcProfile[] = ['conqueror', 'builder', 'raider', 'builder'];

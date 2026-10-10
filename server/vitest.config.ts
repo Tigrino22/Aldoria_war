@@ -10,6 +10,7 @@ export default defineConfig({
       BARBARIAN_VILLAGES: '5',
       NPC_COUNT: '6',
       NPC_TRIBES: '0',
+      NPC_TRIBE_MAX: '0',
       NPC_DAILY: '0',
     },
   },

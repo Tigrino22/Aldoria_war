@@ -2,7 +2,7 @@ import { buildApp } from './app';
 import { pool, tx } from './db';
 import { env } from './env';
 import { processDueEvents } from './game/commands';
-import { ensureNpcTribes, ensureNpcs, processNpcs } from './game/npc';
+import { assignTriblessNpcs, ensureNpcTribes, ensureNpcs, processNpcs } from './game/npc';
 import { ensureWorld } from './game/world';
 import { withGameLock } from './lock';
 import { migrate } from './migrate';
@@ -12,6 +12,7 @@ async function main() {
   await tx((c) => ensureWorld(c, new Date()));
   await tx((c) => ensureNpcs(c, new Date()));
   await tx((c) => ensureNpcTribes(c, new Date()));
+  await tx((c) => assignTriblessNpcs(c));
 
   const app = await buildApp({ logger: true });
   await app.listen({ port: env.port, host: '0.0.0.0' });
