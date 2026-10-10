@@ -1,6 +1,6 @@
 # Joueurs PNJ
 
-Les PNJ sont de vrais comptes joueurs (`players.is_npc`) sans mot de passe valide, pilotés par le serveur. Leur pseudo se termine par « (PNJ) » : on les reconnaît partout (carte, classement, rapports, profil). Ils utilisent exactement les mêmes fonctions que les joueurs (`enqueueBuild`, `enqueueRecruit`, `sendCommand`), donc les mêmes règles, la même protection débutant et les mêmes alertes d'attaque.
+Les PNJ sont de vrais comptes joueurs (`players.is_npc`) sans mot de passe valide, pilotés par le serveur. Leur pseudo est tiré d'une longue liste de prénoms dans l'esprit du Seigneur des Anneaux et de La Roue du Temps (`npc-names.ts`), sans mention « PNJ » : ils se fondent parmi les joueurs. Un nom déjà pris reçoit un surnom (« Aragorn le Sage »), et les premiers PNJ nommés « … (PNJ) » sont renommés au démarrage. Ils utilisent exactement les mêmes fonctions que les joueurs (`enqueueBuild`, `enqueueRecruit`, `sendCommand`), donc les mêmes règles, la même protection débutant et les mêmes alertes d'attaque.
 
 ## Réglages (variables d'environnement)
 
