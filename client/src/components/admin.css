@@ -11,3 +11,8 @@
 .admin-table .chip { margin-left: 6px; font-size: 10px; padding: 0 7px; }
 .admin-chips { margin-block: 6px; }
 @media (max-width: 640px) { .admin-table .hide-m { display: none; } }
+.admin-table .num, .admin-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-bar { height: 8px; min-width: 80px; background: var(--panel-2); border-radius: 5px; overflow: hidden; }
+.admin-bar i { display: block; height: 100%; background: var(--gold); }
+.admin-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+@media (max-width: 800px) { .admin-grid2 { grid-template-columns: 1fr; } }

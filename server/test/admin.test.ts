@@ -34,13 +34,19 @@ describe('administration', () => {
     expect((await app.inject({ method: 'GET', url: '/api/me', headers: boss })).json().isAdmin).toBe(true);
 
     await tx((c) => createNpc(c, new Date(), 'raider'));
-    for (const url of ['/api/admin/npc?hours=24', '/api/admin/players', '/api/admin/market', '/api/admin/world']) {
+    for (const url of ['/api/admin/npc?hours=24', '/api/admin/players', '/api/admin/market', '/api/admin/stats', '/api/admin/world']) {
       const res = await app.inject({ method: 'GET', url, headers: boss });
       expect(res.statusCode, url).toBe(200);
     }
     const players = (await app.inject({ method: 'GET', url: '/api/admin/players', headers: boss })).json();
     expect(players.some((p: { isNpc: boolean }) => p.isNpc)).toBe(true);
     expect((await app.inject({ method: 'GET', url: '/api/admin/npc', headers: boss })).json().stats.npcCount).toBeGreaterThan(0);
+
+    const stats = (await app.inject({ method: 'GET', url: '/api/admin/stats', headers: boss })).json();
+    expect(stats.villages).toBeGreaterThan(0);
+    expect(stats.troops).toHaveLength(6);
+    expect(stats.resources).toHaveLength(4);
+    expect(JSON.stringify(stats)).not.toContain('Patron');
 
     // La dernière activité des joueurs est enregistrée.
     await new Promise((r) => setTimeout(r, 100));

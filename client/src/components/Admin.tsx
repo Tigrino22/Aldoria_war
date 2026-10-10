@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { BUILDINGS, RESOURCE_NAMES, UNITS, type BuildingKey, type Resource, type UnitKey } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { Panel } from '../ui';
 import './admin.css';
 
-type Tab = 'npc' | 'players' | 'market' | 'world';
+type Tab = 'npc' | 'players' | 'market' | 'stats' | 'world';
 type Kind = 'all' | 'attack' | 'scout' | 'market' | 'quiet';
 
 interface NpcEvent {
@@ -44,6 +45,13 @@ interface AdminOffer {
   createdAt: string;
   expiresAt: string;
 }
+interface AdminStats {
+  villages: number;
+  troops: { unit: UnitKey; total: number; players: number; npc: number; perVillage: number }[];
+  resources: { resource: Resource; total: number; perVillage: number; perHour: number }[];
+  buildings: { building: BuildingKey; average: number }[];
+  activity: { hour: number; day: number; week: number; signups: number };
+}
 interface AdminWorld {
   totals: Record<string, number>;
   settings: Record<string, string | number>;
@@ -78,6 +86,7 @@ export default function Admin() {
   const [players, setPlayers] = useState<AdminPlayer[] | null>(null);
   const [offers, setOffers] = useState<AdminOffer[] | null>(null);
   const [world, setWorld] = useState<AdminWorld | null>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [showNpc, setShowNpc] = useState(true);
 
   const load = useCallback(
@@ -86,6 +95,7 @@ export default function Admin() {
         if (tab === 'npc') setLog(await api<NpcLog>(`/api/admin/npc?hours=${hours}`));
         if (tab === 'players') setPlayers(await api<AdminPlayer[]>('/api/admin/players'));
         if (tab === 'market') setOffers(await api<AdminOffer[]>(`/api/admin/market?hours=${hours}`));
+        if (tab === 'stats') setStats(await api<AdminStats>('/api/admin/stats'));
         if (tab === 'world') setWorld(await api<AdminWorld>('/api/admin/world'));
       }),
     [run, tab, hours],
@@ -100,6 +110,7 @@ export default function Admin() {
     ['npc', 'PNJ'],
     ['players', 'Joueurs'],
     ['market', 'Marché'],
+    ['stats', 'Statistiques'],
     ['world', 'Monde'],
   ];
   const kinds: [Kind, string][] = [
@@ -272,6 +283,108 @@ export default function Admin() {
         </Panel>
       )}
 
+      {tab === 'stats' && (
+        <>
+          <div className="admin-kpis">
+            <Kpi label="Villages occupés" value={stats?.villages} />
+            <Kpi label="Joueurs actifs (24 h)" value={stats?.activity.day} />
+            <Kpi label="Troupes au total" value={stats?.troops.reduce((t, x) => t + x.total, 0)} />
+            <Kpi label="Moyenne par village" value={stats && stats.villages ? Math.round(stats.troops.reduce((t, x) => t + x.total, 0) / stats.villages) : undefined} />
+          </div>
+          <Panel title="Troupes dans le monde" actions={<span className="muted small">anonyme</span>}>
+            {!stats ? (
+              <p className="muted">Chargement…</p>
+            ) : (
+              <div className="admin-scroll">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th className="num">Total</th>
+                      <th className="num hide-m">Joueurs / PNJ</th>
+                      <th className="num">Moy. / village</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.troops.map((t) => (
+                      <tr key={t.unit}>
+                        <td>{UNITS[t.unit].name}s</td>
+                        <td className="num">{fmt(t.total)}</td>
+                        <td className="num hide-m">
+                          {fmt(t.players)} / {fmt(t.npc)}
+                        </td>
+                        <td className="num">{dec(t.perVillage)}</td>
+                        <td>
+                          <Bar value={t.perVillage} max={Math.max(...stats.troops.map((x) => x.perVillage))} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+          <div className="admin-grid2">
+            <Panel title="Ressources">
+              {!stats ? (
+                <p className="muted">Chargement…</p>
+              ) : (
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th className="num">Total</th>
+                      <th className="num">Moy. / village</th>
+                      <th className="num">Prod. / h</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.resources.map((r) => (
+                      <tr key={r.resource}>
+                        <td>{RESOURCE_NAMES[r.resource]}</td>
+                        <td className="num">{fmt(r.total)}</td>
+                        <td className="num">{fmt(r.perVillage)}</td>
+                        <td className="num">+{fmt(r.perHour)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="muted small">Stocks au dernier calcul de chaque village ; production brute (avant consommation de blé).</p>
+            </Panel>
+            <Panel title="Bâtiments (niveau moyen)">
+              {!stats ? (
+                <p className="muted">Chargement…</p>
+              ) : (
+                <table className="admin-table">
+                  <tbody>
+                    {stats.buildings.map((b) => (
+                      <tr key={b.building}>
+                        <td>{BUILDINGS[b.building].name}</td>
+                        <td className="num">{dec(b.average)}</td>
+                        <td>
+                          <Bar value={b.average} max={BUILDINGS[b.building].maxLevel} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Panel>
+          </div>
+          <Panel title="Activité des joueurs">
+            {!stats ? (
+              <p className="muted">Chargement…</p>
+            ) : (
+              <p style={{ margin: 0 }}>
+                Dans l'heure : <b>{stats.activity.hour}</b> · dans les 24 h : <b>{stats.activity.day}</b> · dans les 7 jours : <b>{stats.activity.week}</b> · nouveaux inscrits (7 j) : <b>{stats.activity.signups}</b>
+              </p>
+            )}
+          </Panel>
+        </>
+      )}
+
       {tab === 'world' && (
         <>
           <div className="admin-kpis">
@@ -297,6 +410,16 @@ export default function Admin() {
           </Panel>
         </>
       )}
+    </div>
+  );
+}
+
+const dec = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+
+function Bar({ value, max }: { value: number; max: number }) {
+  return (
+    <div className="admin-bar">
+      <i style={{ width: `${max > 0 ? Math.min(100, (value / max) * 100) : 0}%` }} />
     </div>
   );
 }
