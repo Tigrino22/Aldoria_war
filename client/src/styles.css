@@ -340,3 +340,6 @@ textarea { width: 100%; resize: vertical; }
 .wiki-table .cost { flex-wrap: nowrap; gap: 8px; }
 .wiki-table td.left.small { min-width: 130px; }
 .wiki-table img { max-width: none; flex: none; vertical-align: middle; }
+
+.inline-res { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; white-space: nowrap; }
+.inline-res.full { color: var(--warn); }
