@@ -287,3 +287,16 @@ export const RAMS_PER_WALL_LEVEL_DESTROYED = 4;
 export const CANCEL_GRACE_SECONDS = 120;
 /** Part remboursée si on annule après le délai. Un mouvement ne peut plus être annulé passé ce délai. */
 export const CANCEL_REFUND_SHARE = 0.8;
+
+// ---------- Marché : offres ----------
+
+/** Durée de vie d'une offre, en heures de jeu (divisée par la vitesse du monde). */
+export const OFFER_LIFETIME_HOURS = 24;
+/** Taux accepté : ce qu'on demande doit valoir entre la moitié et le double de ce qu'on donne. */
+export const MIN_RATE = 0.5;
+export const MAX_RATE = 2;
+export const MIN_OFFER_AMOUNT = 50;
+export const MAX_PLAYER_OFFERS = 5;
+export const MAX_NPC_OFFERS = 2;
+/** Rayon (en cases) dans lequel un PNJ cherche des offres à accepter. */
+export const NPC_TRADE_RADIUS = 25;

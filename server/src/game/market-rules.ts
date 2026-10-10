@@ -1,17 +1,10 @@
 import { MERCHANT_CAPACITY, RESOURCES, type Resource, type Resources } from '@aldoria/shared';
 
+export { OFFER_LIFETIME_HOURS, MIN_RATE, MAX_RATE, MIN_OFFER_AMOUNT, MAX_PLAYER_OFFERS, MAX_NPC_OFFERS, NPC_TRADE_RADIUS } from '@aldoria/shared';
+import { OFFER_LIFETIME_HOURS, MIN_RATE, MAX_RATE, MIN_OFFER_AMOUNT, MAX_PLAYER_OFFERS, MAX_NPC_OFFERS, NPC_TRADE_RADIUS } from '@aldoria/shared';
+
 // Règles pures du marché : pas de base de données ni d'horloge ici, pour pouvoir les tester facilement.
 
-/** Durée de vie d'une offre, en heures de jeu (divisée par la vitesse du monde). */
-export const OFFER_LIFETIME_HOURS = 24;
-/** Taux accepté : ce qu'on demande doit valoir entre la moitié et le double de ce qu'on donne. */
-export const MIN_RATE = 0.5;
-export const MAX_RATE = 2;
-export const MIN_OFFER_AMOUNT = 50;
-export const MAX_PLAYER_OFFERS = 5;
-export const MAX_NPC_OFFERS = 2;
-/** Rayon (en cases) dans lequel un PNJ cherche des offres à accepter. */
-export const NPC_TRADE_RADIUS = 25;
 /** Au-dessus de cette part de l'entrepôt, une ressource est en excédent pour un PNJ ; en dessous de la seconde, en manque. */
 export const SURPLUS_SHARE = 0.7;
 export const SHORTAGE_SHARE = 0.25;

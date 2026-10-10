@@ -10,6 +10,13 @@ import {
   LOYALTY_REGEN_PER_HOUR,
   MERCHANT_CAPACITY,
   MERCHANT_SPEED,
+  MAX_PLAYER_OFFERS,
+  MAX_NPC_OFFERS,
+  MAX_RATE,
+  MIN_OFFER_AMOUNT,
+  MIN_RATE,
+  NPC_TRADE_RADIUS,
+  OFFER_LIFETIME_HOURS,
   NOBLE_LOYALTY_MAX,
   NOBLE_LOYALTY_MIN,
   RAMS_PER_WALL_LEVEL_DESTROYED,
@@ -186,6 +193,9 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
     debuter: (
       <>
         <p>
+          <b>S'orienter :</b> le menu est organisé en groupes (village, armée, carte, social, aide) ; sur téléphone, il s'ouvre depuis le bouton en haut de l'écran.
+        </p>
+        <p>
           À l'inscription, vous recevez un village placé autour du centre de la carte, avec <Cost cost={STARTING_RESOURCES} /> et ces bâtiments au niveau 1 :{' '}
           {BUILDING_KEYS.filter((k) => STARTING_BUILDINGS[k] > 0).map((k, i) => (
             <span key={k}>{i > 0 && ', '}{B(k)}</span>
@@ -246,6 +256,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>
             <b>Entretien :</b> chaque unité consomme du blé par heure. On ne peut recruter que si la production de la {B('farm')} couvre l'entretien de toute l'armée, recrues comprises
             (les valeurs de la caserne sont données à vitesse x1).
+          </li>
+          <li>
+            <b>Dissolution :</b> depuis le Point de ralliement, le bouton « Dissoudre » renvoie des soldats stationnés dans le village à la vie civile. L'action est définitive et ne rembourse rien,
+            mais le blé qu'ils consommaient est immédiatement libéré. Seules les troupes présentes au village peuvent être dissoutes (pas celles en mouvement ni en renfort chez un autre).
           </li>
         </ul>
       </>
@@ -327,6 +341,22 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>Nombre de marchands : {merchantCount(1)} au niveau 1, {merchantCount(10)} au niveau 10, {merchantCount(20)} au niveau 20.</li>
           <li>À l'arrivée, ce qui dépasse la capacité de l'entrepôt du destinataire est perdu.</li>
         </ul>
+        <h3>Offres du marché</h3>
+        <p>
+          L'onglet « Offres » (aussi dans le menu, « Offres du marché ») permet d'échanger avec les autres joueurs sans connaître leur pseudo : vous publiez ce que vous donnez et ce que vous voulez en échange, et
+          n'importe quel joueur peut accepter.
+        </p>
+        <ul>
+          <li>Les ressources que vous donnez sont retirées de votre entrepôt dès la publication (il faut aussi assez de marchands libres pour les livrer) ; elles vous reviennent si l'offre est annulée ou expire.</li>
+          <li>Le taux (ce que vous demandez ÷ ce que vous donnez) doit rester entre {MIN_RATE} et {MAX_RATE}, et chaque quantité fait au moins {MIN_OFFER_AMOUNT}. Une pastille « 1 : x » indique le taux de chaque offre.</li>
+          <li>Une offre dure {duration((OFFER_LIFETIME_HOURS * 3600) / s)} ; passé ce délai elle expire et vos ressources reviennent.</li>
+          <li>Vous pouvez avoir {MAX_PLAYER_OFFERS} offres ouvertes en même temps et les retirer à tout moment depuis « Mes offres ».</li>
+          <li>Les filtres « Je veux » et « J'offre » trient la liste par ressource </li>
+        </ul>
+        <p>
+          <b>Les PNJ commercent aussi :</b> ils publient jusqu'à {MAX_NPC_OFFERS} offres, en donnant une ressource qu'ils ont en excédent contre une qui leur manque, et acceptent de leur côté vos offres
+          proches (rayon de {NPC_TRADE_RADIUS} cases) quand elles les arrangent. Leurs offres ne se distinguent pas de celles des joueurs.
+        </p>
       </>
     ),
     carte: (
@@ -343,6 +373,17 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           Les villages barbares ne recrutent pas : une garnison vaincue ne revient pas, mais leurs bâtiments gagnent des niveaux avec le temps. Les plus lointains sont aussi les mieux défendus.
         </p>
         <p>Touchez un village sur la carte pour voir son propriétaire, ses points et lui envoyer des troupes ou des marchands. Le pseudo d'un joueur ouvre son profil et la liste de ses villages.</p>
+        <p>
+          <b>Repères :</b> le bouton « Quadrillage » affiche une grille de cases avec leurs coordonnées, et « Mini-map » une vue d'ensemble du monde où vous cliquez pour vous déplacer
+          (bleu : vous, vert : votre tribu, rouge : les autres, gris : barbares). Le champ « x|y » saute directement à une case ; les deux options sont mémorisées sur votre appareil.
+          La carte se manipule au doigt (glisser, pincer) comme à la souris.
+        </p>
+        <p>
+          <b>Joueurs PNJ :</b> certains comptes sont pilotés par le serveur. Ils construisent, recrutent, commercent, rejoignent des tribus et attaquent comme n'importe quel joueur, avec les mêmes règles.
+          Pour laisser les nuits tranquilles, aucun PNJ ne vise de joueur entre 22 h et 8 h (heure de Paris) : pas d'attaque ni d'espionnage, et aucune troupe ne doit arriver chez vous à ces heures.
+          Ils peuvent en revanche piller les villages barbares à toute heure. Hors heures calmes, un PNJ ne s'en prend sans raison qu'à un joueur de force comparable (70 à 150 % de ses points),
+          jamais à un joueur sous protection débutant, mais il riposte contre qui l'a attaqué, lui ou sa tribu.
+        </p>
       </>
     ),
     social: (
@@ -350,11 +391,11 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
         <h3>Rapports</h3>
         <p>Attaques, défenses, espionnages, renforts et livraisons créent un rapport. Un badge indique les rapports non lus ; vous pouvez les supprimer.</p>
         <h3>Messages</h3>
-        <p>Écrivez à n'importe quel joueur en donnant son pseudo. Vous êtes prévenu en direct à la réception.</p>
+        <p>Écrivez à n'importe quel joueur en donnant son pseudo, ou depuis son profil. Vous êtes prévenu en direct à la réception. « Répondre » prépare un message au correspondant de la conversation.</p>
         <h3>Tribus</h3>
         <ul>
           <li>Fondez une tribu avec un nom (3 à 32 caractères) et un tag (2 à 6 lettres ou chiffres), ou rejoignez-en une sur invitation.</li>
-          <li>Le chef invite, exclut et rédige la description de la tribu.</li>
+          <li>Le chef invite, exclut et rédige la description de la tribu. Pour inviter, il ouvre le profil du joueur (en touchant son pseudo) et utilise le bouton « Inviter dans ma tribu » : ce bouton n'apparaît que pour le chef, et seulement si le joueur est libre et n'a pas déjà reçu d'invitation.</li>
           <li>On ne peut appartenir qu'à une tribu à la fois.</li>
           <li>La page de tribu propose aux membres trois outils : les menaces (attaques extérieures en approche sur les villages de la tribu), un planificateur d'attaque groupée (heure de départ de chaque village pour arriver ensemble) et un message envoyé à toute la tribu.</li>
           <li>Les tribus peuvent s'allier ou se faire la guerre ; les renforts d'un allié sont les bienvenus.</li>
