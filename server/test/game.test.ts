@@ -268,4 +268,14 @@ describe('jeu', () => {
     const after = await app.inject({ method: 'GET', url: '/api/me', headers: auth(token) });
     expect(after.statusCode).toBe(401);
   });
+
+  it('un village barbare pillé retrouve des troupes avec le temps', async () => {
+    const t0 = new Date(Date.now() - 200 * HOUR);
+    const id = await tx((c) =>
+      createVillage(c, { ownerId: null, name: 'Camp', x: 3, y: 97, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: emptyUnits() }),
+    );
+    await tx((c) => syncVillage(c, id, new Date(t0.getTime() + 100 * HOUR)));
+    const troops = await tx((c) => getTroops(c, id, id));
+    expect(troops.spearman + troops.swordsman).toBeGreaterThan(0);
+  });
 });
