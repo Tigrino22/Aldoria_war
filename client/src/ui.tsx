@@ -77,3 +77,9 @@ export function Panel({ title, children, actions }: { title: string; children: R
     </section>
   );
 }
+
+/** Nom de joueur cliquable qui mène à son profil. */
+export function PlayerLink({ name }: { name: string | null | undefined }) {
+  if (!name) return null;
+  return <a href={`#/joueur/${encodeURIComponent(name)}`}>{name}</a>;
+}
