@@ -120,6 +120,64 @@ export default async function socialRoutes(app: FastifyInstance) {
     });
   });
 
+  // ---------- Outils de tribu ----------
+  /** Villages des membres de la tribu (réservé aux membres), pour planifier des attaques groupées. */
+  app.get('/api/tribes/mine/villages', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act(async (c) => {
+      const { tribeId } = await tribeOf(c, playerId);
+      if (!tribeId) throw new GameError("Vous n'avez pas de tribu");
+      const { rows } = await c.query(
+        `SELECT v.id, v.name, v.x, v.y, v.points, p.id AS owner_id, p.username FROM villages v JOIN players p ON p.id = v.owner_id
+         WHERE p.tribe_id = $1 ORDER BY p.username, v.id`,
+        [tribeId],
+      );
+      return rows.map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, points: r.points, ownerId: r.owner_id, ownerName: r.username }));
+    });
+  });
+
+  /** Attaques en approche sur les villages des membres : qui, d'où, quand. Les troupes restent secrètes. */
+  app.get('/api/tribes/mine/threats', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act(async (c) => {
+      const { tribeId } = await tribeOf(c, playerId);
+      if (!tribeId) throw new GameError("Vous n'avez pas de tribu");
+      const { rows } = await c.query(
+        `SELECT c.id, c.arrive_at, t.id AS target_id, t.name AS target_name, t.x AS tx, t.y AS ty, pt.id AS defender_id, pt.username AS defender,
+                o.name AS origin_name, o.x AS ox, o.y AS oy, po.username AS attacker
+         FROM commands c
+         JOIN villages t ON t.id = c.target_village_id JOIN players pt ON pt.id = t.owner_id
+         JOIN villages o ON o.id = c.origin_village_id LEFT JOIN players po ON po.id = o.owner_id
+         WHERE c.type = 'attack' AND NOT c.processed AND pt.tribe_id = $1 AND (po.tribe_id IS DISTINCT FROM $1)
+         ORDER BY c.arrive_at LIMIT 100`,
+        [tribeId],
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        arriveAt: new Date(r.arrive_at).toISOString(),
+        target: { id: r.target_id, name: r.target_name, x: r.tx, y: r.ty, ownerName: r.defender },
+        origin: { name: r.origin_name, x: r.ox, y: r.oy, ownerName: r.attacker },
+      }));
+    });
+  });
+
+  /** Message envoyé à tous les autres membres de la tribu. */
+  app.post('/api/tribes/mine/broadcast', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const playerId = await requirePlayer(req);
+    const body = z.object({ subject: z.string().trim().min(1).max(120), body: z.string().trim().min(1).max(5000) }).parse(req.body);
+    return act(async (c, outbox) => {
+      const { tribeId } = await tribeOf(c, playerId);
+      if (!tribeId) throw new GameError("Vous n'avez pas de tribu");
+      const members = (await c.query('SELECT id FROM players WHERE tribe_id = $1 AND id <> $2', [tribeId, playerId])).rows;
+      const me = (await c.query('SELECT username FROM players WHERE id = $1', [playerId])).rows[0];
+      for (const m of members) {
+        await c.query('INSERT INTO messages (from_id, to_id, subject, body) VALUES ($1, $2, $3, $4)', [playerId, m.id, `[Tribu] ${body.subject}`, body.body]);
+        outbox.push(m.id, { type: 'message', from: me.username });
+      }
+      return { sent: members.length };
+    });
+  });
+
   app.get('/api/tribes/:id', async (req) => {
     const playerId = await requirePlayer(req);
     const { id } = idParam.parse(req.params);

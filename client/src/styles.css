@@ -340,3 +340,5 @@ textarea { width: 100%; resize: vertical; }
 .wiki-table .cost { flex-wrap: nowrap; gap: 8px; }
 .wiki-table td.left.small { min-width: 130px; }
 .wiki-table img { max-width: none; flex: none; vertical-align: middle; }
+
+.rank-table tr.late { color: var(--danger); }
