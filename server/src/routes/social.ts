@@ -212,6 +212,42 @@ export default async function socialRoutes(app: FastifyInstance) {
     });
   });
 
+  // ---------- Profils ----------
+  app.get('/api/players/:name', async (req) => {
+    await requirePlayer(req);
+    const { name } = z.object({ name: z.string().trim().min(1).max(60) }).parse(req.params);
+    const p = (
+      await pool.query(
+        `SELECT p.id, p.username, p.created_at, p.protection_until, t.id AS tribe_id, t.tag, t.name AS tribe_name
+         FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE lower(p.username) = lower($1)`,
+        [name],
+      )
+    ).rows[0];
+    if (!p) throw notFound('Joueur introuvable');
+    const villages = (
+      await pool.query('SELECT id, name, x, y, points FROM villages WHERE owner_id = $1 ORDER BY points DESC, id', [p.id])
+    ).rows;
+    const points = villages.reduce((sum, v) => sum + v.points, 0);
+    const rank = (
+      await pool.query(
+        `SELECT count(*)::int + 1 AS rank FROM (
+           SELECT p2.id, coalesce(sum(v.points), 0) AS pts FROM players p2 LEFT JOIN villages v ON v.owner_id = p2.id GROUP BY p2.id
+         ) s WHERE s.pts > $1`,
+        [points],
+      )
+    ).rows[0].rank as number;
+    return {
+      id: p.id,
+      username: p.username,
+      createdAt: p.created_at,
+      protected: !!p.protection_until && new Date(p.protection_until) > new Date(),
+      points,
+      rank,
+      tribe: p.tribe_id ? { id: p.tribe_id, tag: p.tag, name: p.tribe_name } : null,
+      villages,
+    };
+  });
+
   // ---------- Classements ----------
   app.get('/api/ranking/players', async (req) => {
     await requirePlayer(req);

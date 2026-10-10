@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
-import { Panel } from '../ui';
+import { Panel, PlayerLink } from '../ui';
 
 export default function Ranking() {
   const { me, run } = useGame();
@@ -31,7 +31,7 @@ export default function Ranking() {
             {rows.map((r) =>
               tab === 'players' ? (
                 <tr key={r.id} className={r.id === me.player.id ? 'me' : ''}>
-                  <td>{r.rank}</td><td>{r.username}</td><td>{r.tag ?? '–'}</td><td>{r.villages}</td><td>{fmt(r.points)}</td>
+                  <td>{r.rank}</td><td><PlayerLink name={r.username} /></td><td>{r.tag ?? '–'}</td><td>{r.villages}</td><td>{fmt(r.points)}</td>
                 </tr>
               ) : (
                 <tr key={r.id} className={r.id === me.player.tribe?.id ? 'me' : ''}>
