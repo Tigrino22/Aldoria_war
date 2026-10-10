@@ -108,7 +108,6 @@ export default function Tribe({ id }: { id?: number }) {
         )}
       </Panel>
 
-      {tribe.isNpc && <p className="muted small">Tribu de PNJ : ses membres sont pilotés par le serveur et ne rejoignent pas les tribus des joueurs.</p>}
 
       <Panel title="Membres">
         <div className="table-wrap">

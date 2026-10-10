@@ -197,6 +197,12 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           peut vous attaquer. Attention : si vous attaquez vous-même un autre joueur, votre protection s'arrête aussitôt. Les villages barbares peuvent être attaqués sans perdre la protection.
         </p>
         <p>Conseil de départ : montez les quatre bâtiments de ressources, puis l'{B('townhall')} au niveau 3 pour débloquer la {B('barracks')} et le {B('market')}.</p>
+        <p>
+          <b>Premiers pas :</b> une liste de quêtes vous guide au début ; chaque quête accomplie rapporte une récompense à récupérer.
+        </p>
+        <p>
+          <b>Annulations :</b> vous pouvez annuler une construction, un recrutement ou un mouvement de troupes en cours (une partie des ressources est rendue pour les deux premiers).
+        </p>
       </>
     ),
     ressources: (
@@ -333,7 +339,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <b>Villages barbares :</b> des villages sans propriétaire sont répartis sur la carte. Plus ils sont loin du centre, plus ils sont développés et défendus (lanciers et épéistes). Ils ne
           recrutent pas et ne vous attaquent jamais : ce sont des cibles idéales pour piller, ou pour une première conquête.
         </p>
-        <p>Touchez un village sur la carte pour voir son propriétaire, ses points et lui envoyer des troupes ou des marchands.</p>
+        <p>
+          Les villages barbares pillés se reconstruisent : leur garnison se reforme peu à peu et ils gagnent des niveaux avec le temps. Les plus lointains sont aussi les mieux défendus.
+        </p>
+        <p>Touchez un village sur la carte pour voir son propriétaire, ses points et lui envoyer des troupes ou des marchands. Le pseudo d'un joueur ouvre son profil et la liste de ses villages.</p>
       </>
     ),
     social: (
@@ -347,7 +356,14 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>Fondez une tribu avec un nom (3 à 32 caractères) et un tag (2 à 6 lettres ou chiffres), ou rejoignez-en une sur invitation.</li>
           <li>Le chef invite, exclut et rédige la description de la tribu.</li>
           <li>On ne peut appartenir qu'à une tribu à la fois.</li>
+          <li>La page de tribu propose aux membres trois outils : les menaces (attaques extérieures en approche sur les villages de la tribu), un planificateur d'attaque groupée (heure de départ de chaque village pour arriver ensemble) et un message envoyé à toute la tribu.</li>
+          <li>Les tribus peuvent s'allier ou se faire la guerre ; les renforts d'un allié sont les bienvenus.</li>
         </ul>
+        <h3>Vue d'ensemble et aides à l'attaque</h3>
+        <p>
+          La vue d'ensemble liste tous vos villages (ressources, constructions, troupes, mouvements). Avant un envoi, la simulation estime le résultat d'un combat à partir de ce que vos éclaireurs ont appris, et vous
+          pouvez enregistrer des modèles d'armée pour les réutiliser.
+        </p>
         <h3>Classement</h3>
         <p>
           Les points d'un joueur sont la somme des points de ses villages, et ceux d'un village la somme des points de ses bâtiments (un bâtiment au niveau N vaut N×(N+1)/2 points). Le
