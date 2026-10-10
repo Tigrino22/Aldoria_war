@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STARTING_BUILDINGS, emptyUnits } from '@aldoria/shared';
-import { barbarianCap, barbarianTier, barbarianTroopTarget, growBarbarian } from '../src/game/barbarians';
+import { barbarianCap, barbarianTier, growBarbarian } from '../src/game/barbarians';
 
 const seeded = () => {
   let s = 12345;
@@ -16,16 +16,10 @@ describe('barbares', () => {
     expect(barbarianCap(19, 100)).toBe(20);
   });
 
-  it('une garnison pillée revient vers sa cible sans la dépasser', () => {
-    const cap = 4;
-    const target = barbarianTroopTarget(cap);
-    const rng = seeded();
-    const partial = growBarbarian({ buildings: { ...STARTING_BUILDINGS }, troops: emptyUnits() }, 5, cap, rng);
-    expect(partial.troops.spearman).toBeGreaterThan(0);
-    expect(partial.troops.spearman).toBeLessThan(target.spearman);
-    const full = growBarbarian({ buildings: { ...STARTING_BUILDINGS }, troops: emptyUnits() }, 1000, cap, rng);
-    expect(full.troops.spearman).toBe(target.spearman);
-    expect(full.troops.swordsman).toBe(target.swordsman);
+  it('les barbares ne produisent aucune unité : une garnison pillée ne revient pas', () => {
+    const troops = { ...emptyUnits(), spearman: 3 };
+    const grown = growBarbarian({ buildings: { ...STARTING_BUILDINGS }, troops }, 100_000, 4, seeded());
+    expect(grown.troops).toEqual(troops);
   });
 
   it('les bâtiments montent, sans dépasser le plafond et sans créer de marché', () => {

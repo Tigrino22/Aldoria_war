@@ -340,14 +340,14 @@ describe('jeu', () => {
     await expect(tx((c) => cancelCommand(c, new Outbox(), a, second.id, new Date(t0.getTime() + 200_000)))).rejects.toThrow(/secondes/);
   });
 
-  it('un village barbare pillé retrouve des troupes avec le temps', async () => {
+  it('un village barbare pillé ne retrouve aucune troupe avec le temps', async () => {
     const t0 = new Date(Date.now() - 200 * HOUR);
     const id = await tx((c) =>
       createVillage(c, { ownerId: null, name: 'Camp', x: 3, y: 97, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: emptyUnits() }),
     );
     await tx((c) => syncVillage(c, id, new Date(t0.getTime() + 100 * HOUR)));
     const troops = await tx((c) => getTroops(c, id, id));
-    expect(troops.spearman + troops.swordsman).toBeGreaterThan(0);
+    expect(troops.spearman + troops.swordsman).toBe(0);
   });
 
   it('le profil public liste les villages du joueur, sans tenir compte de la casse', async () => {
