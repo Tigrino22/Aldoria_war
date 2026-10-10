@@ -160,6 +160,24 @@ describe('PNJ agressifs', () => {
     expect((await attacksOn(npc, big)).length).toBeGreaterThan(0);
   });
 
+  it('aucune limite journalière : un PNJ attaqué frappe le même joueur autant de fois que nécessaire', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 400, scout: 3 })));
+    const foe = await makePlayer('Adversaire');
+    const base = await villageOf(foe, home.x + 2, home.y + 1, { swordsman: 20 });
+    await pool.query('UPDATE players SET protection_until = NULL');
+    const t = new Date(NOON.getTime() + 75 * HOUR);
+    await tx((c) => sendCommand(c, new Outbox(), foe, base, { type: 'attack', targetId: home.id, units: { swordsman: 20 } }, t));
+    for (let i = 0; i < 6; i++) {
+      const at = new Date(t.getTime() + (i + 1) * 60_000);
+      await scouted(npc, base, at);
+      await tx((c) => npcThink(c, new Outbox(), npc, at));
+      await pool.query("UPDATE commands SET processed = true WHERE player_id = $1", [npc]);
+    }
+    expect((await attacksOn(npc, base)).length).toBeGreaterThanOrEqual(5);
+  });
+
   it('trois nouveaux PNJ par jour, un toutes les 8 heures, jusqu’au plafond', async () => {
     await pool.query('DELETE FROM players WHERE is_npc');
     await tx((c) => createNpc(c, new Date()));

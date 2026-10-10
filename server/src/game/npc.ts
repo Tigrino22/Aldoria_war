@@ -44,21 +44,13 @@ const delayMs = () => Math.max(30_000, ((10 + rng() * 10) * 60_000) / Math.sqrt(
 const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 /** Rayon (en cases) dans lequel un PNJ cherche des cibles. */
 const RAID_RADIUS = 20;
-/** Au plus 2 attaques par PNJ et par jour sur des joueurs, et 1 attaque par jour (tous PNJ confondus) sur un même joueur. */
-const MAX_PLAYER_RAIDS_PER_NPC_PER_DAY = 2;
-const MAX_RAIDS_PER_TARGET_PER_DAY = 1;
-/** Un PNJ qui se venge peut frapper plus souvent : 4 attaques par jour sur des joueurs, 3 sur le même. */
-const MAX_REVENGE_RAIDS_PER_NPC_PER_DAY = 4;
-const MAX_REVENGE_RAIDS_PER_TARGET_PER_DAY = 3;
 /** Nombre maximal de nobles dans un train. */
 const MAX_TRAIN = 6;
 const DAY_MS = 86_400_000;
 /** Délai minimal (en heures de jeu) entre deux attaques armées d'un même PNJ, pour qu'il ne vide pas les barbares à lui seul. */
 const RAID_COOLDOWN_GAME_HOURS = 6;
-/** Délai (en heures de jeu) d'un PNJ fort, et plafonds relevés : 6 attaques par jour sur des joueurs, 4 sur le même. */
+/** Délai (en heures de jeu) d'un PNJ fort entre deux attaques. */
 const STRONG_COOLDOWN_GAME_HOURS = 2;
-const MAX_STRONG_RAIDS_PER_NPC_PER_DAY = 6;
-const MAX_STRONG_RAIDS_PER_TARGET_PER_DAY = 4;
 /** Délai minimal (en heures de jeu) entre deux missions d'espionnage d'un même PNJ. */
 const SCOUT_COOLDOWN_GAME_HOURS = 4;
 
@@ -255,27 +247,6 @@ async function freshScoutIntel(c: Db, npcId: number, villageId: number, now: Dat
   return { troops: normalizeUnits(data.intel.troops), wall: data.intel.buildings.wall ?? 0 };
 }
 
-async function raidsOnPlayersByNpc(c: Db, npcId: number, now: Date): Promise<number> {
-  const { rows } = await c.query(
-    `SELECT count(*)::int AS n FROM commands cm JOIN villages t ON t.id = cm.target_village_id
-     WHERE cm.player_id = $1 AND cm.type = 'attack' AND cm.sent_at > $2 AND t.owner_id IS NOT NULL
-       AND coalesce((cm.units->>'swordsman')::int, 0) + coalesce((cm.units->>'cavalry')::int, 0) > 0`,
-    [npcId, new Date(now.getTime() - DAY_MS)],
-  );
-  return rows[0].n;
-}
-
-async function raidsOnOwner(c: Db, ownerId: number, now: Date): Promise<number> {
-  const { rows } = await c.query(
-    `SELECT count(*)::int AS n FROM commands cm
-     JOIN villages t ON t.id = cm.target_village_id JOIN players a ON a.id = cm.player_id
-     WHERE t.owner_id = $1 AND a.is_npc AND cm.type = 'attack' AND cm.sent_at > $2
-       AND coalesce((cm.units->>'swordsman')::int, 0) + coalesce((cm.units->>'cavalry')::int, 0) > 0`,
-    [ownerId, new Date(now.getTime() - DAY_MS)],
-  );
-  return rows[0].n;
-}
-
 interface Candidate {
   id: number;
   x: number;
@@ -336,20 +307,10 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const arrivalOf = (units: UnitCounts, to: { x: number; y: number }) => new Date(now.getTime() + travelTime(units, village, to, env.worldSpeed) * 1000);
   /**
    * « Train de nobles » : un PNJ qui a au moins 4 nobles les envoie un par un, arrivant à une seconde d'écart juste après l'assaut qui nettoie la défense.
-   * Renvoie le nombre de nobles du train (0 si aucun), avec au plus une tentative par jour sur un même joueur.
+   * Renvoie le nombre de nobles du train (0 si aucun).
    */
-  const trainSize = async (owner: number | null, rival: boolean): Promise<number> => {
+  const trainSize = (): number => {
     if (home.noble < NOBLES_PER_CONQUEST) return 0;
-    if (owner !== null && !rival) {
-      const recent = (
-        await c.query(
-          `SELECT 1 FROM commands cm JOIN villages t ON t.id = cm.target_village_id
-           WHERE t.owner_id = $1 AND cm.type = 'attack' AND cm.sent_at > $2 AND coalesce((cm.units->>'noble')::int, 0) > 0 LIMIT 1`,
-          [owner, new Date(now.getTime() - DAY_MS)],
-        )
-      ).rows;
-      if (recent.length) return 0;
-    }
     return Math.min(home.noble, MAX_TRAIN);
   };
 
@@ -391,9 +352,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const myPoints = (await c.query('SELECT coalesce(sum(points), 0)::int AS p FROM villages WHERE owner_id = $1', [npcId])).rows[0].p as number;
   const sameSize = humans.filter((t) => pointRatioOk(myPoints, t.ownerPoints));
   const aggressive = !quiet && isLeader && opCooldownOk && !onCooldown ? sameSize : [];
-  let players = [...new Set([...revenge, ...aggressive])];
-  const playerRaids = players.length ? await raidsOnPlayersByNpc(c, npcId, now) : 0;
-  if (playerRaids >= (revenge.length ? MAX_REVENGE_RAIDS_PER_NPC_PER_DAY : strong ? MAX_STRONG_RAIDS_PER_NPC_PER_DAY : MAX_PLAYER_RAIDS_PER_NPC_PER_DAY)) players = [];
+  const players = [...new Set([...revenge, ...aggressive])];
   // Les PNJ en guerre préfèrent frapper les villages rivaux plutôt que les barbares.
   const prey = onCooldown ? [] : rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
   const revengePool = players.filter((t) => revenge.includes(t));
@@ -402,8 +361,6 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const target = pool.map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
 
   const hostileToPlayer = target.ownerId !== null && !target.rival;
-  const avenging = hostileToPlayer && grudges.includes(target.ownerId!);
-  if (hostileToPlayer && (await raidsOnOwner(c, target.ownerId!, now)) >= (avenging ? MAX_REVENGE_RAIDS_PER_TARGET_PER_DAY : strong ? MAX_STRONG_RAIDS_PER_TARGET_PER_DAY : MAX_RAIDS_PER_TARGET_PER_DAY)) return;
   // L'arrivée d'une attaque ou d'un espion chez un joueur ne doit jamais tomber pendant les heures calmes.
   const arrivesQuiet = (units: UnitCounts) => hostileToPlayer && isQuietAt(arrivalOf(units, target));
 
@@ -423,7 +380,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     const picked = pickWinningUnits(attackers, intel.troops, intel.wall);
     if (!picked) return;
     const units = picked;
-    const nobles = await trainSize(target.ownerId, target.rival);
+    const nobles = trainSize();
     // Tous les envois arrivent à la suite : l'assaut d'abord, puis un noble par seconde.
     const single = { ...emptyUnits(), noble: 1 };
     const naturals = [arrivalOf(units, target), ...(nobles ? [arrivalOf(single, target)] : [])];
