@@ -6,4 +6,6 @@
   .minimap canvas { width: 110px; height: 110px; }
   .minimap span { display: none; }
   .minimap { padding: 4px; }
+  /* La fenêtre d'actions du village passe au premier plan : on range la mini-map tant qu'elle est ouverte. */
+  .map-wrap.has-popup .minimap { display: none; }
 }
