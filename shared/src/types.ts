@@ -1,4 +1,4 @@
-import type { BuildingKey, Buildings, Resources, UnitCounts, UnitKey } from './config';
+import type { BuildingKey, Buildings, Resource, Resources, UnitCounts, UnitKey } from './config';
 
 /** Types échangés entre l'API et le client. */
 
@@ -188,4 +188,20 @@ export interface PlayerProfile {
   rank: number;
   tribe: { id: number; tag: string; name: string } | null;
   villages: { id: number; name: string; x: number; y: number; points: number }[];
+}
+
+/** Offre publique du marché : « je donne X contre Y ». */
+export interface MarketOfferView {
+  id: number;
+  villageId: number;
+  villageName: string;
+  x: number;
+  y: number;
+  ownerName: string;
+  isNpc: boolean;
+  give: { resource: Resource; amount: number };
+  want: { resource: Resource; amount: number };
+  expiresAt: string;
+  /** Distance en cases depuis le village qui consulte les offres. */
+  distance: number;
 }

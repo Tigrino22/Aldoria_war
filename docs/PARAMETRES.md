@@ -164,3 +164,20 @@ Chaque niveau de caserne réduit le temps de recrutement de 6 %.
 
 Chaque marchand porte 1 000 ressources, à 6 min par case.
 
+
+## Offres de marché (joueurs et PNJ)
+
+Valeurs dans `server/src/game/market-rules.ts`, à ajuster librement.
+
+| Paramètre | Valeur |
+|---|---|
+| Durée de vie d'une offre | 24 h de jeu (divisée par la vitesse du monde) |
+| Taux demandé / donné accepté | entre 0,5 et 2 |
+| Minimum par côté | 50 ressources |
+| Offres ouvertes par joueur | 5 (2 pour un PNJ) |
+| PNJ : excédent / manque | plus de 70 % / moins de 25 % de l'entrepôt |
+| PNJ : montant offert | 30 % du stock en excédent (max. 1 000), taux 0,9 (bâtisseur) ou 1 |
+| PNJ : rayon pour accepter | 25 cases |
+| PNJ pillards | commercent une réflexion sur trois |
+
+Les ressources offertes sont retirées du village à la publication et rendues à l'annulation ou à l'expiration. À l'acceptation, deux convois de marchands partent, un dans chaque sens ; chaque côté doit avoir assez de marchands libres.

@@ -1,0 +1,10 @@
+.offers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.offers li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.offers li:last-child { border-bottom: 0; }
+.offer-who { display: flex; flex-direction: column; flex: 1; min-width: 160px; }
+.offer-who .chip { margin-left: 6px; font-size: 10px; padding: 0 7px; align-self: flex-start; }
+.offer-deal { display: flex; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; font-size: 16px; }
+.arrow { color: var(--gold); font-size: 20px; font-weight: 700; }
+.offer-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.offer-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
+.offer-form input { width: 100px; }
