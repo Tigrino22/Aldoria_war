@@ -157,3 +157,12 @@ export interface TradeReportData {
   to: { id: number; name: string; x: number; y: number; playerName: string | null };
   resources: Resources;
 }
+
+/** Ce que le joueur sait d'un village cible, d'après son dernier espionnage ou sa dernière attaque. */
+export interface TargetIntel {
+  /** Troupes qui étaient (ou restaient) sur place. */
+  troops: UnitCounts;
+  wall: number;
+  at: string;
+  source: 'scout' | 'attack';
+}

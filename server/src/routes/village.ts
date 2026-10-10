@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { BUILDING_KEYS, RESOURCES, UNIT_KEYS } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
-import type { Db } from '../db';
+import { pool, type Db } from '../db';
 import { GameError, forbidden } from '../errors';
+import { pickIntel } from '../game/intel';
 import { recallTroops, sendCommand, sendTrade } from '../game/commands';
 import { enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
@@ -51,6 +52,19 @@ export default async function villageRoutes(app: FastifyInstance) {
         protected: v.protection_until ? new Date(v.protection_until) > new Date() : false,
       };
     });
+  });
+
+  /** Le dernier renseignement du joueur sur un village cible, pour simuler une attaque. */
+  app.get('/api/villages/:id/intel', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT type, data, created_at FROM reports
+       WHERE player_id = $1 AND type IN ('scout', 'attack') AND (data->'defender'->'village'->>'id')::int = $2
+       ORDER BY created_at DESC, id DESC LIMIT 10`,
+      [playerId, id],
+    );
+    return pickIntel(rows) ?? { none: true };
   });
 
   app.post('/api/villages/:id/build', async (req) => {
