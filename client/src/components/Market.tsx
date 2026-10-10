@@ -30,6 +30,7 @@ export default function Market({ focus }: { focus?: string }) {
   const setTab = (t: 'send' | 'offers') => go(t === 'offers' ? 'marche/offres' : 'marche');
   const [offers, setOffers] = useState<{ offers: MarketOfferView[]; mine: MarketOfferView[] } | null>(null);
   const [filter, setFilter] = useState<Resource | null>(null);
+  const [filterPay, setFilterPay] = useState<Resource | null>(null);
   const [form, setForm] = useState<{ give: Resource; giveAmount: string; want: Resource; wantAmount: string }>({ give: 'wood', giveAmount: '', want: 'clay', wantAmount: '' });
   const villageId = v?.id;
   const hasMarket = (v?.buildings.market ?? 0) > 0;
@@ -103,7 +104,7 @@ export default function Market({ focus }: { focus?: string }) {
   }
 
   if (tab === 'offers') {
-    const shown = (offers?.offers ?? []).filter((o) => !filter || o.give.resource === filter);
+    const shown = (offers?.offers ?? []).filter((o) => (!filter || o.give.resource === filter) && (!filterPay || o.want.resource === filterPay));
     const giveAmount = Math.floor(Number(form.giveAmount) || 0);
     const wantAmount = Math.floor(Number(form.wantAmount) || 0);
     const rate = giveAmount > 0 ? wantAmount / giveAmount : 0;
@@ -157,6 +158,15 @@ export default function Market({ focus }: { focus?: string }) {
             <span className="muted small">Je veux :</span>
             {RESOURCES.map((r) => (
               <button key={r} className={`chip chip-btn ${filter === r ? 'chip-ok' : ''}`} aria-pressed={filter === r} onClick={() => setFilter(filter === r ? null : r)}>
+                <ResIcon r={r} size={16} />
+                {RESOURCE_NAMES[r]}
+              </button>
+            ))}
+          </div>
+          <div className="row offer-filter">
+            <span className="muted small">J'offre :</span>
+            {RESOURCES.map((r) => (
+              <button key={r} className={`chip chip-btn ${filterPay === r ? 'chip-ok' : ''}`} aria-pressed={filterPay === r} onClick={() => setFilterPay(filterPay === r ? null : r)}>
                 <ResIcon r={r} size={16} />
                 {RESOURCE_NAMES[r]}
               </button>
