@@ -5,7 +5,7 @@ import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents } from '../src/game/commands';
 import { createNpc, ensureNpcs, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
-import { chooseBuilding, isQuiet, nextRecruit, npcCap, pickWinningUnits } from '../src/game/npc-rules';
+import { armyTarget, chooseBuilding, isQuiet, nextRecruit, npcCap, pickWinningUnits } from '../src/game/npc-rules';
 import { createVillage, getTroops, setTroops } from '../src/game/village';
 
 const MIN = 60_000;
@@ -64,12 +64,18 @@ describe('règles des PNJ', () => {
     expect(later.map((w) => w.unit)).not.toContain('spearman');
   });
 
-  it('n’attaque que si la victoire est nette, avec la plus petite armée qui suffit', () => {
+  it('n’attaque que si la victoire est nette, avec toute l’armée face à des défenseurs et le minimum face à un village vide', () => {
     const defenders = { ...emptyUnits(), spearman: 20 };
     expect(pickWinningUnits({ ...emptyUnits(), swordsman: 10 }, defenders, 0)).toBeNull();
     const units = pickWinningUnits({ ...emptyUnits(), swordsman: 400 }, defenders, 0);
-    expect(units).not.toBeNull();
-    expect(units!.swordsman).toBeLessThan(400);
+    expect(units).toEqual({ ...emptyUnits(), swordsman: 400 });
+    const vide = pickWinningUnits({ ...emptyUnits(), swordsman: 400 }, emptyUnits(), 0);
+    expect(vide!.swordsman).toBeLessThan(400);
+  });
+
+  it('les Bâtisseurs ne recrutent pas de nobles', () => {
+    expect(armyTarget('builder', 20, 1).noble).toBe(0);
+    expect(armyTarget('raider', 20, 1).noble).toBeGreaterThan(0);
   });
 });
 

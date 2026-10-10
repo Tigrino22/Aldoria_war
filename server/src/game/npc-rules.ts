@@ -81,7 +81,6 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
     t.spearman = scale(6);
     t.swordsman = scale(3);
     t.scout = 2;
-    t.noble = cap >= 12 ? NOBLES_PER_CONQUEST : 0;
   } else if (profile === 'conqueror') {
     t.swordsman = scale(5);
     t.cavalry = scale(2);
@@ -118,9 +117,14 @@ export function nextRecruit(
 /** Marge de sécurité demandée avant d'attaquer : la force d'attaque doit dépasser 1,3 fois la défense estimée. */
 export const ATTACK_MARGIN = 1.3;
 
-/** Plus petite part de l'armée disponible (au moins `minShare`) qui bat la défense estimée avec la marge voulue, ou null si même toute l'armée ne suffit pas. */
+const noTroops = (u: UnitCounts) => UNIT_KEYS.every((k) => u[k] === 0);
+
+/** Parts d'armée essayées : une seule (toute l'armée) face à des défenseurs, car un petit détachement perd trop de soldats ; toutes face à un village sans troupes. */
+const sharesFor = (defenders: UnitCounts, minShare: number) => (noTroops(defenders) ? [0.25, 0.35, 0.5, 0.7, 1] : [1]).filter((x) => x >= minShare);
+
+/** Toute l'armée disponible si elle bat la défense estimée avec la marge voulue, sauf face à un village sans troupes : alors la plus petite part (au moins `minShare`) qui suffit. Null si elle ne suffit pas. */
 export function pickWinningUnits(available: UnitCounts, defenders: UnitCounts, wall: number, minShare = 0): UnitCounts | null {
-  for (const share of [0.25, 0.35, 0.5, 0.7, 1].filter((x) => x >= minShare)) {
+  for (const share of sharesFor(defenders, minShare)) {
     const units = emptyUnits();
     for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
     if (UNIT_KEYS.every((k) => units[k] === 0)) continue;
@@ -206,8 +210,8 @@ export function carryOf(units: UnitCounts): number {
 export const MIN_LOOT = 200;
 
 /**
- * Choisit les troupes d'un pillage d'après ce qu'il y a à prendre : la plus petite part de l'armée qui gagne ET peut emporter
- * l'essentiel du stock, sinon la plus grande part qui gagne (jusqu'à toute l'armée). Renvoie aussi le butin attendu.
+ * Choisit les troupes d'un pillage. Face à des défenseurs, toute l'armée part (si elle gagne avec la marge voulue) pour limiter les pertes.
+ * Face à un village sans troupes, la plus petite part qui peut emporter l'essentiel du stock. Renvoie aussi le butin attendu.
  */
 export function pickRaidUnits(
   available: UnitCounts,
@@ -218,7 +222,7 @@ export function pickRaidUnits(
 ): { units: UnitCounts; loot: number } | null {
   const total = stock.wood + stock.clay + stock.iron + stock.wheat;
   let best: UnitCounts | null = null;
-  for (const share of [0.25, 0.35, 0.5, 0.7, 1].filter((x) => x >= minShare)) {
+  for (const share of sharesFor(defenders, minShare)) {
     const units = emptyUnits();
     for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
     if (UNIT_KEYS.every((k) => units[k] === 0)) continue;

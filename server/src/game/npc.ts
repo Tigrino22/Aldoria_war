@@ -352,10 +352,11 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const sameSize = humans.filter((t) => pointRatioOk(myPoints, t.ownerPoints));
   const aggressive = !quiet && isLeader && opCooldownOk ? sameSize : [];
   const players = [...new Set([...revenge, ...aggressive])];
+  // Un Bâtisseur se développe surtout en pillant les barbares et ne s'en prend que de temps en temps à un joueur.
   // Les PNJ en guerre préfèrent frapper les villages rivaux plutôt que les barbares.
   const prey = rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
   const revengePool = players.filter((t) => revenge.includes(t));
-  const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < 0.4) ? players : prey;
+  const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < (profile === 'builder' ? 0.15 : 0.4)) ? players : prey;
   if (pool.length === 0) return;
   const target = pool.map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
 
