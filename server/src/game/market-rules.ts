@@ -1,7 +1,7 @@
 import { MERCHANT_CAPACITY, RESOURCES, type Resource, type Resources } from '@aldoria/shared';
 
-export { OFFER_LIFETIME_HOURS, MIN_RATE, MAX_RATE, MIN_OFFER_AMOUNT, MAX_PLAYER_OFFERS, MAX_NPC_OFFERS, NPC_TRADE_RADIUS } from '@aldoria/shared';
-import { OFFER_LIFETIME_HOURS, MIN_RATE, MAX_RATE, MIN_OFFER_AMOUNT, MAX_PLAYER_OFFERS, MAX_NPC_OFFERS, NPC_TRADE_RADIUS } from '@aldoria/shared';
+export { OFFER_LIFETIME_HOURS, MIN_RATE, MAX_RATE, MIN_OFFER_AMOUNT, MAX_PLAYER_OFFERS } from '@aldoria/shared';
+import { OFFER_LIFETIME_HOURS, MIN_RATE, MAX_RATE, MIN_OFFER_AMOUNT, MAX_PLAYER_OFFERS } from '@aldoria/shared';
 
 // Règles pures du marché : pas de base de données ni d'horloge ici, pour pouvoir les tester facilement.
 
@@ -33,13 +33,13 @@ export function marketNeeds({ stock, capacity }: NpcStock): { surplus: Resource[
   return { surplus, shortage };
 }
 
-/** Offre qu'un PNJ publie : il donne 30 % d'une ressource en excédent contre celle qui lui manque le plus. */
-export function planOffer(npc: NpcStock, profile: 'builder' | 'raider' | 'conqueror'): { give: Resource; giveAmount: number; want: Resource; wantAmount: number } | null {
+/** Offre qu'un PNJ publie : il donne 30 % d'une ressource en excédent (au plus `maxGive`, ce que portent ses marchands libres) contre celle qui lui manque le plus. */
+export function planOffer(npc: NpcStock, profile: 'builder' | 'raider' | 'conqueror', maxGive = MERCHANT_CAPACITY): { give: Resource; giveAmount: number; want: Resource; wantAmount: number } | null {
   const { surplus, shortage } = marketNeeds(npc);
   if (!surplus.length || !shortage.length) return null;
   const give = surplus.reduce((a, b) => (npc.stock[b] > npc.stock[a] ? b : a));
   const want = shortage.reduce((a, b) => (npc.stock[b] < npc.stock[a] ? b : a));
-  const giveAmount = Math.min(MERCHANT_CAPACITY, Math.floor((npc.stock[give] * 0.3) / 10) * 10);
+  const giveAmount = Math.min(maxGive, Math.floor((npc.stock[give] * 0.3) / 10) * 10);
   if (giveAmount < 100) return null;
   // Un bâtisseur négocie un peu mieux (0,9 contre 1), les autres échangent à parité.
   const wantAmount = Math.round((giveAmount * (profile === 'builder' ? 0.9 : 1)) / 10) * 10;

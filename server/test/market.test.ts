@@ -117,9 +117,13 @@ describe('offres de marché', () => {
     );
     await tx((c) => npcThink(c, new Outbox(), npc, T0));
     const offers = (await pool.query("SELECT give_resource, give_amount, want_resource, want_amount FROM market_offers WHERE player_id = $1 AND status = 'open'", [npc])).rows;
-    expect(offers).toHaveLength(1);
-    expect(offers[0]).toMatchObject({ give_resource: 'wood', want_resource: 'clay' });
-    expect(offers[0].give_amount).toBeGreaterThanOrEqual(100);
+    // Plus de plafond d'offres : il en publie plusieurs tant qu'il a des marchands libres et un excédent.
+    expect(offers[0].give_resource).toBe('wood');
+    expect(offers.length).toBeGreaterThan(2);
+    for (const o of offers) {
+      expect(o.want_resource).toBe('clay');
+      expect(o.give_amount).toBeGreaterThanOrEqual(100);
+    }
 
     // Un joueur proche offre de l'argile contre du bois, à parité : le PNJ, qui manque d'argile, accepte.
     const p = await player('Voisin');

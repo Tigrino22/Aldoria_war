@@ -1,4 +1,5 @@
 import {
+  MERCHANT_CAPACITY,
   STARTING_BUILDINGS,
   STARTING_RESOURCES,
   type BuildingKey,
@@ -35,8 +36,11 @@ import {
   type NpcProfile,
 } from './npc-rules';
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
-import { acceptOffer, createOffer, expireOffers } from './market';
-import { MAX_NPC_OFFERS, NPC_TRADE_RADIUS, npcAccepts, planOffer } from './market-rules';
+import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
+
+/** Nombre maximal d'échanges (acceptations ou publications) d'un PNJ par village et par réflexion. */
+const MARKET_ROUNDS = 10;
+import { npcAccepts, planOffer } from './market-rules';
 import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, resourcesOf, syncVillage } from './village';
 
 let rng: () => number = Math.random;
@@ -444,39 +448,46 @@ async function economyStep(c: Db, npcId: number, profile: NpcProfile, villageId:
 }
 
 /**
- * Marché : un PNJ en équilibre ses ressources. Il accepte d'abord une offre proche qui lui apporte ce qui lui manque
- * contre son excédent ; sinon il publie lui-même une offre (deux au maximum). Les pillards commercent moins souvent.
+ * Marché : un PNJ rééquilibre ses ressources sans limite de distance, d'offres ni de fréquence. Il accepte les offres qui lui
+ * apportent ce qui lui manque contre son excédent, puis publie les siennes, jusqu'à épuisement de ses marchands libres.
  */
 async function marketStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, villageId: number, now: Date) {
-  const v = await syncVillage(c, villageId, now);
-  if (v.buildings.market < 1) return;
-  if (profile === 'raider' && rng() > 1 / 3) return;
-  const npc = { stock: resourcesOf(v), capacity: warehouseCapacity(v.buildings.warehouse) };
+  for (let round = 0; round < MARKET_ROUNDS; round++) {
+    const v = await syncVillage(c, villageId, now);
+    if (v.buildings.market < 1) return;
+    const free = await freeMerchants(c, villageId, v.buildings.market);
+    if (free < 1) return;
+    const npc = { stock: resourcesOf(v), capacity: warehouseCapacity(v.buildings.warehouse) };
 
-  const { rows } = await c.query(
-    `SELECT o.id, o.give_resource, o.give_amount, o.want_resource, o.want_amount, (o.give_amount::float / o.want_amount) AS rate
-     FROM market_offers o JOIN villages ov ON ov.id = o.village_id
-     WHERE o.status = 'open' AND o.expires_at > $1 AND o.player_id <> $2 AND (ov.x - $3)^2 + (ov.y - $4)^2 <= $5
-     ORDER BY rate DESC, o.id LIMIT 20`,
-    [now, npcId, v.x, v.y, NPC_TRADE_RADIUS * NPC_TRADE_RADIUS],
-  );
-  for (const o of rows) {
-    const offer = { give: o.give_resource, giveAmount: o.give_amount, want: o.want_resource, wantAmount: o.want_amount };
-    if (!npcAccepts(npc, offer)) continue;
+    const { rows } = await c.query(
+      `SELECT o.id, o.give_resource, o.give_amount, o.want_resource, o.want_amount, (o.give_amount::float / o.want_amount) AS rate
+       FROM market_offers o
+       WHERE o.status = 'open' AND o.expires_at > $1 AND o.player_id <> $2
+       ORDER BY rate DESC, o.id LIMIT 50`,
+      [now, npcId],
+    );
+    let done = false;
+    for (const o of rows) {
+      const offer = { give: o.give_resource, giveAmount: o.give_amount, want: o.want_resource, wantAmount: o.want_amount };
+      if (!npcAccepts(npc, offer)) continue;
+      try {
+        await acceptOffer(c, outbox, npcId, villageId, o.id, now);
+        done = true;
+        break;
+      } catch (err) {
+        if (!(err instanceof GameError)) throw err;
+      }
+    }
+    if (done) continue;
+
+    const plan = planOffer(npc, profile, free * MERCHANT_CAPACITY);
+    if (!plan) return;
     try {
-      await acceptOffer(c, outbox, npcId, villageId, o.id, now);
-      return;
+      await createOffer(c, outbox, npcId, villageId, plan, now, Infinity);
     } catch (err) {
       if (!(err instanceof GameError)) throw err;
+      return;
     }
-  }
-
-  const plan = planOffer(npc, profile);
-  if (!plan) return;
-  try {
-    await createOffer(c, outbox, npcId, villageId, plan, now, MAX_NPC_OFFERS);
-  } catch (err) {
-    if (!(err instanceof GameError)) throw err;
   }
 }
 

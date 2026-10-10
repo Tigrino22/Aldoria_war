@@ -11,11 +11,9 @@ import {
   MERCHANT_CAPACITY,
   MERCHANT_SPEED,
   MAX_PLAYER_OFFERS,
-  MAX_NPC_OFFERS,
   MAX_RATE,
   MIN_OFFER_AMOUNT,
   MIN_RATE,
-  NPC_TRADE_RADIUS,
   OFFER_LIFETIME_HOURS,
   NOBLE_LOYALTY_MAX,
   NOBLE_LOYALTY_MIN,
@@ -354,8 +352,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>Les filtres « Je veux » et « J'offre » trient la liste par ressource </li>
         </ul>
         <p>
-          <b>Les PNJ commercent aussi :</b> ils publient jusqu'à {MAX_NPC_OFFERS} offres, en donnant une ressource qu'ils ont en excédent contre une qui leur manque, et acceptent de leur côté vos offres
-          proches (rayon de {NPC_TRADE_RADIUS} cases) quand elles les arrangent. Leurs offres ne se distinguent pas de celles des joueurs.
+          <b>Les PNJ commercent aussi :</b> sans limite de distance ni de nombre d'offres, ils rééquilibrent en permanence leurs ressources avec tous leurs marchands libres : ils publient une offre pour une ressource en excédent contre une qui leur manque, et acceptent les vôtres quand elles les arrangent. Leurs offres ne se distinguent pas de celles des joueurs.
         </p>
       </>
     ),

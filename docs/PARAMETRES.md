@@ -174,11 +174,11 @@ Valeurs dans `server/src/game/market-rules.ts`, à ajuster librement.
 | Durée de vie d'une offre | 24 h de jeu (divisée par la vitesse du monde) |
 | Taux demandé / donné accepté | entre 0,5 et 2 |
 | Minimum par côté | 50 ressources |
-| Offres ouvertes par joueur | 5 (2 pour un PNJ) |
+| Offres ouvertes par joueur | 5 (aucune limite pour un PNJ) |
 | PNJ : excédent / manque | plus de 70 % / moins de 25 % de l'entrepôt |
-| PNJ : montant offert | 30 % du stock en excédent (max. 1 000), taux 0,9 (bâtisseur) ou 1 |
-| PNJ : rayon pour accepter | 25 cases |
-| PNJ pillards | commercent une réflexion sur trois |
+| PNJ : montant offert | 30 % du stock en excédent (au plus ce que portent ses marchands libres), taux 0,9 (bâtisseur) ou 1 |
+| PNJ : rayon pour accepter | aucun (tout le monde) |
+| PNJ : échanges par réflexion | jusqu'à 10 par village, tant qu'il reste des marchands libres |
 
 Les ressources offertes sont retirées du village à la publication et rendues à l'annulation ou à l'expiration. À l'acceptation, deux convois de marchands partent, un dans chaque sens ; chaque côté doit avoir assez de marchands libres.
 

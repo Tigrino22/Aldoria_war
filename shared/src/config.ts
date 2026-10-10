@@ -297,6 +297,3 @@ export const MIN_RATE = 0.5;
 export const MAX_RATE = 2;
 export const MIN_OFFER_AMOUNT = 50;
 export const MAX_PLAYER_OFFERS = 5;
-export const MAX_NPC_OFFERS = 2;
-/** Rayon (en cases) dans lequel un PNJ cherche des offres à accepter. */
-export const NPC_TRADE_RADIUS = 25;

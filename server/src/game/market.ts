@@ -21,7 +21,7 @@ import { busyMerchants, loadVillage, saveVillage, syncVillage } from './village'
 const isResource = (r: unknown): r is Resource => (RESOURCES as readonly string[]).includes(r as string);
 const lifetimeMs = () => (OFFER_LIFETIME_HOURS * 3_600_000) / env.worldSpeed;
 
-async function freeMerchants(c: Db, villageId: number, marketLevel: number) {
+export async function freeMerchants(c: Db, villageId: number, marketLevel: number) {
   return merchantCount(marketLevel) - (await busyMerchants(c, villageId));
 }
 
