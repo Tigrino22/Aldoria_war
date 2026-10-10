@@ -17,6 +17,7 @@ import VillageView from './VillageView';
 import Overview from './Overview';
 import Profile from './Profile';
 import Wiki from './Wiki';
+import Admin from './Admin';
 import { api } from '../api';
 
 // La carte embarque PixiJS : elle n'est chargée qu'à la première ouverture.
@@ -65,7 +66,8 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
 ];
-const ALL_ITEMS = GROUPS.flatMap((g) => g.items);
+const ADMIN_ITEM: NavItem = { path: 'admin', label: 'Administration', img: NAV_IMG.classement };
+const ALL_ITEMS = [...GROUPS.flatMap((g) => g.items), ADMIN_ITEM];
 /** Les quatre entrées toujours visibles en bas de l'écran sur mobile, le reste est dans « Menu ». */
 const TAB_PATHS = ['village', 'carte', 'troupes', 'rapports'];
 const TAB_ITEMS = TAB_PATHS.map((p) => ALL_ITEMS.find((n) => n.path === p)!);
@@ -123,6 +125,8 @@ export default function Layout() {
     );
   }
 
+  // L'entrée « Administration » n'existe que pour les pseudos listés côté serveur (ADMIN_USERNAMES).
+  const groups = me.isAdmin ? GROUPS.map((g) => (g.title === 'Aide' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g)) : GROUPS;
   const here = route.length > 1 && ALL_ITEMS.some((n) => n.path === route.slice(0, 2).join('/')) ? route.slice(0, 2).join('/') : page;
   const drawerBadge = badge('messages') + badge('tribu');
   const shiftVillage = (d: number) => {
@@ -169,7 +173,7 @@ export default function Layout() {
       </div>
       <div className="body">
         <aside className="side">
-          {GROUPS.map((g) => (
+          {groups.map((g) => (
             <nav key={g.title} className="side-group" aria-label={g.title}>
               <h4>{g.title}</h4>
               {g.items.map((n) => (
@@ -202,6 +206,7 @@ export default function Layout() {
           {page === 'marche' && <Market focus={route[1]} />}
           {page === 'compte' && <Account />}
           {page === 'apercu' && <Overview />}
+          {page === 'admin' && me.isAdmin && <Admin />}
           {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
         </main>
       </div>
@@ -227,7 +232,7 @@ export default function Layout() {
         <div className="sheet-backdrop" onClick={() => setDrawer(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-grip" />
-            {GROUPS.map((g) => (
+            {groups.map((g) => (
               <section key={g.title}>
                 <h4>{g.title}</h4>
                 <div className="sheet-grid">

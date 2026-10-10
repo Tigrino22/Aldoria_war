@@ -31,6 +31,11 @@ export const env = {
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',
   npcQuietStart: count('NPC_QUIET_START', 22),
   npcQuietEnd: count('NPC_QUIET_END', 8),
+  // Pseudos (séparés par des virgules) qui accèdent à la page d'administration.
+  adminUsernames: (process.env.ADMIN_USERNAMES ?? '')
+    .split(',')
+    .map((n) => n.trim().toLowerCase())
+    .filter(Boolean),
   // Dossier du client compilé (client/dist) à servir avec l'API, pour héberger le jeu sur un seul serveur.
   staticDir: process.env.STATIC_DIR || null,
   // Derrière un proxy (hébergeur, Caddy) : lire la vraie adresse IP des joueurs pour la limitation des requêtes.
