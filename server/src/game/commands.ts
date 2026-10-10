@@ -10,6 +10,7 @@ import {
   ScoutReportData,
   TradeReportData,
   UnitCounts,
+  UnitKey,
   carryCapacity,
   emptyResources,
   emptyUnits,
@@ -133,6 +134,21 @@ export async function sendCommand(
     outbox.push(target.owner_id, { type: 'village', villageId: target.id });
   }
   return { id, arriveAt };
+}
+
+/**
+ * Dissout des unités présentes au village : elles disparaissent sans remboursement et ne coûtent plus de blé.
+ * Les troupes en mouvement ou stationnées ailleurs ne sont pas concernées.
+ */
+export async function disbandTroops(c: Db, outbox: Outbox, playerId: number, villageId: number, unit: UnitKey, count: number, now: Date) {
+  // Synchroniser d'abord : le blé consommé jusqu'ici l'est avec l'ancien effectif.
+  const village = await syncVillage(c, villageId, now);
+  if (village.owner_id !== playerId) throw forbidden("Ce village n'est pas à vous");
+  if (!Number.isInteger(count) || count < 1) throw new GameError("Indiquez un nombre d'unités à dissoudre");
+  const troops = await getTroops(c, villageId, villageId);
+  if (troops[unit] < count) throw new GameError("Vous n'avez pas autant d'unités au village");
+  await setTroops(c, villageId, villageId, { ...troops, [unit]: troops[unit] - count });
+  outbox.push(playerId, { type: 'village', villageId });
 }
 
 /** Rappelle des renforts (par leur propriétaire) ou les renvoie chez eux (par le village qui les héberge). */

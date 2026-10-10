@@ -4,7 +4,7 @@ import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
-import { cancelCommand, processDueEvents, sendCommand, sendTrade, setRandom } from '../src/game/commands';
+import { cancelCommand, disbandTroops, processDueEvents, sendCommand, sendTrade, setRandom } from '../src/game/commands';
 import { cancelBuild, cancelRecruit, createVillage, enqueueBuild, enqueueRecruit, getTroops, syncVillage } from '../src/game/village';
 
 let app: Awaited<ReturnType<typeof buildApp>>;
@@ -360,5 +360,23 @@ describe('jeu', () => {
     expect(p.rank).toBeGreaterThanOrEqual(1);
     const missing = await app.inject({ method: 'GET', url: '/api/players/Inconnu', headers: auth(a.token) });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it('dissoudre des unités les retire du village sans rien rembourser, et seulement chez soi', async () => {
+    const owner = await makePlayer('Économe');
+    const other = await makePlayer('Intrus');
+    const t0 = new Date('2030-01-01T00:00:00Z');
+    const id = await tx((c) =>
+      createVillage(c, { ownerId: owner, name: 'Réforme', x: 240, y: 230, buildings: { ...STARTING_BUILDINGS, farm: 5 }, resources: { wood: 0, clay: 0, iron: 0, wheat: 100 }, at: t0, troops: { ...emptyUnits(), spearman: 30, swordsman: 5 } }),
+    );
+    await expect(tx((c) => disbandTroops(c, new Outbox(), other, id, 'spearman', 5, t0))).rejects.toThrow(/pas à vous/);
+    await expect(tx((c) => disbandTroops(c, new Outbox(), owner, id, 'spearman', 31, t0))).rejects.toThrow(/pas autant/);
+    await expect(tx((c) => disbandTroops(c, new Outbox(), owner, id, 'spearman', 0, t0))).rejects.toThrow();
+    await tx((c) => disbandTroops(c, new Outbox(), owner, id, 'spearman', 12, t0));
+    const left = await tx((c) => getTroops(c, id, id));
+    expect(left.spearman).toBe(18);
+    expect(left.swordsman).toBe(5);
+    await tx((c) => disbandTroops(c, new Outbox(), owner, id, 'swordsman', 5, t0));
+    expect((await tx((c) => getTroops(c, id, id))).swordsman).toBe(0);
   });
 });
