@@ -64,6 +64,13 @@ describe('règles des PNJ', () => {
     expect(later.map((w) => w.unit)).not.toContain('spearman');
   });
 
+  it('recrute des hallebardiers dès que la caserne le permet (niveau 4)', () => {
+    const avant = nextRecruit('builder', { ...STARTING_BUILDINGS, barracks: 3 }, emptyUnits(), 4, 1);
+    expect(avant.map((w) => w.unit)).not.toContain('halberdier');
+    const apres = nextRecruit('builder', { ...STARTING_BUILDINGS, barracks: 4 }, emptyUnits(), 4, 1);
+    expect(apres.map((w) => w.unit)).toContain('halberdier');
+  });
+
   it('n’attaque que si la victoire est nette, avec toute l’armée face à des défenseurs et le minimum face à un village vide', () => {
     const defenders = { ...emptyUnits(), spearman: 20 };
     expect(pickWinningUnits({ ...emptyUnits(), swordsman: 10 }, defenders, 0)).toBeNull();

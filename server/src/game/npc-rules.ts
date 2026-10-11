@@ -78,7 +78,8 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
   const scale = (n: number) => Math.round(n * cap * difficulty);
   const t = emptyUnits();
   if (profile === 'builder') {
-    t.spearman = scale(6);
+    t.spearman = scale(4);
+    t.halberdier = scale(3);
     t.swordsman = scale(3);
     t.scout = 2;
   } else if (profile === 'conqueror') {
@@ -86,6 +87,7 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
     t.cavalry = scale(2);
     t.ram = scale(1);
     t.spearman = scale(2);
+    t.halberdier = scale(1);
     t.scout = 4;
     // Quatre nobles font tomber la loyauté d'un village dans trois cas sur quatre (20 à 35 points chacun).
     t.noble = cap >= 10 ? NOBLES_PER_CONQUEST : 0;
@@ -93,6 +95,7 @@ export function armyTarget(profile: NpcProfile, cap: number, difficulty: number)
     t.swordsman = scale(6);
     t.cavalry = scale(2);
     t.spearman = scale(2);
+    t.halberdier = scale(1);
     t.scout = 4;
     t.noble = cap >= 10 ? NOBLES_PER_CONQUEST : 0;
   }
