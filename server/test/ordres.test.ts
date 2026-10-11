@@ -115,6 +115,38 @@ describe('ordres planifiés', () => {
     expect((await pool.query('SELECT owner_id FROM villages WHERE id = $1', [target])).rows[0].owner_id).toBe(me);
   });
 
+  it('escorte au choix : avec de quoi escorter 3 nobles sur 4, seules 3 attaques partent', async () => {
+    const me = await makePlayer('Limité');
+    const foe = await makePlayer('Cible limitée');
+    const home = await village(me, 110, 110, { cavalry: 10, spearman: 7, noble: 4 });
+    const target = await village(foe, 113, 110);
+    const landAt = new Date(T0.getTime() + 3 * HOUR);
+    // Escorte de 2 lanciers par noble : 7 lanciers n'en couvrent que 3. L'assaut part à cheval, plus vite que les nobles.
+    await tx((c) => placeOrder(c, new Outbox(), me, home, { type: 'attack', targetId: target, units: { cavalry: 10 }, arriveAt: landAt, train: { nobles: 4, escort: { spearman: 2 }, gapSeconds: 1 } }, T0));
+    const planned = (await tx((c) => plannedOrders(c, me)))[0];
+    expect(planned.parts).toHaveLength(4); // l'assaut + 3 nobles
+    expect(planned.parts.filter((p) => p.units.noble === 1)).toHaveLength(3);
+    const left = await tx((c) => getTroops(c, home, home));
+    expect(left.noble).toBe(1);
+    expect(left.spearman).toBe(1);
+    // Les unités plus rapides partent plus tard : toutes les arrivées tombent à l'heure choisie (à la seconde d'écart près).
+    const arrivals = planned.parts.map((p) => Date.parse(p.arriveAt) - landAt.getTime()).sort((a, b) => a - b);
+    expect(arrivals).toEqual([0, 1000, 2000, 3000]);
+    const assault = planned.parts.find((p) => p.units.cavalry === 10)!;
+    const noble = planned.parts.find((p) => p.units.noble === 1)!;
+    expect(Date.parse(assault.departAt)).toBeGreaterThan(Date.parse(noble.departAt));
+  });
+
+  it('refuse un train quand aucun noble ne peut partir avec son escorte', async () => {
+    const me = await makePlayer('Sans escorte');
+    const foe = await makePlayer('Cible 3');
+    const home = await village(me, 130, 130, { spearman: 1, noble: 2 });
+    const target = await village(foe, 132, 130);
+    await expect(
+      tx((c) => placeOrder(c, new Outbox(), me, home, { type: 'attack', targetId: target, units: {}, arriveAt: null, train: { nobles: 2, escort: { spearman: 2 }, gapSeconds: 1 } }, T0)),
+    ).rejects.toThrow(/escorte/);
+  });
+
   it('annuler un ordre rend les troupes réservées', async () => {
     const me = await makePlayer('Prudent');
     const foe = await makePlayer('Voisin');

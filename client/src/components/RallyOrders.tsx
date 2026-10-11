@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  DEFAULT_NOBLE_ESCORT,
   DEFAULT_NOBLE_GAP_SECONDS,
   NOBLE_LOYALTY_MAX,
   NOBLE_LOYALTY_MIN,
@@ -12,6 +11,7 @@ import {
   orderTotal,
   planOrderParts,
   totalUnits,
+  trainCapacity,
   travelTime,
   type MapVillage,
   type NobleTrain,
@@ -42,7 +42,7 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
   const [landInput, setLandInput] = useState('');
   const [train, setTrain] = useState(false);
   const [nobles, setNobles] = useState('3');
-  const [escort, setEscort] = useState(String(DEFAULT_NOBLE_ESCORT));
+  const [escort, setEscort] = useState<Partial<Record<UnitKey, string>>>({ swordsman: '2' });
   const [gap, setGap] = useState(String(DEFAULT_NOBLE_GAP_SECONDS));
 
   useEffect(() => {
@@ -60,10 +60,12 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
   const attack = type === 'attack' && !ownTarget;
 
   const strike = normalizeUnits(Object.fromEntries(UNIT_KEYS.map((k) => [k, k === 'noble' && train ? 0 : Number(counts[k] || 0)])));
+  const escortUnits = normalizeUnits(Object.fromEntries(UNIT_KEYS.map((k) => [k, k === 'noble' ? 0 : Number(escort[k] || 0)])));
+  const wantedNobles = Math.max(0, Math.floor(Number(nobles) || 0));
+  // Pas assez de troupes pour tous les nobles demandés : seuls ceux qui ont leur escorte partent.
+  const possibleNobles = trainCapacity(v.troopsHome, strike, wantedNobles, escortUnits);
   const trainSpec: NobleTrain | null =
-    train && attack
-      ? { nobles: Math.max(0, Math.floor(Number(nobles) || 0)), escort: { ...emptyUnits(), swordsman: Math.max(0, Math.floor(Number(escort) || 0)) }, gapMs: Math.max(1, Math.min(10, Math.floor(Number(gap) || 1))) * 1000 }
-      : null;
+    train && attack ? { nobles: possibleNobles, escort: escortUnits, gapMs: Math.max(1, Math.min(10, Math.floor(Number(gap) || 1))) * 1000 } : null;
   const total = orderTotal(strike, trainSpec);
   const enough = UNIT_KEYS.every((k) => total[k] <= v.troopsHome[k]);
   const travelMs = (u: typeof strike) => travelTime(u, v, target ?? v, world.speed) * 1000;
@@ -75,7 +77,9 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
       ? 'Aucun village à ces coordonnées.'
       : target.id === v.id
         ? 'Choisissez un autre village que celui d’où partent les troupes.'
-        : totalUnits(total) === 0
+        : trainSpec && trainSpec.nobles < 1
+          ? 'Pas assez de troupes pour envoyer un noble avec son escorte.'
+          : totalUnits(total) === 0
           ? 'Sélectionnez des troupes.'
           : !enough
             ? 'Vous n’avez pas assez de troupes dans ce village.'
@@ -96,7 +100,7 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
         targetId: target.id,
         units: strike,
         arriveAt: timing === 'at' && landAt ? landAt.toISOString() : null,
-        train: trainSpec ? { nobles: trainSpec.nobles, escort: { swordsman: trainSpec.escort.swordsman }, gapSeconds: trainSpec.gapMs / 1000 } : null,
+        train: trainSpec ? { nobles: wantedNobles, escort: trainSpec.escort, gapSeconds: trainSpec.gapMs / 1000 } : null,
       };
       setVillage(await api<VillageState>(`/api/villages/${v.id}/orders`, { body }));
       toast(timing === 'at' ? 'Ordre planifié : les troupes partiront à l’heure voulue' : 'Vos troupes sont en route');
@@ -161,17 +165,42 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
             </legend>
             <p className="muted small">
               Chaque attaque ne fait baisser la loyauté qu’une seule fois ({NOBLE_LOYALTY_MIN} à {NOBLE_LOYALTY_MAX}), quel que soit le nombre de nobles qu’elle compte. Le train envoie donc l’assaut, puis un noble
-              par attaque, chacun arrivant quelques secondes après le précédent. Sans escorte, un noble seul ne survit pas à la défense de base du village.
+              par attaque, chacun arrivant quelques secondes après le précédent. Choisissez l’escorte de chaque noble : sans elle, un noble seul ne survit pas à la défense de base du village.
             </p>
             {train && (
-              <div className="rally-row">
-                <label htmlFor="train-nobles">Nobles</label>
-                <input id="train-nobles" type="number" min={1} max={v.troopsHome.noble} value={nobles} onChange={(e) => setNobles(e.target.value)} />
-                <label htmlFor="train-escort">Épéistes par noble</label>
-                <input id="train-escort" type="number" min={0} value={escort} onChange={(e) => setEscort(e.target.value)} />
-                <label htmlFor="train-gap">Écart (s)</label>
-                <input id="train-gap" type="number" min={1} max={10} value={gap} onChange={(e) => setGap(e.target.value)} />
-              </div>
+              <>
+                <div className="rally-row">
+                  <label htmlFor="train-nobles">Nobles</label>
+                  <input id="train-nobles" type="number" min={1} max={v.troopsHome.noble} value={nobles} onChange={(e) => setNobles(e.target.value)} />
+                  <label htmlFor="train-gap">Écart (s)</label>
+                  <input id="train-gap" type="number" min={1} max={10} value={gap} onChange={(e) => setGap(e.target.value)} />
+                </div>
+                <p className="small">Escorte de chaque noble :</p>
+                <div className="send-grid">
+                  {UNIT_KEYS.filter((k) => k !== 'noble').map((k) => (
+                    <label key={k} className={v.troopsHome[k] === 0 ? 'dim' : ''} htmlFor={`escort-${k}`}>
+                      <UnitIcon unit={k} size={28} />
+                      <input
+                        id={`escort-${k}`}
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={escort[k] ?? ''}
+                        disabled={v.troopsHome[k] === 0}
+                        onChange={(e) => setEscort((c) => ({ ...c, [k]: e.target.value }))}
+                      />
+                      <span className="small muted">({fmt(v.troopsHome[k])})</span>
+                      <span className="sr-only">{UNITS[k].name}</span>
+                    </label>
+                  ))}
+                </div>
+                {possibleNobles < wantedNobles && possibleNobles > 0 && (
+                  <p className="warn small">
+                    Troupes insuffisantes pour {wantedNobles} nobles : seules {possibleNobles} attaque{possibleNobles > 1 ? 's' : ''} partiront.
+                  </p>
+                )}
+              </>
             )}
           </fieldset>
         )}

@@ -37,6 +37,16 @@ export function orderTotal(strike: UnitCounts, train: NobleTrain | null): UnitCo
   return total;
 }
 
+/**
+ * Nombre de nobles que le village peut vraiment faire partir : limité par les nobles restants et par l'escorte de chacun
+ * (3 escortes disponibles sur 4 nobles demandés : seules 3 attaques partent). `available` est ce qui est au village, `strike` ce que l'assaut emporte déjà.
+ */
+export function trainCapacity(available: UnitCounts, strike: UnitCounts, wanted: number, escort: UnitCounts): number {
+  let n = Math.min(Math.max(0, Math.floor(wanted)), available.noble - strike.noble);
+  for (const k of UNIT_KEYS) if (k !== 'noble' && escort[k] > 0) n = Math.min(n, Math.floor((available[k] - strike[k]) / escort[k]));
+  return Math.max(0, n);
+}
+
 export type OrderPlan = { parts: OrderPart[]; error?: undefined } | { parts?: undefined; error: string };
 
 /**

@@ -12,6 +12,7 @@ import {
   planOrderParts,
   subtractUnits,
   totalUnits,
+  trainCapacity,
   travelTime,
 } from '@aldoria/shared';
 import { tx, type Db } from '../db';
@@ -67,7 +68,11 @@ export async function placeOrder(c: Db, outbox: Outbox, playerId: number, origin
     const escort = normalizeUnits(input.train.escort ?? {});
     if (escort.noble > 0) throw new GameError('Un noble ne peut pas en escorter un autre');
     const gapSeconds = Math.min(MAX_NOBLE_GAP_SECONDS, Math.max(1, Math.floor(input.train.gapSeconds ?? DEFAULT_NOBLE_GAP_SECONDS)));
-    train = { nobles: Math.floor(input.train.nobles), escort, gapMs: gapSeconds * 1000 };
+    // Pas assez de troupes pour tous les nobles demandés : seuls ceux qui ont leur escorte partent (3 attaques au lieu de 4, par exemple).
+    const home = await getTroops(c, origin.id, origin.id);
+    const nobles = trainCapacity(home, strike, input.train.nobles, escort);
+    if (nobles < 1) throw new GameError("Pas assez de troupes pour envoyer un seul noble avec son escorte");
+    train = { nobles, escort, gapMs: gapSeconds * 1000 };
   }
   const units = orderTotal(strike, train);
   if (totalUnits(units) === 0) throw new GameError('Sélectionnez au moins une unité');

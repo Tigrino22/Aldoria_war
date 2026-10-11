@@ -232,7 +232,7 @@ Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaq
 
 ## Point de ralliement : ordres planifiés et train de nobles
 
-Page « Troupes » (`#/troupes`, ou `#/troupes/x,y` depuis la carte). Code : `server/src/game/orders.ts` (base de données), `shared/src/orders.ts` (découpe des ordres, aussi utilisée par le client pour afficher le plan avant l'envoi), `client/src/components/RallyOrders.tsx`.
+Page « Point de ralliement » du menu, distincte de « Troupes » (`#/ralliement`, ou `#/ralliement/x,y` depuis la carte). Code : `server/src/game/orders.ts` (base de données), `shared/src/orders.ts` (découpe des ordres, aussi utilisée par le client pour afficher le plan avant l'envoi), `client/src/components/RallyOrders.tsx`.
 
 | Règle | Valeur |
 |---|---|
@@ -242,5 +242,6 @@ Page « Troupes » (`#/troupes`, ou `#/troupes/x,y` depuis la carte). Code : `se
 | Départ en retard (serveur arrêté) | Plus de 5 s après l'heure prévue : l'heure d'arrivée précise est abandonnée, les troupes partent aussitôt |
 | Village d'origine conquis | Les ordres planifiés depuis ce village disparaissent avec lui |
 | Loyauté | Une attaque victorieuse avec au moins un noble survivant fait baisser la loyauté de 20 à 35, **une seule fois**, quel que soit le nombre de nobles |
-| Train de nobles | L'assaut, puis un mouvement par noble (avec une escorte, 2 épéistes par défaut), chacun arrivant 1 s (1 à 10 s) après le précédent. Un noble seul ne survit pas à la défense de base d'un village |
+| Vitesses différentes | Chaque mouvement part à `arrivée - son propre trajet` (selon son unité la plus lente) : cavaliers plus tard, nobles plus tôt, pour que tous arrivent à l'heure voulue |
+| Train de nobles | L'assaut, puis un mouvement par noble (avec l'escorte choisie par le joueur, 2 épéistes par défaut ; nombre de nobles plafonné par les nobles et escortes disponibles : 3 attaques au lieu de 4 si l'escorte manque), chacun arrivant 1 s (1 à 10 s) après le précédent. Un noble seul ne survit pas à la défense de base d'un village |
 | PNJ | Leur train de nobles suit la même règle : 2 épéistes d'escorte par noble |

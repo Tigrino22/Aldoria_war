@@ -7,6 +7,7 @@ import { liveResources } from '../ui';
 import Barracks from './Barracks';
 import Messages from './Messages';
 import RallyPoint from './RallyPoint';
+import RallyPage from './RallyPage';
 import Ranking from './Ranking';
 import Reports from './Reports';
 import Market from './Market';
@@ -48,6 +49,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Armée',
     items: [
       { path: 'troupes', label: 'Troupes', img: NAV_IMG.troupes },
+      { path: 'ralliement', label: 'Point de ralliement', img: NAV_IMG.troupes },
       { path: 'pillage', label: 'Assistant de pillage', img: UNIT_IMG.cavalry },
       { path: 'carte', label: 'Carte', img: NAV_IMG.carte },
     ],
@@ -196,7 +198,8 @@ export default function Layout() {
           {page === 'village' && route[1] !== 'hotel' && <VillageView />}
           {(page === 'hotel' || (page === 'village' && route[1] === 'hotel')) && (village ? <TownHall v={village} /> : <p className="muted">Chargement du village…</p>)}
           {page === 'caserne' && <Barracks />}
-          {page === 'troupes' && <RallyPoint focus={route[1]} />}
+          {page === 'troupes' && <RallyPoint />}
+          {page === 'ralliement' && <RallyPage focus={route[1]} />}
           {page === 'pillage' && <Raid />}
           {page === 'carte' && (
             <Suspense fallback={<p className="muted">Chargement de la carte…</p>}>

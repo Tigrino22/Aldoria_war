@@ -421,7 +421,7 @@ export default function MapView({ focus }: { focus?: string }) {
           ) : (
             <>
               <SendTroops target={selected} protectedTarget={!!info?.protected} onSent={() => setSelected(null)} />
-              <a className="btn ghost small" href={`#/troupes/${selected.x},${selected.y}`}>
+              <a className="btn ghost small" href={`#/ralliement/${selected.x},${selected.y}`}>
                 Ouvrir au point de ralliement
               </a>
               {selected.ownerId && village && village.buildings.market > 0 && (
