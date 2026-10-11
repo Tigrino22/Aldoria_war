@@ -4,9 +4,10 @@ import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { Panel } from '../ui';
+import AdminWars from './AdminWars';
 import './admin.css';
 
-type Tab = 'npc' | 'players' | 'market' | 'stats' | 'world';
+type Tab = 'npc' | 'wars' | 'players' | 'market' | 'stats' | 'world';
 type Kind = 'all' | 'attack' | 'scout' | 'market' | 'quiet';
 
 interface NpcEvent {
@@ -134,6 +135,7 @@ export default function Admin() {
 
   const tabs: [Tab, string][] = [
     ['npc', 'PNJ'],
+    ['wars', 'Guerres'],
     ['players', 'Joueurs'],
     ['market', 'Marché'],
     ['stats', 'Statistiques'],
@@ -158,7 +160,7 @@ export default function Admin() {
             </button>
           ))}
         </div>
-        {(tab === 'npc' || tab === 'market') && (
+        {(tab === 'npc' || tab === 'market' || tab === 'wars') && (
           <div className="row admin-chips">
             <span className="muted small">Période :</span>
             {[1, 6, 24, 72].map((h) => (
@@ -225,6 +227,8 @@ export default function Admin() {
           </Panel>
         </>
       )}
+
+      {tab === 'wars' && <AdminWars hours={hours} />}
 
       {tab === 'players' && (
         <Panel

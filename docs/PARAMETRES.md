@@ -189,7 +189,7 @@ Les ressources offertes sont retirées du village à la publication et rendues �
 
 ## Administration
 
-Page `#/admin` (menu « Aide » > « Administration »), en lecture seule : activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), joueurs et PNJ, offres du marché, totaux et paramètres du monde.
+Page `#/admin` (menu « Aide » > « Administration »), en lecture seule : activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, offres du marché, totaux et paramètres du monde.
 
 Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).
 
@@ -210,6 +210,20 @@ Onglet « Monde » : interrupteurs de la riposte des PNJ et des guerres entre tr
 | Interrupteur | « Guerres entre tribus de PNJ » (variable `NPC_WARS`, 1 par défaut) : coupé, plus de nouvelle guerre ni de frappe de guerre |
 
 Code : `server/src/game/npc-wars.ts` (règles pures `planWars`, déclaration en base, rancunes entre PNJ), consommé par `attackStep` dans `npc.ts`.
+
+### Suivi des guerres (Administration > Guerres)
+
+Onglet en lecture seule, actualisé toutes les 5 s, avec une période au choix (1, 6, 24 ou 72 h). Code : `server/src/game/npc-war-report.ts` (route `GET /api/admin/wars`), `client/src/components/AdminWars.tsx`.
+
+| Bloc | Contenu |
+|---|---|
+| Fronts | Une ligne par paire de tribus en guerre ou ayant combattu sur la période : temps restant, villages de chaque camp, victoires, conquêtes, unités perdues, attaques en route |
+| Attaques en route | Les attaques entre tribus de PNJ qui n'ont pas encore atterri, avec compte à rebours, troupes et nobles |
+| Rythme des batailles | Batailles par heure (barre dorée si conquête) |
+| Journal | Batailles (attaquant, cible, résultat, pertes, « riposte » hors guerre déclarée, « conquête ») et déclarations / fins de guerre |
+| Tribus en trêve | Date de la prochaine guerre possible |
+
+Les batailles viennent des rapports de défense des PNJ (ils contiennent les pertes des deux camps) : un combat entre deux PNJ de tribus différentes. Les déclarations et fins de guerre sont écrites dans la table `npc_war_log` (migration 012) par `refreshWars`. Les rapports des PNJ sont conservés 3 jours : c'est la limite de l'historique.
 
 ## Recrutement des PNJ : villages offensifs et défensifs
 

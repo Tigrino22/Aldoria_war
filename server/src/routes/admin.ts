@@ -6,6 +6,7 @@ import { pool } from '../db';
 import { env } from '../env';
 import { forbidden } from '../errors';
 import { isQuiet } from '../game/npc-rules';
+import { warOverview } from '../game/npc-war-report';
 import { GameError } from '../errors';
 import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
@@ -88,6 +89,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       },
       events: events.slice(0, 300).map((e) => ({ ...e, at: e.at.toISOString() })),
     };
+  });
+
+  /** Guerres entre tribus de PNJ : état en direct et historique des dernières heures. */
+  app.get('/api/admin/wars', async (req) => {
+    await requireAdmin(req);
+    const { hours } = hoursQuery.parse(req.query);
+    return warOverview(hours);
   });
 
   /** Joueurs et PNJ : points, villages, dernière connexion. */

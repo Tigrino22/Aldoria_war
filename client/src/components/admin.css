@@ -27,3 +27,10 @@
 .switch.on .switch-track { background: var(--ok, #3a7d44); }
 .switch.on .switch-knob { transform: translateX(22px); }
 .switch:focus-visible .switch-track { outline: 2px solid var(--ok, #3a7d44); outline-offset: 2px; }
+.war-score { font-variant-numeric: tabular-nums; }
+.war-chart { display: flex; align-items: flex-end; gap: 3px; height: 120px; padding-bottom: 16px; }
+.war-col { position: relative; flex: 1; min-width: 4px; height: 100%; display: flex; align-items: flex-end; background: var(--panel-2); border-radius: 3px; }
+.war-col i { display: block; width: 100%; min-height: 2px; background: var(--muted); border-radius: 3px; }
+.war-col i.conquest { background: var(--gold); }
+.war-col span { position: absolute; bottom: -15px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--muted); }
+.war-truce { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
