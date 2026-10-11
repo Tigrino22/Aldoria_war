@@ -5,7 +5,8 @@ import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents } from '../src/game/commands';
 import { createNpc, ensureNpcs, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
-import { armyTarget, chooseBuilding, isQuiet, nextRecruit, npcCap, pickWinningUnits } from '../src/game/npc-rules';
+import { armyTarget, villageRoles } from '../src/game/npc-roles';
+import { chooseBuilding, isQuiet, nextRecruit, npcCap, pickWinningUnits } from '../src/game/npc-rules';
 import { createVillage, getTroops, setTroops } from '../src/game/village';
 
 const MIN = 60_000;
@@ -58,16 +59,16 @@ describe('règles des PNJ', () => {
   });
 
   it('recrute d’abord ce qui manque le plus, parmi les unités disponibles', () => {
-    const wanted = nextRecruit('raider', { ...STARTING_BUILDINGS, barracks: 1 }, emptyUnits(), 4, 1);
+    const wanted = nextRecruit('raider', 'offense', { ...STARTING_BUILDINGS, barracks: 1 }, emptyUnits(), 4, 1);
     expect(wanted.map((w) => w.unit)).toEqual(['spearman']);
-    const later = nextRecruit('raider', { ...STARTING_BUILDINGS, barracks: 5 }, { ...emptyUnits(), spearman: 100 }, 4, 1);
+    const later = nextRecruit('raider', 'offense', { ...STARTING_BUILDINGS, barracks: 5 }, { ...emptyUnits(), spearman: 100 }, 4, 1);
     expect(later.map((w) => w.unit)).not.toContain('spearman');
   });
 
   it('recrute des hallebardiers dès que la caserne le permet (niveau 4)', () => {
-    const avant = nextRecruit('builder', { ...STARTING_BUILDINGS, barracks: 3 }, emptyUnits(), 4, 1);
+    const avant = nextRecruit('builder', 'defense', { ...STARTING_BUILDINGS, barracks: 3 }, emptyUnits(), 4, 1);
     expect(avant.map((w) => w.unit)).not.toContain('halberdier');
-    const apres = nextRecruit('builder', { ...STARTING_BUILDINGS, barracks: 4 }, emptyUnits(), 4, 1);
+    const apres = nextRecruit('builder', 'defense', { ...STARTING_BUILDINGS, barracks: 4 }, emptyUnits(), 4, 1);
     expect(apres.map((w) => w.unit)).toContain('halberdier');
   });
 
@@ -81,8 +82,49 @@ describe('règles des PNJ', () => {
   });
 
   it('les Bâtisseurs ne recrutent pas de nobles', () => {
-    expect(armyTarget('builder', 20, 1).noble).toBe(0);
-    expect(armyTarget('raider', 20, 1).noble).toBeGreaterThan(0);
+    expect(armyTarget('builder', 'offense', 20, 1).noble).toBe(0);
+    expect(armyTarget('raider', 'offense', 20, 1).noble).toBeGreaterThan(0);
+    expect(armyTarget('raider', 'defense', 20, 1).noble).toBe(0);
+  });
+
+  it('un village offensif recrute de quoi frapper, un village défensif de quoi tenir : jamais d’unités hors rôle', () => {
+    const off = armyTarget('conqueror', 'offense', 20, 1);
+    const def = armyTarget('conqueror', 'defense', 20, 1);
+    expect(off.swordsman).toBeGreaterThan(off.spearman);
+    expect(off.cavalry).toBeGreaterThan(0);
+    expect(off.halberdier).toBe(0);
+    expect(def.spearman + def.halberdier).toBeGreaterThan(5 * def.swordsman);
+    expect([def.cavalry, def.ram, def.noble]).toEqual([0, 0, 0]);
+    // Un pillard défend moins fort qu'un bâtisseur, un bâtisseur attaque moins fort qu'un pillard.
+    expect(armyTarget('raider', 'defense', 20, 1).halberdier).toBeLessThan(armyTarget('builder', 'defense', 20, 1).halberdier);
+    expect(armyTarget('builder', 'offense', 20, 1).swordsman).toBeLessThan(armyTarget('raider', 'offense', 20, 1).swordsman);
+  });
+
+  it('le recrutement suit le rôle du village', () => {
+    const buildings = { ...STARTING_BUILDINGS, barracks: 10, townhall: 10, wall: 3 };
+    const defense = nextRecruit('conqueror', 'defense', buildings, emptyUnits(), 12, 1).map((w) => w.unit);
+    const offense = nextRecruit('conqueror', 'offense', buildings, emptyUnits(), 12, 1).map((w) => w.unit);
+    expect(defense).toEqual(expect.arrayContaining(['spearman', 'halberdier']));
+    for (const u of ['cavalry', 'ram', 'noble']) expect(defense).not.toContain(u);
+    expect(offense).toEqual(expect.arrayContaining(['swordsman', 'cavalry', 'ram', 'noble']));
+    expect(offense).not.toContain('halberdier');
+  });
+
+  it('les villages d’un PNJ se répartissent entre offensifs et défensifs', () => {
+    expect(villageRoles('builder', 1)).toEqual(['defense']);
+    expect(villageRoles('raider', 1)).toEqual(['offense']);
+    expect(villageRoles('conqueror', 1)).toEqual(['offense']);
+    for (const profile of ['builder', 'raider', 'conqueror'] as const) {
+      for (let n = 2; n <= 8; n++) {
+        const roles = villageRoles(profile, n);
+        expect(roles).toHaveLength(n);
+        expect(roles).toContain('offense');
+        expect(roles).toContain('defense');
+      }
+    }
+    expect(villageRoles('builder', 2)).toEqual(['defense', 'offense']);
+    expect(villageRoles('raider', 4).filter((r) => r === 'offense')).toHaveLength(3);
+    expect(villageRoles('builder', 4).filter((r) => r === 'offense')).toHaveLength(1);
   });
 });
 

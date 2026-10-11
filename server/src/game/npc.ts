@@ -19,7 +19,6 @@ import { sendCommand } from './commands';
 import { pickNpcName } from './npc-names';
 import {
   NOBLES_PER_CONQUEST,
-  armyTarget,
   pointRatioOk,
   NPC_PROFILES,
   npcTribeNameCandidates,
@@ -36,6 +35,7 @@ import {
   type NpcProfile,
 } from './npc-rules';
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
+import { villageRoles, type VillageRole } from './npc-roles';
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
 
@@ -434,7 +434,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   }
 }
 
-async function economyStep(c: Db, npcId: number, profile: NpcProfile, villageId: number, cap: number, now: Date) {
+async function economyStep(c: Db, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
   const v = await syncVillage(c, villageId, now);
   const queued = (await c.query('SELECT building, level FROM build_queue WHERE village_id = $1', [villageId])).rows;
   const levels: Buildings = { ...v.buildings };
@@ -456,7 +456,7 @@ async function economyStep(c: Db, npcId: number, profile: NpcProfile, villageId:
     const u = normalizeUnits(r.units);
     for (const k of Object.keys(owned) as (keyof UnitCounts)[]) owned[k] += u[k];
   }
-  for (const choice of nextRecruit(profile, v.buildings, owned, cap, env.npcDifficulty).slice(0, 3)) {
+  for (const choice of nextRecruit(profile, role, v.buildings, owned, cap, env.npcDifficulty).slice(0, 3)) {
     try {
       await enqueueRecruit(c, villageId, choice.unit, choice.count, now);
       return;
@@ -532,8 +532,10 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   const cap = npcCap(await worldDays(c, now), env.npcDifficulty);
   const tribe = await npcTribeOf(c, npcId);
   let angry = false;
-  for (const v of villages.slice(0, 3)) {
-    await economyStep(c, npcId, profile, v.id, cap, now);
+  // Les villages se partagent entre offensifs et défensifs selon le profil du PNJ (voir npc-roles.ts).
+  const roles = villageRoles(profile, villages.length);
+  for (const [i, v] of villages.slice(0, 3).entries()) {
+    await economyStep(c, npcId, profile, roles[i], v.id, cap, now);
     await marketStep(c, outbox, npcId, profile, v.id, now);
     if (tribe) await defendStep(c, outbox, npcId, v.id, tribe, now);
     // Un PNJ en colère enchaîne jusqu'à trois attaques par réflexion, sur des villages différents de l'agresseur.
