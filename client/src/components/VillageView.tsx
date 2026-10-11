@@ -98,6 +98,8 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
   );
 }
 
+import IncomingDetail from './IncomingDetail';
+
 export default function VillageView() {
   const { village: v, world, me, run, refreshMe, setVillage } = useGame();
   const [route, go] = useRoute();
@@ -152,6 +154,7 @@ export default function VillageView() {
           ⚠ {enemyIncoming.length} attaque{enemyIncoming.length > 1 ? 's' : ''} en approche. Prochaine arrivée dans <Countdown to={enemyIncoming[0].arriveAt} />.
         </div>
       )}
+      <IncomingDetail incoming={v.incoming} />
 
       <div className="scene" style={{ backgroundImage: `url("${villageBg}")` }}>
         {v.buildings.wall > 0 && (

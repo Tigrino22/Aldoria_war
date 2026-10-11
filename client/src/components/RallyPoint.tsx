@@ -18,7 +18,7 @@ function Movement({ c, direction, onCancel }: { c: CommandView; direction: 'in' 
         {direction === 'in' ? 'de' : 'vers'} <a href={`#/carte/${other.x},${other.y}`}>{other.name} ({other.x}|{other.y})</a>
         {other.ownerName && <span className="muted"> · <PlayerLink name={other.ownerName} /></span>}
       </span>
-      <UnitList units={c.units} empty="" />
+      {c.units && <UnitList units={c.units} empty="" />}
       <span className="mv-time">
         <Countdown to={c.arriveAt} />
         <span className="muted small">{clockTime(c.arriveAt)}</span>

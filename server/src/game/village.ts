@@ -399,8 +399,8 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     troopsHome: await getTroops(c, v.id, v.id),
     supportHere: await troopGroups(c, 'here', v.id),
     supportAway: await troopGroups(c, 'away', v.id),
-    // On voit ce qui arrive chez soi, sauf la composition des attaques ennemies.
-    incoming: incoming.map((r) => toCommandView(r, r.type !== 'attack' || r.player_id === viewerId)),
+    // On voit ce qui arrive chez soi, sauf la composition des attaques et des renforts envoyés par un autre joueur.
+    incoming: incoming.map((r) => toCommandView(r, (r.type !== 'attack' && r.type !== 'support') || r.player_id === viewerId)),
     outgoing: outgoing.map((r) => toCommandView(r, true)),
     market: { merchants: merchantCount(v.buildings.market), available: merchantCount(v.buildings.market) - (await busyMerchants(c, v.id)) },
   };
