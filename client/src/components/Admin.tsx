@@ -83,6 +83,7 @@ const SETTING_LABEL: Record<string, string> = {
   npcCount: 'Nombre de PNJ',
   npcRevenge: 'Riposte des PNJ',
   npcWars: 'Guerres entre tribus de PNJ',
+  npcPlayerWars: 'Guerres contre les tribus de joueurs',
   npcDifficulty: 'Difficulté des PNJ',
   npcTimezone: 'Fuseau des heures calmes',
   quietHours: 'Heures calmes',

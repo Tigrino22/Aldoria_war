@@ -38,14 +38,27 @@ export interface TribeInfo {
   id: number;
   leaderId: number | null;
   state: TribeState;
+  /** Tribus de joueurs en guerre contre cette tribu en ce moment, déclarée par elle ou contre elle (voir tribe-wars.ts). */
+  playerEnemies?: number[];
 }
 
-export async function npcTribeOf(c: Db, npcId: number): Promise<TribeInfo | null> {
+/** Tribus de joueurs en guerre contre cette tribu à cet instant (guerres de la table `tribe_wars`). */
+export async function playerWarEnemiesOf(c: Pick<Db, 'query'>, tribeId: number, now: Date): Promise<number[]> {
+  const { rows } = await c.query(
+    `SELECT o.id FROM tribe_wars w JOIN tribes o ON o.id = CASE WHEN w.declarer_id = $1 THEN w.target_id ELSE w.declarer_id END
+     WHERE (w.declarer_id = $1 OR w.target_id = $1) AND w.ended_at IS NULL AND w.until > $2 AND NOT o.is_npc`,
+    [tribeId, now],
+  );
+  return rows.map((r) => r.id as number);
+}
+
+export async function npcTribeOf(c: Db, npcId: number, now: Date = new Date()): Promise<TribeInfo | null> {
   const { rows } = await c.query(
     'SELECT t.id, t.leader_id, t.npc_state FROM players p JOIN tribes t ON t.id = p.tribe_id WHERE p.id = $1 AND t.is_npc',
     [npcId],
   );
-  return rows[0] ? { id: rows[0].id, leaderId: rows[0].leader_id, state: rows[0].npc_state ?? {} } : null;
+  if (!rows[0]) return null;
+  return { id: rows[0].id, leaderId: rows[0].leader_id, state: rows[0].npc_state ?? {}, playerEnemies: await playerWarEnemiesOf(c, rows[0].id, now) };
 }
 
 export async function saveTribeState(c: Db, tribe: TribeInfo) {

@@ -4,6 +4,7 @@ import { fmt } from '../format';
 import { useGame } from '../game';
 import { Panel, PlayerLink } from '../ui';
 import TribeTools from './TribeTools';
+import TribeWars from './TribeWars';
 
 interface TribeInfo {
   id: number;
@@ -26,12 +27,20 @@ export default function Tribe({ id }: { id?: number }) {
   const [form, setForm] = useState({ name: '', tag: '' });
   const [invite, setInvite] = useState('');
   const [desc, setDesc] = useState<string | null>(null);
+  const [tab, setTab] = useState<'tribe' | 'wars'>('tribe');
+  const [warCount, setWarCount] = useState<number | null>(null);
 
   const load = () => tribeId && run(async () => setTribe(await api(`/api/tribes/${tribeId}`)));
   useEffect(() => {
     setTribe(null);
     load();
   }, [tribeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Le nombre de guerres en cours s'affiche sur l'onglet dès l'ouverture de la page.
+  const ownTribe = me.player.tribe?.id === tribeId;
+  useEffect(() => {
+    if (ownTribe) run(async () => setWarCount((await api<{ active: unknown[] }>('/api/tribes/mine/wars')).active.length));
+  }, [ownTribe, run]);
 
   const invites = me.invites.length > 0 && (
     <Panel title="Invitations reçues">
@@ -90,6 +99,19 @@ export default function Tribe({ id }: { id?: number }) {
   return (
     <div className="stack">
       {invites}
+      {isMember && (
+        <div className="tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'tribe'} onClick={() => setTab('tribe')}>
+            Tribu
+          </button>
+          <button role="tab" aria-selected={tab === 'wars'} onClick={() => setTab('wars')}>
+            Guerres{warCount ? ` (${warCount})` : ''}
+          </button>
+        </div>
+      )}
+      {isMember && tab === 'wars' && <TribeWars onCount={setWarCount} />}
+      {(!isMember || tab === 'tribe') && (
+      <>
       <Panel title={`[${tribe.tag}] ${tribe.name}`}>
         <p className="muted">
           {tribe.members.length} membre{tribe.members.length > 1 ? 's' : ''} · {fmt(tribe.points)} points
@@ -160,6 +182,8 @@ export default function Tribe({ id }: { id?: number }) {
         <button className="btn danger" onClick={() => run(async () => { await api('/api/tribes/leave', { method: 'POST' }); await refreshMe(); location.hash = '#/tribu'; })}>
           Quitter la tribu
         </button>
+      )}
+      </>
       )}
     </div>
   );

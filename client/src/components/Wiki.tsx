@@ -457,6 +457,11 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>On ne peut appartenir qu'à une tribu à la fois.</li>
           <li>La page de tribu propose aux membres trois outils : les menaces (attaques extérieures en approche sur les villages de la tribu), un planificateur d'attaque groupée (heure de départ de chaque village pour arriver ensemble) et un message envoyé à toute la tribu.</li>
           <li>Les tribus peuvent s'allier ou se faire la guerre ; les renforts d'un allié sont les bienvenus.</li>
+          <li>
+            <b>Guerres :</b> l'onglet « Guerres » de la page Tribu liste les guerres de votre tribu (déclarées par vous ou contre vous) avec le temps restant. Le chef peut déclarer la guerre à une tribu de joueurs ou de PNJ pour 4 jours
+            (3 guerres déclarées à la fois au plus) et y mettre fin quand il veut. Une tribu de PNJ peut aussi vous déclarer la guerre sans provocation : ses membres frappent alors les villages de votre tribu, jamais pendant les
+            heures calmes, et vous êtes prévenus par message. Entre deux tribus de joueurs, la guerre est un état déclaré, visible des deux camps.
+          </li>
         </ul>
         <h3>Vue d'ensemble et aides à l'attaque</h3>
         <p>
