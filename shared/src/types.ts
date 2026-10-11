@@ -68,7 +68,7 @@ export interface CommandView {
   type: CommandType;
   origin: { id: number; name: string; x: number; y: number; ownerName: string | null };
   target: { id: number; name: string; x: number; y: number; ownerName: string | null };
-  /** Absent pour les attaques entrantes ennemies : on ne voit pas ce qui arrive. */
+  /** Absent pour les attaques et renforts entrants envoyés par un autre joueur : on ne voit pas ce qui arrive. */
   units: UnitCounts | null;
   /** Butin au retour d'une attaque, ou cargaison d'un convoi de marchands. */
   loot: Resources | null;

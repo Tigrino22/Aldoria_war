@@ -3,6 +3,7 @@ import { BUILDINGS, RESOURCES, RESOURCE_NAMES, totalUnits, type VillageState } f
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame, useNow } from '../game';
+import IncomingDetail from './IncomingDetail';
 import { Countdown, Panel, ResIcon, UnitList, liveResources } from '../ui';
 
 export default function Overview() {
@@ -57,6 +58,7 @@ export default function Overview() {
                 {attacks.length} attaque{attacks.length > 1 ? 's' : ''} en approche : la première arrive dans <Countdown to={attacks[0].arriveAt} />
               </p>
             )}
+            <IncomingDetail incoming={v.incoming} />
             <p>
               {RESOURCES.map((r) => (
                 <span key={r} className={`inline-res ${res[r] >= v.capacity ? 'full' : ''}`} title={RESOURCE_NAMES[r]}>
