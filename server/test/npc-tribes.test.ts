@@ -266,7 +266,7 @@ describe('tribus de PNJ', () => {
     expect(await hits()).toBeGreaterThan(0);
   });
 
-  it('un PNJ attaqué par un PNJ d’une autre tribu lui en veut, sauf si la riposte est coupée', async () => {
+  it('un PNJ attaqué par un PNJ d’une autre tribu lui en veut, même quand la riposte contre les joueurs est coupée', async () => {
     const [t1, , t3] = (await pool.query('SELECT id FROM tribes ORDER BY id')).rows;
     const a = (await pool.query('SELECT p.id FROM players p WHERE tribe_id = $1 ORDER BY p.id LIMIT 1 OFFSET 1', [t1.id])).rows[0].id;
     const b = (await pool.query('SELECT p.id FROM players p WHERE tribe_id = $1 ORDER BY p.id LIMIT 1', [t3.id])).rows[0].id;
@@ -278,8 +278,9 @@ describe('tribus de PNJ', () => {
     });
     const victim = await tx((c) => npcTribeOf(c, a));
     expect(await tx((c) => npcGrudgesOf(c, a, victim, NOON))).toEqual([b]);
+    // L'interrupteur de riposte ne vise que les joueurs : celle entre PNJ reste active.
     env.npcRevenge = 0;
-    expect(await tx((c) => npcGrudgesOf(c, a, victim, NOON))).toEqual([]);
+    expect(await tx((c) => npcGrudgesOf(c, a, victim, NOON))).toEqual([b]);
     env.npcRevenge = 1;
   });
 

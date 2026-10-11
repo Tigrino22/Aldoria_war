@@ -201,7 +201,8 @@ Onglet « Monde » : interrupteurs de la riposte des PNJ et des guerres entre tr
 
 | Règle | Valeur |
 |---|---|
-| Riposte | Un PNJ attaqué par un joueur **ou par un PNJ d'une autre tribu** lui en veut 3 jours (interrupteur « Riposte des PNJ ») |
+| Riposte contre les joueurs | Un PNJ attaqué par un joueur lui en veut 3 jours (interrupteur « Riposte des PNJ ») |
+| Riposte entre PNJ | Un PNJ attaqué par un PNJ d'une autre tribu lui en veut 3 jours ; toujours active, l'interrupteur de riposte ne la coupe pas |
 | Guerre de tribus | Une tribu déclare la guerre à une autre, rivale de préférence, jamais à une alliée ; la guerre est réciproque et dure 4 jours réels |
 | Trêve | Au moins 2 jours réels (plus un délai aléatoire) avant qu'une tribu ne redéclare la guerre |
 | Cibles en guerre | Villages de la tribu ennemie jusqu'à 40 cases (20 pour un pillage ordinaire), choisis en priorité (9 fois sur 10) avant joueurs et barbares |
