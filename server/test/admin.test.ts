@@ -3,6 +3,7 @@ import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { env } from '../src/env';
 import { migrate } from '../src/migrate';
+import { warehouseCapacity } from '@aldoria/shared';
 import { createNpc } from '../src/game/npc';
 
 let app: Awaited<ReturnType<typeof buildApp>>;
@@ -99,5 +100,30 @@ describe('administration', () => {
     await new Promise((r) => setTimeout(r, 100));
     const seen = (await app.inject({ method: 'GET', url: '/api/admin/players', headers: boss })).json().find((p: { username: string }) => p.username === 'Curieux');
     expect(seen.lastSeen).not.toBeNull();
+  });
+
+  it('remplit les entrepôts des PNJ jusqu’à un pourcentage, sans jamais réduire', async () => {
+    env.adminUsernames.push('patron2');
+    const boss = await register('Patron2');
+    const other = await register('Curieux2');
+    const npcId = await tx((c) => createNpc(c, new Date(), 'raider'));
+    const post = (headers: Record<string, string>, payload: object) => app.inject({ method: 'POST', url: '/api/admin/npc/fill', headers, payload });
+    expect((await post(other, { percent: 50 })).statusCode).toBe(403);
+    expect((await post(boss, { percent: 150 })).statusCode).toBe(400);
+
+    await pool.query('UPDATE villages SET wood = 0, clay = 10, iron = 0, wheat = 0 WHERE owner_id = $1', [npcId]);
+    const res = await post(boss, { percent: 50 });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().changed).toBeGreaterThan(0);
+    const v = (await pool.query('SELECT v.wood, v.clay, v.buildings FROM villages v WHERE v.owner_id = $1', [npcId])).rows[0];
+    const cap = warehouseCapacity(v.buildings.warehouse);
+    expect(v.wood).toBeGreaterThanOrEqual(Math.floor(cap / 2));
+    expect(v.clay).toBeGreaterThanOrEqual(Math.floor(cap / 2));
+
+    // Un pourcentage plus bas ne vide rien.
+    await post(boss, { percent: 10 });
+    const after = (await pool.query('SELECT wood FROM villages WHERE owner_id = $1', [npcId])).rows[0];
+    expect(after.wood).toBeGreaterThanOrEqual(v.wood);
+    env.adminUsernames.length = 0;
   });
 });

@@ -104,6 +104,7 @@ export default function Admin() {
   const [settings, setSettings] = useState<AdminSetting[] | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [showNpc, setShowNpc] = useState(true);
+  const [fill, setFill] = useState(50);
 
   const load = useCallback(
     () =>
@@ -132,6 +133,12 @@ export default function Admin() {
       setSettings(await api<AdminSetting[]>('/api/admin/settings', { method: 'PUT', body: values }));
       setDraft({});
       toast(done);
+    });
+
+  const fillWarehouses = () =>
+    run(async () => {
+      const r = await api<{ villages: number; changed: number }>('/api/admin/npc/fill', { method: 'POST', body: { percent: fill } });
+      toast(`Entrepôts remplis à ${fill} % : ${r.changed} village${r.changed > 1 ? 's' : ''} sur ${r.villages}`);
     });
 
   const tabs: [Tab, string][] = [
@@ -184,6 +191,18 @@ export default function Admin() {
             <Kpi label="Offres de marché" value={log?.stats.offers} />
             <Kpi label="Attaques en heures calmes" value={log?.stats.quietAttacks} />
           </div>
+          <Panel title="Remplir les entrepôts des PNJ">
+            <p className="muted small">
+              Monte chaque ressource de tous les villages de PNJ jusqu'à la part choisie de la capacité de leur entrepôt. Ce qu'ils ont déjà au-dessus n'est jamais retiré.
+            </p>
+            <div className="admin-fill">
+              <input type="range" min={0} max={100} step={5} value={fill} aria-label="Remplissage en pourcentage" onChange={(e) => setFill(Number(e.target.value))} />
+              <b className="admin-fill-val">{fill} %</b>
+              <button className="btn primary" onClick={fillWarehouses}>
+                Remplir
+              </button>
+            </div>
+          </Panel>
           <Panel title="Activité des PNJ">
             <div className="row admin-chips">
               {kinds.map(([k, label]) => (
@@ -198,7 +217,7 @@ export default function Admin() {
               <p className="muted">Aucune activité sur cette période.</p>
             ) : (
               <div className="admin-scroll">
-                <table className="admin-table">
+                <table className="admin-table admin-events">
                   <thead>
                     <tr>
                       <th>Heure</th>
