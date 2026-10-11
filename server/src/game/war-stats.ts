@@ -15,6 +15,9 @@ interface Battle {
   defenderId: number | null;
   attackerWins: boolean;
   conquered: boolean;
+  /** Valeur en blé des défenseurs tués par l'attaquant, et des attaquants tués par la défense. */
+  attackerKills?: number;
+  defenderKills?: number;
   village: { name: string; x: number; y: number };
   at: Date;
 }
@@ -22,6 +25,7 @@ interface Battle {
 /** Enregistre le résultat d'une bataille pour le classement de guerre et, pour une conquête, dans le journal public. */
 export async function recordBattle(c: Db, b: Battle) {
   if (!b.attackerId || !b.defenderId || b.attackerId === b.defenderId) return;
+  await recordTribeWar(c, b);
   if (b.attackerWins) await c.query('UPDATE players SET attack_wins = attack_wins + 1 WHERE id = $1', [b.attackerId]);
   else await c.query('UPDATE players SET defense_wins = defense_wins + 1 WHERE id = $1', [b.defenderId]);
   if (!b.conquered) return;
@@ -32,4 +36,30 @@ export async function recordBattle(c: Db, b: Battle) {
      SELECT $1, a.id, a.username, d.id, d.username, $4, $5, $6 FROM players a, players d WHERE a.id = $2 AND d.id = $3`,
     [b.at, b.attackerId, b.defenderId, b.village.name, b.village.x, b.village.y],
   );
+}
+
+/** Compte la bataille dans la guerre de tribu en cours entre les tribus des deux camps, s'il y en a une. */
+async function recordTribeWar(c: Db, b: Battle) {
+  const { rows } = await c.query('SELECT id, tribe_id FROM players WHERE id = ANY($1)', [[b.attackerId, b.defenderId]]);
+  const attackerTribe = rows.find((r) => r.id === b.attackerId)?.tribe_id as number | null | undefined;
+  const defenderTribe = rows.find((r) => r.id === b.defenderId)?.tribe_id as number | null | undefined;
+  if (!attackerTribe || !defenderTribe || attackerTribe === defenderTribe) return;
+  const war = (
+    await c.query(
+      `SELECT id, declarer_id FROM tribe_wars
+       WHERE ended_at IS NULL AND until > $3 AND ((declarer_id = $1 AND target_id = $2) OR (declarer_id = $2 AND target_id = $1))
+       ORDER BY started_at DESC LIMIT 1`,
+      [attackerTribe, defenderTribe, b.at],
+    )
+  ).rows[0];
+  if (!war) return;
+  const col = (declarer: boolean, name: string) => `${declarer ? 'declarer' : 'target'}_${name}`;
+  const attackerIsDeclarer = war.declarer_id === attackerTribe;
+  const add: [string, number][] = [
+    [b.attackerWins ? col(attackerIsDeclarer, 'attack_wins') : col(!attackerIsDeclarer, 'defense_wins'), 1],
+    [col(attackerIsDeclarer, 'kills'), Math.round(b.attackerKills ?? 0)],
+    [col(!attackerIsDeclarer, 'kills'), Math.round(b.defenderKills ?? 0)],
+  ];
+  if (b.conquered) add.push([col(attackerIsDeclarer, 'conquests'), 1]);
+  for (const [name, n] of add) if (n > 0) await c.query(`UPDATE tribe_wars SET ${name} = ${name} + $2 WHERE id = $1`, [war.id, n]);
 }

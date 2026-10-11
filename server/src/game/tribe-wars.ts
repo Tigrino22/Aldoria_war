@@ -3,6 +3,7 @@ import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { WAR_DAYS } from './npc-wars';
+import { WAR_SCORE_SQL } from './war-stats';
 import { GRUDGE_DAYS, REAL_ATTACK } from './npc-tribes';
 
 /**
@@ -78,8 +79,18 @@ async function notifyMembers(c: Pick<Db, 'query'>, outbox: Outbox, tribeId: numb
 
 const tribeLabel = (t: { tag: string; name: string }) => `[${t.tag}] ${t.name}`;
 
+/** Bilan d'un camp dans une guerre : batailles gagnées, villages conquis, adversaires battus (en blé). */
+export interface TribeWarSide {
+  attackWins: number;
+  defenseWins: number;
+  conquests: number;
+  kills: number;
+}
+
 export interface TribeWarLine {
   id: number;
+  /** Bilan de notre tribu et de l'adversaire depuis le début de la guerre. */
+  stats: { mine: TribeWarSide; theirs: TribeWarSide };
   other: { id: number; tag: string; name: string; isNpc: boolean; members: number; villages: number; points: number };
   /** `declared` : déclarée par notre tribu ; `received` : déclarée contre nous. */
   direction: 'declared' | 'received';
@@ -102,6 +113,8 @@ export interface TribeWarsView {
   declaredCount: number;
   maxDeclared: number;
   durationDays: number;
+  /** Les cinq meilleurs guerriers de la tribu (classement de guerre, toutes batailles confondues). */
+  warriors: { username: string; score: number; conquests: number; wins: number }[];
 }
 
 async function leaderOf(c: Pick<Db, 'query'>, playerId: number) {
@@ -116,6 +129,8 @@ export async function tribeWarsView(c: Pick<Db, 'query'>, playerId: number, now:
   const lines = (
     await c.query(
       `SELECT w.id, w.declarer_id, w.target_id, w.started_at, w.until, w.ended_at, dp.username AS declared_by,
+              w.declarer_attack_wins, w.declarer_defense_wins, w.declarer_conquests, w.declarer_kills,
+              w.target_attack_wins, w.target_defense_wins, w.target_conquests, w.target_kills,
               o.id AS oid, o.tag, o.name, o.is_npc,
               (SELECT count(*)::int FROM players p WHERE p.tribe_id = o.id) AS members,
               (SELECT count(*)::int FROM villages v JOIN players p ON p.id = v.owner_id WHERE p.tribe_id = o.id) AS villages,
@@ -128,8 +143,15 @@ export async function tribeWarsView(c: Pick<Db, 'query'>, playerId: number, now:
       [tribeId, new Date(now.getTime() - 7 * DAY_MS)],
     )
   ).rows;
+  const sideOf = (r: (typeof lines)[number], prefix: 'declarer' | 'target'): TribeWarSide => ({
+    attackWins: r[`${prefix}_attack_wins`],
+    defenseWins: r[`${prefix}_defense_wins`],
+    conquests: r[`${prefix}_conquests`],
+    kills: Number(r[`${prefix}_kills`]),
+  });
   const line = (r: (typeof lines)[number]): TribeWarLine => ({
     id: r.id,
+    stats: r.declarer_id === tribeId ? { mine: sideOf(r, 'declarer'), theirs: sideOf(r, 'target') } : { mine: sideOf(r, 'target'), theirs: sideOf(r, 'declarer') },
     other: { id: r.oid, tag: r.tag, name: r.name, isNpc: r.is_npc, members: r.members, villages: r.villages, points: r.points },
     direction: r.declarer_id === tribeId ? 'declared' : 'received',
     declaredBy: r.declared_by,
@@ -152,6 +174,13 @@ export async function tribeWarsView(c: Pick<Db, 'query'>, playerId: number, now:
   ).rows
     .filter((t) => !busy.has(t.id))
     .map((t) => ({ id: t.id, tag: t.tag, name: t.name, isNpc: t.is_npc, members: t.members, points: t.points }));
+  const warriors = (
+    await c.query(
+      `SELECT p.username, ${WAR_SCORE_SQL}::int AS score, p.conquests, (p.attack_wins + p.defense_wins) AS wins
+       FROM players p WHERE p.tribe_id = $1 AND ${WAR_SCORE_SQL} > 0 ORDER BY score DESC, p.id LIMIT 5`,
+      [tribeId],
+    )
+  ).rows.map((r) => ({ username: r.username as string, score: r.score as number, conquests: r.conquests as number, wins: Number(r.wins) }));
   const declaredCount = active.filter((l) => l.direction === 'declared').length;
   return {
     isLeader,
@@ -163,6 +192,7 @@ export async function tribeWarsView(c: Pick<Db, 'query'>, playerId: number, now:
     declaredCount,
     maxDeclared: MAX_DECLARED_WARS,
     durationDays: PLAYER_WAR_DAYS,
+    warriors,
   };
 }
 

@@ -4,6 +4,7 @@ import { pool } from '../src/db';
 import { migrate } from '../src/migrate';
 import { tx } from '../src/db';
 import { recordBattle, warScore, WAR_POINTS } from '../src/game/war-stats';
+import { tribeWarsView } from '../src/game/tribe-wars';
 
 let app: Awaited<ReturnType<typeof buildApp>>;
 
@@ -74,5 +75,34 @@ describe('classement de guerre et statistiques du monde', () => {
     const text = JSON.stringify(stats);
     for (const name of ['Conquerant', 'Perdant', 'Curieux', 'Spectateur']) expect(text).not.toContain(name);
     expect((await app.inject({ method: 'GET', url: '/api/world/stats' })).statusCode).toBe(401);
+  });
+
+  it('compte les batailles dans la guerre de tribu en cours, pour chaque camp', async () => {
+    await register('Vert1');
+    await register('Rouge1');
+    await register('Neutre1');
+    const id = async (n: string) => (await pool.query('SELECT id FROM players WHERE username = $1', [n])).rows[0].id as number;
+    const [v, r, n] = [await id('Vert1'), await id('Rouge1'), await id('Neutre1')];
+    const tv = (await pool.query("INSERT INTO tribes (name, tag, leader_id) VALUES ('Verts', 'VER', $1) RETURNING id", [v])).rows[0].id as number;
+    const tr = (await pool.query("INSERT INTO tribes (name, tag, leader_id) VALUES ('Rouges', 'ROU', $1) RETURNING id", [r])).rows[0].id as number;
+    await pool.query('UPDATE players SET tribe_id = $2 WHERE id = $1', [v, tv]);
+    await pool.query('UPDATE players SET tribe_id = $2 WHERE id = $1', [r, tr]);
+    const at = new Date();
+    const village = { name: 'Fief', x: 9, y: 9 };
+    // Les Verts déclarent la guerre aux Rouges.
+    await pool.query("INSERT INTO tribe_wars (declarer_id, target_id, started_at, until) VALUES ($1, $2, $3, $4)", [tv, tr, new Date(at.getTime() - 1000), new Date(at.getTime() + 86_400_000)]);
+    await tx(async (c) => {
+      await recordBattle(c, { attackerId: v, defenderId: r, attackerWins: true, conquered: true, village, at, attackerKills: 100, defenderKills: 30 });
+      await recordBattle(c, { attackerId: r, defenderId: v, attackerWins: false, conquered: false, village, at, attackerKills: 10, defenderKills: 50 });
+      await recordBattle(c, { attackerId: r, defenderId: v, attackerWins: true, conquered: false, village, at, attackerKills: 70, defenderKills: 5 });
+      // Hors guerre : un tiers sans tribu ne compte pas.
+      await recordBattle(c, { attackerId: n, defenderId: v, attackerWins: true, conquered: true, village, at, attackerKills: 999, defenderKills: 0 });
+    });
+    const mine = (await tribeWarsView(pool, v, at)).active[0].stats;
+    expect(mine.mine).toEqual({ attackWins: 1, defenseWins: 1, conquests: 1, kills: 100 + 50 + 5 });
+    expect(mine.theirs).toEqual({ attackWins: 1, defenseWins: 0, conquests: 0, kills: 30 + 10 + 70 });
+    const theirs = (await tribeWarsView(pool, r, at)).active[0].stats;
+    expect(theirs.mine).toEqual(mine.theirs);
+    expect((await tribeWarsView(pool, v, at)).warriors.map((w) => w.username)).toEqual(['Vert1']);
   });
 });

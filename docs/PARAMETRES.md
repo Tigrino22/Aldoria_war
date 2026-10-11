@@ -225,6 +225,8 @@ Table `tribe_wars` (migration 013), code dans `server/src/game/tribe-wars.ts`, p
 | Messages | Les membres de la tribu visée reçoivent un message à la déclaration, à la fin anticipée et à l'expiration |
 | Interrupteurs | « Guerres contre les tribus de joueurs » (variable `NPC_PLAYER_WARS`, 1 par défaut) : coupé, aucune nouvelle guerre contre des joueurs, les guerres en cours cessent d'avoir un effet et on ne peut plus déclarer la guerre à un PNJ. Nécessite aussi « Guerres entre tribus de PNJ » |
 
+Statistiques de guerre de tribu (migration 015) : `tribe_wars` garde, pour la tribu qui déclare et pour la tribu visée, les batailles gagnées en attaque et en défense, les villages conquis et les adversaires battus (valeur en blé). `recordBattle` (`war-stats.ts`) les incrémente à chaque bataille entre deux joueurs dont les tribus ont une guerre en cours (PNJ compris). Rien n'est reconstitué avant la migration. La vue `tribeWarsView` ajoute le bilan de chaque guerre (`stats.mine` / `stats.theirs`) et les cinq meilleurs guerriers de la tribu (score du classement de guerre) ; le panneau « Statistiques de guerre » de l'onglet Guerres les affiche.
+
 ### Suivi des guerres (Administration > Guerres)
 
 Onglet en lecture seule, actualisé toutes les 5 s, avec une période au choix (1, 6, 24 ou 72 h). Code : `server/src/game/npc-war-report.ts` (route `GET /api/admin/wars`), `client/src/components/AdminWars.tsx`.
