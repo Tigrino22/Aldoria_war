@@ -218,6 +218,7 @@ Table `tribe_wars` (migration 013), code dans `server/src/game/tribe-wars.ts`, p
 | Règle | Valeur |
 |---|---|
 | Déclaration par un PNJ | Une tribu de PNJ déclare la guerre à une tribu de joueurs libre (aucune guerre en cours contre un PNJ, au moins un village hors protection des débutants), sans provocation ; une tribu de joueurs n'a qu'un agresseur PNJ à la fois |
+| Déclaration par provocation | Si la riposte, les guerres entre PNJ et les guerres contre les joueurs sont activées, un joueur membre d'une tribu qui attaque un PNJ d'une tribu de PNJ (3 derniers jours) fait déclarer la guerre à sa tribu par cette tribu, 4 jours, avec message aux membres ; pas de doublon tant qu'une guerre est en cours entre elles, ni après une fin à la main. Sans tribu, seule la riposte individuelle joue |
 | Rythme | Une tribu de PNJ neuve attend 0 à 24 h, puis une guerre dure 4 jours, suivie d'au moins 3 jours de trêve avant la suivante contre des joueurs ; sans cible libre elle réessaie 1 h plus tard |
 | Déclaration par un chef | Seul le chef de tribu, vers une tribu de joueurs ou de PNJ ayant au moins un village ; 4 jours ; 3 guerres déclarées à la fois au plus ; une seule guerre à la fois entre deux mêmes tribus ; le chef y met fin quand il veut |
 | Effet | Contre ou depuis une tribu de PNJ, tous les membres PNJ frappent les villages ennemis (jusqu'à 40 cases, 70 % de l'armée offensive, sans condition de taille), jamais pendant les heures calmes ni sur un joueur sous protection ; entre deux tribus de joueurs, c'est un état déclaré sans effet mécanique |

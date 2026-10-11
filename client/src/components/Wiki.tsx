@@ -459,7 +459,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>Les tribus peuvent s'allier ou se faire la guerre ; les renforts d'un allié sont les bienvenus.</li>
           <li>
             <b>Guerres :</b> l'onglet « Guerres » de la page Tribu liste les guerres de votre tribu (déclarées par vous ou contre vous) avec le temps restant. Le chef peut déclarer la guerre à une tribu de joueurs ou de PNJ pour 4 jours
-            (3 guerres déclarées à la fois au plus) et y mettre fin quand il veut. Une tribu de PNJ peut aussi vous déclarer la guerre sans provocation : ses membres frappent alors les villages de votre tribu, jamais pendant les
+            (3 guerres déclarées à la fois au plus) et y mettre fin quand il veut. Une tribu de PNJ peut aussi vous déclarer la guerre sans provocation, ou en riposte quand l'un des vôtres attaque un de ses membres (si la riposte est activée) : ses membres frappent alors les villages de votre tribu, jamais pendant les
             heures calmes, et vous êtes prévenus par message. Entre deux tribus de joueurs, la guerre est un état déclaré, visible des deux camps.
           </li>
         </ul>
