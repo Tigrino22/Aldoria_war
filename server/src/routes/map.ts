@@ -4,7 +4,8 @@ import { RESOURCES, UNIT_KEYS, type MapVillage, type RaidStatus, type RaidTarget
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { forbidden } from '../errors';
-import { pickIntel } from '../game/intel';
+import { env } from '../env';
+import { estimateLoot, pickIntel } from '../game/intel';
 
 export default async function mapRoutes(app: FastifyInstance) {
   app.get('/api/map', async (req) => {
@@ -64,14 +65,17 @@ export default async function mapRoutes(app: FastifyInstance) {
       for (const r of reports.rows) {
         if (!last.has(r.target)) last.set(r.target, { type: r.type, data: r.data, at: r.created_at });
         const h = history.get(r.target) ?? [];
-        if (h.length < 10) h.push(r);
+        if (h.length < 20) h.push(r);
         history.set(r.target, h);
       }
       const cmds = await pool.query("SELECT DISTINCT target_village_id FROM commands WHERE player_id = $1 AND NOT processed AND type = 'attack' AND target_village_id = ANY($2::int[])", [playerId, ids]);
       for (const r of cmds.rows) moving.add(r.target_village_id);
     }
+    const now = new Date();
     return rows.map((r): RaidTarget => {
       const l = last.get(r.id);
+      const h = history.get(r.id) ?? [];
+      const intel = pickIntel(h);
       let status: RaidStatus = 'never';
       let loot = 0;
       if (l?.type === 'scout') status = 'scouted';
@@ -81,7 +85,7 @@ export default async function mapRoutes(app: FastifyInstance) {
         status = !d.attackerWins ? 'lost' : lost > 0 ? 'losses' : 'clean';
         if (d.attackerWins && d.loot) loot = RESOURCES.reduce((n, k) => n + (d.loot[k] ?? 0), 0);
       }
-      return { id: r.id, name: r.name, x: r.x, y: r.y, points: r.points, distance: Math.round(r.dist * 10) / 10, status, lastAt: l ? new Date(l.at).toISOString() : null, lastLoot: loot, intel: pickIntel(history.get(r.id) ?? []), underAttack: moving.has(r.id) };
+      return { id: r.id, name: r.name, x: r.x, y: r.y, points: r.points, distance: Math.round(r.dist * 10) / 10, status, lastAt: l ? new Date(l.at).toISOString() : null, lastLoot: loot, intel, lootable: estimateLoot(h, now, env.worldSpeed, intel?.troops ?? null), underAttack: moving.has(r.id) };
     });
   });
 }

@@ -260,8 +260,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
             mais le blé qu'ils consommaient est immédiatement libéré. Seules les troupes présentes au village peuvent être dissoutes (pas celles en mouvement ni en renfort chez un autre).
           </li>
           <li>
-            <b>Assistant de pillage :</b> l'entrée « Assistant de pillage » du menu liste les villages barbares autour de votre village actif (rayon de 10, 20 ou 30 cases). Enregistrez un modèle de troupes, puis envoyez-le
-            en un clic sur un village, ou sur plusieurs villages cochés d'un coup (tant qu'il reste assez de troupes). Une pastille indique le résultat de votre dernière attaque : gris, jamais attaqué ; bleu, espionné ;
+            <b>Assistant de pillage :</b> l'entrée « Assistant de pillage » du menu liste les villages barbares autour de votre village actif (rayon de 10, 20 ou 30 cases). Enregistrez deux modèles de troupes, A et B, puis cliquez
+            sur A ou B à côté d'un village pour l'attaquer avec ce modèle, ou envoyez-le à plusieurs villages cochés d'un coup (tant qu'il reste assez de troupes). Un village vers lequel une attaque est en route disparaît
+            de la liste jusqu'à son arrivée. Le butin pillable est estimé d'après votre dernier rapport où un éclaireur a vu les réserves (production depuis, plafond de l'entrepôt, pillages depuis et cachette déduits) ;
+            sans ce rapport, il affiche « ? » : espionnez d'abord. Une pastille indique le résultat de votre dernière attaque : gris, jamais attaqué ; bleu, espionné ;
             rouge, attaque perdue ; jaune, victoire avec pertes ; vert, victoire sans perte.
           </li>
         </ul>

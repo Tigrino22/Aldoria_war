@@ -1,22 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { UNITS, UNIT_KEYS, normalizeUnits, resolveCombat, wallDuringCombat, type RaidStatus, type RaidTarget, type UnitKey } from '@aldoria/shared';
+import { RESOURCES, RESOURCE_NAMES, UNITS, UNIT_KEYS, normalizeUnits, resolveCombat, wallDuringCombat, type RaidStatus, type RaidTarget, type UnitKey, type VillageState } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, coords, fmt } from '../format';
 import { useGame, useRoute } from '../game';
 import { Panel, UnitIcon } from '../ui';
 import './raid.css';
 
-const MODEL_KEY = 'aldoria.raidModel';
+type Slot = 'A' | 'B';
+const SLOTS: Slot[] = ['A', 'B'];
+/** Le modèle A garde l'ancienne clé pour retrouver le modèle déjà enregistré. */
+const MODEL_KEY: Record<Slot, string> = { A: 'aldoria.raidModel', B: 'aldoria.raidModelB' };
 type Model = Partial<Record<UnitKey, number>>;
+type Draft = Partial<Record<UnitKey, string>>;
 
-const readModel = (): Model => {
+const cleanModel = (raw: Record<string, unknown>): Model =>
+  Object.fromEntries(UNIT_KEYS.filter((k) => Number(raw[k]) > 0).map((k) => [k, Math.floor(Number(raw[k]))]));
+
+const readModel = (slot: Slot): Model => {
   try {
-    const raw = JSON.parse(localStorage.getItem(MODEL_KEY) ?? '{}');
-    return Object.fromEntries(UNIT_KEYS.filter((k) => Number(raw[k]) > 0).map((k) => [k, Math.floor(Number(raw[k]))]));
+    return cleanModel(JSON.parse(localStorage.getItem(MODEL_KEY[slot]) ?? '{}'));
   } catch {
     return {};
   }
 };
+const toDraft = (m: Model): Draft => Object.fromEntries(Object.entries(m).map(([k, n]) => [k, String(n)]));
 
 /** Pastille du résultat de la dernière attaque sur ce village. */
 export const STATUS: Record<RaidStatus, { label: string; cls: string }> = {
@@ -28,13 +35,45 @@ export const STATUS: Record<RaidStatus, { label: string; cls: string }> = {
 };
 
 const RADII = [10, 20, 30];
-type Sort = 'distance' | 'points' | 'loot';
+type Sort = 'distance' | 'points' | 'lootable' | 'loot';
+
+const unitsOf = (m: Model) => UNIT_KEYS.filter((k) => (m[k] ?? 0) > 0);
+const capacityOf = (m: Model) => unitsOf(m).reduce((n, k) => n + (m[k] ?? 0) * UNITS[k].carry, 0);
+const possibleOf = (m: Model, v: VillageState) => {
+  const used = unitsOf(m);
+  return used.length ? Math.min(...used.map((k) => Math.floor(v.troopsHome[k] / m[k]!))) : 0;
+};
+
+function ModelEditor({ slot, model, village, onSave }: { slot: Slot; model: Model; village: VillageState; onSave: (m: Model) => void }) {
+  const [draft, setDraft] = useState<Draft>(() => toDraft(model));
+  const draftModel = cleanModel(draft);
+  const dirty = JSON.stringify(draftModel) !== JSON.stringify(model);
+  const possible = possibleOf(model, village);
+  return (
+    <div className="raid-model">
+      <h3><span className={`raid-slot slot-${slot}`}>{slot}</span> Modèle {slot}</h3>
+      <div className="raid-units">
+        {UNIT_KEYS.map((k) => (
+          <label key={k} className="raid-unit" htmlFor={`raid-${slot}-${k}`}>
+            <b><UnitIcon unit={k} size={24} /> {UNITS[k].name}</b>
+            <span className="muted small">butin {UNITS[k].carry} · dispo {fmt(village.troopsHome[k])}</span>
+            <input id={`raid-${slot}-${k}`} type="number" min={0} inputMode="numeric" placeholder="0" value={draft[k] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, [k]: e.target.value }))} />
+          </label>
+        ))}
+        <button className="btn primary small" disabled={!dirty} onClick={() => onSave(draftModel)}>Enregistrer {slot}</button>
+      </div>
+      <p className="raid-sum">
+        <span>Capacité de butin : <b>{fmt(capacityOf(model))}</b></span>
+        <span>Dans ce village : <b className={possible > 0 ? 'ok' : 'bad'}>{possible} envoi{possible > 1 ? 's' : ''} possible{possible > 1 ? 's' : ''}</b></span>
+      </p>
+    </div>
+  );
+}
 
 export default function Raid() {
   const { village: v, setVillage, run, toast } = useGame();
   const [, go] = useRoute();
-  const [model, setModel] = useState<Model>(readModel);
-  const [draft, setDraft] = useState<Partial<Record<UnitKey, string>>>(() => Object.fromEntries(Object.entries(readModel()).map(([k, n]) => [k, String(n)])));
+  const [models, setModels] = useState<Record<Slot, Model>>(() => ({ A: readModel('A'), B: readModel('B') }));
   const [radius, setRadius] = useState(10);
   const [sort, setSort] = useState<Sort>('distance');
   const [targets, setTargets] = useState<RaidTarget[] | null>(null);
@@ -50,29 +89,28 @@ export default function Raid() {
     load();
   }, [load]);
 
+  // Les villages vers lesquels une attaque est déjà en route sont masqués.
+  const hidden = (targets ?? []).filter((t) => t.underAttack).length;
   const list = useMemo(() => {
-    const t = [...(targets ?? [])];
+    const t = (targets ?? []).filter((x) => !x.underAttack);
     if (sort === 'points') t.sort((a, b) => b.points - a.points);
+    else if (sort === 'lootable') t.sort((a, b) => (b.lootable?.total ?? -1) - (a.lootable?.total ?? -1));
     else if (sort === 'loot') t.sort((a, b) => b.lastLoot - a.lastLoot);
     return t;
   }, [targets, sort]);
 
   if (!v) return null;
 
-  const used = UNIT_KEYS.filter((k) => (model[k] ?? 0) > 0);
-  const capacity = used.reduce((n, k) => n + (model[k] ?? 0) * UNITS[k].carry, 0);
-  const possible = used.length ? Math.min(...used.map((k) => Math.floor(v.troopsHome[k] / model[k]!))) : 0;
-  const draftModel: Model = Object.fromEntries(UNIT_KEYS.filter((k) => Number(draft[k]) > 0).map((k) => [k, Math.floor(Number(draft[k]))]));
-  const dirty = JSON.stringify(draftModel) !== JSON.stringify(model);
+  const possible: Record<Slot, number> = { A: possibleOf(models.A, v), B: possibleOf(models.B, v) };
 
-  const save = () => {
-    setModel(draftModel);
+  const save = (slot: Slot, m: Model) => {
+    setModels((all) => ({ ...all, [slot]: m }));
     try {
-      localStorage.setItem(MODEL_KEY, JSON.stringify(draftModel));
+      localStorage.setItem(MODEL_KEY[slot], JSON.stringify(m));
     } catch {
       /* stockage indisponible : le modèle reste en mémoire pour cette session */
     }
-    toast('Modèle de pillage enregistré');
+    toast(`Modèle ${slot} enregistré`);
   };
 
   const toggle = (id: number) =>
@@ -82,11 +120,11 @@ export default function Raid() {
       else n.add(id);
       return n;
     });
-  const free = list.filter((t) => !t.underAttack);
-  const selectNearest = () => setSelected(new Set([...free].sort((a, b) => a.distance - b.distance).slice(0, Math.min(5, possible || 5)).map((t) => t.id)));
+  const selectNearest = () => setSelected(new Set([...list].sort((a, b) => a.distance - b.distance).slice(0, 5).map((t) => t.id)));
 
-  const sendTo = async (ids: number[]) => {
-    if (!used.length) return toast('Enregistrez d’abord un modèle de troupes');
+  const sendTo = async (slot: Slot, ids: number[]) => {
+    const model = models[slot];
+    if (!unitsOf(model).length) return toast(`Enregistrez d’abord le modèle ${slot}`);
     let sent = 0;
     await run(async () => {
       for (const id of ids) {
@@ -100,37 +138,24 @@ export default function Raid() {
         }
       }
     });
-    if (sent > 0) toast(`${sent} attaque${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''}`);
+    if (sent > 0) toast(`${sent} attaque${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''} avec le modèle ${slot}`);
     setSelected(new Set());
     load();
   };
 
   // Attaque suicidaire : la défense est connue et le modèle ne la battrait pas.
-  const suicidal = (t: RaidTarget) => {
-    if (!t.intel || !used.length) return false;
-    const attackers = normalizeUnits(model);
+  const suicidal = (t: RaidTarget, slot: Slot) => {
+    if (!t.intel || !unitsOf(models[slot]).length) return false;
+    const attackers = normalizeUnits(models[slot]);
     return !resolveCombat({ attackers, defenders: [t.intel.troops], wallLevel: wallDuringCombat(t.intel.wall, attackers.ram) }).attackerWins;
   };
   const picked = list.filter((t) => selected.has(t.id));
 
   return (
     <>
-      <Panel title="Mon modèle de pillage">
-        <div className="raid-units">
-          {UNIT_KEYS.map((k) => (
-            <label key={k} className="raid-unit" htmlFor={`raid-${k}`}>
-              <b><UnitIcon unit={k} size={24} /> {UNITS[k].name}</b>
-              <span className="muted small">butin {UNITS[k].carry} · dispo {fmt(v.troopsHome[k])}</span>
-              <input id={`raid-${k}`} type="number" min={0} inputMode="numeric" placeholder="0" value={draft[k] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, [k]: e.target.value }))} />
-            </label>
-          ))}
-          <button className="btn primary small" disabled={!dirty} onClick={save}>Enregistrer</button>
-        </div>
-        <p className="raid-sum">
-          <span>Capacité de butin : <b>{fmt(capacity)}</b></span>
-          <span>Dans ce village : <b className={possible > 0 ? 'ok' : 'bad'}>{possible} envoi{possible > 1 ? 's' : ''} possible{possible > 1 ? 's' : ''}</b></span>
-        </p>
-        <p className="muted small">Le modèle est mémorisé sur cet appareil.</p>
+      <Panel title="Mes modèles de pillage">
+        {SLOTS.map((slot) => <ModelEditor key={slot} slot={slot} model={models[slot]} village={v} onSave={(m) => save(slot, m)} />)}
+        <p className="muted small">Les modèles sont mémorisés sur cet appareil. Cliquez sur A ou B à côté d’un village pour l’attaquer avec ce modèle.</p>
       </Panel>
 
       <Panel title={`Villages barbares autour de ${v.name}`}>
@@ -138,7 +163,7 @@ export default function Raid() {
           <span className="muted">Rayon :</span>
           {RADII.map((r) => <button key={r} className={`chip-btn ${radius === r ? 'on' : ''}`} onClick={() => setRadius(r)}>{r} cases</button>)}
           <span className="muted">Trier par :</span>
-          {([['distance', 'Distance'], ['points', 'Points'], ['loot', 'Dernier butin']] as const).map(([s, label]) => (
+          {([['distance', 'Distance'], ['points', 'Points'], ['lootable', 'Butin estimé'], ['loot', 'Dernier butin']] as const).map(([s, label]) => (
             <button key={s} className={`chip-btn ${sort === s ? 'on' : ''}`} onClick={() => setSort(s)}>{label}</button>
           ))}
           <button className="btn small ghost" onClick={selectNearest}>Sélectionner les 5 plus proches</button>
@@ -146,29 +171,60 @@ export default function Raid() {
         <p className="raid-legend small">
           {(Object.keys(STATUS) as RaidStatus[]).map((s) => <span key={s}><i className={`dot ${STATUS[s].cls}`} /> {STATUS[s].label}</span>)}
         </p>
-        {targets === null ? <p className="muted">Chargement…</p> : list.length === 0 ? <p className="muted">Aucun village barbare dans ce rayon.</p> : (
+        {hidden > 0 && <p className="muted small">{hidden} village{hidden > 1 ? 's' : ''} masqué{hidden > 1 ? 's' : ''} : une attaque y est déjà en route.</p>}
+        {targets === null ? <p className="muted">Chargement…</p> : list.length === 0 ? <p className="muted">{hidden > 0 ? 'Tous les villages barbares de ce rayon ont déjà une attaque en route.' : 'Aucun village barbare dans ce rayon.'}</p> : (
           <ul className="raid-list">
-            {list.map((t) => (
-              <li key={t.id} className={selected.has(t.id) ? 'sel' : ''}>
-                <input type="checkbox" aria-label={`Sélectionner ${t.name}`} checked={selected.has(t.id)} disabled={t.underAttack} onChange={() => toggle(t.id)} />
-                <div className="raid-who">
-                  <b><i className={`dot ${STATUS[t.status].cls}`} title={STATUS[t.status].label} /> <a href="#/carte" onClick={(e) => { e.preventDefault(); go(`carte/${t.x},${t.y}`); }}>{t.name}</a> <span className="chip">{coords(t)}</span>{suicidal(t) && <span className="raid-danger" title="D'après votre dernier renseignement, ce modèle perdrait">Attaque suicidaire</span>}</b>
-                  <span className="muted small">
-                    {t.distance.toLocaleString('fr-FR')} cases · {fmt(t.points)} pts · {t.lastAt ? `${STATUS[t.status].label}, ${clockTime(t.lastAt)}${t.lastLoot ? ` · ${fmt(t.lastLoot)} pillés` : ''}` : 'Jamais attaqué'}
+            {list.map((t) => {
+              const danger = SLOTS.filter((s) => suicidal(t, s));
+              return (
+                <li key={t.id} className={selected.has(t.id) ? 'sel' : ''}>
+                  <input type="checkbox" aria-label={`Sélectionner ${t.name}`} checked={selected.has(t.id)} onChange={() => toggle(t.id)} />
+                  <div className="raid-who">
+                    <b><i className={`dot ${STATUS[t.status].cls}`} title={STATUS[t.status].label} /> <a href="#/carte" onClick={(e) => { e.preventDefault(); go(`carte/${t.x},${t.y}`); }}>{t.name}</a> <span className="chip">{coords(t)}</span>{danger.length > 0 && <span className="raid-danger" title="D'après votre dernier renseignement, ce modèle perdrait">Attaque suicidaire ({danger.join(', ')})</span>}</b>
+                    <span className="muted small">
+                      {t.distance.toLocaleString('fr-FR')} cases · {fmt(t.points)} pts · {t.lastAt ? `${STATUS[t.status].label}, ${clockTime(t.lastAt)}${t.lastLoot ? ` · ${fmt(t.lastLoot)} pillés` : ''}` : 'Jamais attaqué'}
+                    </span>
+                  </div>
+                  {t.lootable ? (
+                    <span className="raid-loot" title={`Estimé d'après l'éclaireur du ${clockTime(t.lootable.seenAt)} : ${RESOURCES.map((r) => `${RESOURCE_NAMES[r]} ${fmt(t.lootable!.resources[r])}`).join(', ')}`}>
+                      <b>≈ {fmt(t.lootable.total)}</b>
+                      <span className="muted small">pillables</span>
+                    </span>
+                  ) : (
+                    <span className="raid-loot unknown" title="Aucun rapport d'éclaireur sur ce village : envoyez un espion pour estimer le butin">
+                      <b>?</b>
+                      <span className="muted small">à espionner</span>
+                    </span>
+                  )}
+                  <span className="raid-send">
+                    {SLOTS.map((slot) => (
+                      <button
+                        key={slot}
+                        className={`btn small raid-slot-btn slot-${slot} ${danger.includes(slot) ? 'danger' : ''}`}
+                        disabled={possible[slot] < 1}
+                        title={unitsOf(models[slot]).length ? `Envoyer le modèle ${slot} (butin max. ${fmt(capacityOf(models[slot]))})` : `Modèle ${slot} vide`}
+                        onClick={() => sendTo(slot, [t.id])}
+                      >
+                        {slot}
+                      </button>
+                    ))}
                   </span>
-                </div>
-                {t.underAttack ? <span className="btn small" aria-disabled>Troupes en route</span> : <button className="btn primary small" disabled={!used.length || possible < 1} onClick={() => sendTo([t.id])}>Envoyer le modèle</button>}
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
         {picked.length > 0 && (
           <div className="raid-foot">
-            <span><b>{picked.length} village{picked.length > 1 ? 's' : ''} sélectionné{picked.length > 1 ? 's' : ''}</b> · butin max. {fmt(capacity * picked.length)}</span>
-            {picked.length > possible && <span className="warn small">Troupes pour {possible} envoi{possible > 1 ? 's' : ''} seulement</span>}
-            <button className="btn gold" disabled={!used.length || possible < 1} onClick={() => sendTo(picked.slice(0, possible).map((t) => t.id))}>
-              Envoyer le modèle à {Math.min(picked.length, possible)} village{Math.min(picked.length, possible) > 1 ? 's' : ''}
-            </button>
+            <span><b>{picked.length} village{picked.length > 1 ? 's' : ''} sélectionné{picked.length > 1 ? 's' : ''}</b>{picked.some((t) => t.lootable) && <> · butin estimé {fmt(picked.reduce((n, t) => n + (t.lootable?.total ?? 0), 0))}</>}</span>
+            {SLOTS.map((slot) => {
+              const n = Math.min(picked.length, possible[slot]);
+              return (
+                <button key={slot} className="btn gold" disabled={n < 1} title={picked.length > possible[slot] ? `Troupes pour ${possible[slot]} envoi${possible[slot] > 1 ? 's' : ''} seulement` : undefined} onClick={() => sendTo(slot, picked.slice(0, n).map((t) => t.id))}>
+                  Envoyer {slot} à {n} village{n > 1 ? 's' : ''}
+                </button>
+              );
+            })}
           </div>
         )}
       </Panel>

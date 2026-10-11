@@ -132,7 +132,9 @@ export interface RaidTarget {
   lastLoot: number;
   /** Ce que le joueur sait de la défense (dernier espionnage ou dernière attaque dont l'armée a survécu). */
   intel: TargetIntel | null;
-  /** Des troupes du village de départ sont déjà en route vers cette cible. */
+  /** Ressources pillables estimées d'après le dernier rapport où un éclaireur a vu les réserves (null sans un tel rapport). */
+  lootable: LootEstimate | null;
+  /** Des troupes du joueur sont déjà en route vers cette cible. */
   underAttack: boolean;
 }
 
@@ -193,6 +195,15 @@ export interface QuestView {
 }
 
 /** Ce que le joueur sait d'un village cible, d'après son dernier espionnage ou sa dernière attaque. */
+/** Butin estimé : réserves vues par un éclaireur, plus la production depuis, moins ce qui a été pillé depuis et la cachette. */
+export interface LootEstimate {
+  /** Total pillable estimé maintenant, toutes ressources confondues. */
+  total: number;
+  resources: Resources;
+  /** Date du rapport d'éclaireur qui sert de base. */
+  seenAt: string;
+}
+
 export interface TargetIntel {
   /** Troupes qui étaient (ou restaient) sur place. */
   troops: UnitCounts;
