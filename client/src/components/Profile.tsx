@@ -71,6 +71,9 @@ export default function Profile({ name }: { name: string }) {
         {' · '}rang {profile.rank} · {fmt(profile.points)} points · inscrit le {clockTime(profile.createdAt)}
         {profile.protected && ' · sous protection débutant'}
       </p>
+      <p className="small">
+        Adversaires battus : <strong>{fmt(profile.killsAttack)}</strong> en attaque · <strong>{fmt(profile.killsDefense)}</strong> en défense
+      </p>
       <h3>Villages ({profile.villages.length})</h3>
       {profile.villages.length === 0 ? (
         <p className="muted">Aucun village pour le moment.</p>

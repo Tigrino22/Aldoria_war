@@ -13,7 +13,9 @@ interface TribeInfo {
   leaderId: number;
   isNpc?: boolean;
   points: number;
-  members: { id: number; username: string; villages: number; points: number }[];
+  killsAttack: number;
+  killsDefense: number;
+  members: { id: number; username: string; villages: number; points: number; killsAttack: number; killsDefense: number }[];
   invites: { id: number; username: string }[];
 }
 
@@ -92,6 +94,9 @@ export default function Tribe({ id }: { id?: number }) {
         <p className="muted">
           {tribe.members.length} membre{tribe.members.length > 1 ? 's' : ''} · {fmt(tribe.points)} points
         </p>
+        <p className="small">
+          Adversaires battus : <strong>{fmt(tribe.killsAttack)}</strong> en attaque · <strong>{fmt(tribe.killsDefense)}</strong> en défense
+        </p>
         {desc !== null ? (
           <form className="form" onSubmit={(e) => { e.preventDefault(); run(async () => { await api('/api/tribes/description', { body: { description: desc } }); setDesc(null); load(); }); }}>
             <textarea id="tribe-desc" rows={5} value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={2000} />
@@ -113,7 +118,7 @@ export default function Tribe({ id }: { id?: number }) {
         <div className="table-wrap">
           <table className="rank-table">
             <thead>
-              <tr><th>Joueur</th><th>Villages</th><th>Points</th>{isLeader && <th />}</tr>
+              <tr><th>Joueur</th><th>Villages</th><th>Points</th><th>Battus (att.)</th><th>Battus (déf.)</th>{isLeader && <th />}</tr>
             </thead>
             <tbody>
               {tribe.members.map((m) => (
@@ -121,6 +126,8 @@ export default function Tribe({ id }: { id?: number }) {
                   <td><PlayerLink name={m.username} />{m.id === tribe.leaderId && <span className="chip">chef</span>}</td>
                   <td>{m.villages}</td>
                   <td>{fmt(m.points)}</td>
+                  <td>{fmt(m.killsAttack)}</td>
+                  <td>{fmt(m.killsDefense)}</td>
                   {isLeader && (
                     <td>
                       {m.id !== me.player.id && (

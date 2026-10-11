@@ -220,6 +220,9 @@ export interface PlayerProfile {
   protected: boolean;
   points: number;
   rank: number;
+  /** Adversaires battus en attaque et en défense (valeur en blé des troupes tuées). */
+  killsAttack: number;
+  killsDefense: number;
   tribe: { id: number; tag: string; name: string } | null;
   /** « can » : le chef de tribu qui consulte peut inviter ce joueur ; « pending » : invitation déjà envoyée ; sinon « none ». */
   invite: 'none' | 'can' | 'pending';

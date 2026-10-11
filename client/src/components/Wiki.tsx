@@ -453,6 +453,11 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           Les points d'un joueur sont la somme des points de ses villages, et ceux d'un village la somme des points de ses bâtiments (un bâtiment au niveau N vaut N×(N+1)/2 points). Le
           classement des tribus additionne les points de leurs membres.
         </p>
+        <p>
+          Deux autres classements, pour les joueurs comme pour les tribus, comptent les adversaires battus : chaque troupe ennemie tuée vaut le blé qu'elle consomme par heure (un lancier 1, un cavalier 4).
+          « Attaque » compte les troupes tuées quand vous attaquez, « Défense » celles tuées quand on vous attaque (les renforts partagent ce total avec le propriétaire du village, selon leur poids). Ces chiffres
+          figurent sur les profils des joueurs et des tribus, et seuls les combats livrés depuis cette fonctionnalité sont comptés.
+        </p>
       </>
     ),
     compte: (
