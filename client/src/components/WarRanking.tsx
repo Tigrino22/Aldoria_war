@@ -77,10 +77,20 @@ export default function WarRankingView() {
           ))}
         </div>
         {data && (
-          <p className="muted small">
-            Score de guerre = {data.points.conquest} points par village conquis à un adversaire, {data.points.win} par bataille gagnée (en attaque ou en défense) et 1 point par {data.points.killsDivisor} d'adversaires
-            battus. Les villages barbares ne comptent pas. Le décompte démarre à la mise en place du classement.
-          </p>
+          <div className="wr-legend" aria-label="Calcul du score de guerre">
+            <span>
+              Village conquis <b>{data.points.conquest}</b>
+            </span>
+            <span>
+              Victoire <b>{data.points.win}</b>
+            </span>
+            <span>
+              {data.points.killsDivisor} adversaires battus <b>1</b>
+            </span>
+            <i className="muted" title="Une victoire est une attaque réussie, ou une attaque repoussée quand on vous attaque. Les espionnages et les villages barbares ne comptent pas.">
+              ?
+            </i>
+          </div>
         )}
         {!data ? (
           <p className="muted">Chargement…</p>

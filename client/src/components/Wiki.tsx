@@ -479,7 +479,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
         <p>La page Classement a trois onglets, chacun pour les joueurs et pour les tribus (les chiffres d'une tribu sont la somme de ceux de ses membres) :</p>
         <ul>
           <li><b>Joueurs et Tribus :</b> classement général par points, avec deux variantes, « Attaque » et « Défense », qui comptent les adversaires battus.</li>
-          <li><b>Guerre :</b> classement de guerre (conquêtes, villages perdus, batailles gagnées), podium, dernières conquêtes du monde et guerres de tribus en cours.</li>
+          <li><b>Guerre :</b> classement de guerre (conquêtes, villages perdus, victoires), podium, dernières conquêtes du monde et guerres de tribus en cours.</li>
           <li>La page « Statistiques du monde », dans le menu Social, donne les totaux et moyennes de toute la carte.</li>
         </ul>
         <p>
@@ -493,8 +493,8 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
         </p>
         <p>
           <b>Classement de guerre :</b> l'onglet « Guerre » classe joueurs et tribus (la somme de leurs membres) selon un score de guerre : 250 points par village conquis à un adversaire (joueur ou PNJ, jamais un village barbare),
-          5 points par bataille gagnée contre un village occupé, en attaque comme en défense, et 1 point par 50 d'adversaires battus. Le tableau montre aussi les villages perdus. Un podium met les trois premiers en avant,
-          et deux listes donnent les dernières conquêtes du monde et les guerres de tribus en cours. Les compteurs démarrent à la mise en place du classement : les batailles passées ne sont pas reconstituées.
+          5 points par victoire contre un village occupé (une attaque réussie, ou une attaque repoussée quand on vous attaque ; les espionnages ne comptent pas), et 1 point par 50 d'adversaires battus. Le tableau montre aussi les villages perdus. Un podium met les trois premiers en avant,
+          et deux listes donnent les dernières conquêtes du monde et les guerres de tribus en cours. 
         </p>
         <h3>Statistiques du monde</h3>
         <p>
