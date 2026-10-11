@@ -420,19 +420,3 @@ textarea { width: 100%; resize: vertical; }
   .nav button { font-size: 11px; }
   .body { display: block; }
 }
-
-/* Fenêtre d'annonce d'une nouveauté */
-.announce {
-  width: min(640px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--panel); border: 2px solid var(--gold); border-radius: var(--radius);
-  padding: 28px 30px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.45);
-}
-.announce h2 { margin: 0; font-family: var(--display); font-size: 30px; line-height: 1.15; }
-.announce-tag { align-self: flex-start; background: var(--gold); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 12px; border-radius: 12px; }
-.announce-lead { margin: 0; font-size: 17px; }
-.announce-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
-.announce p.muted { margin: 0; }
-.announce-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
-@media (max-width: 560px) {
-  .announce { padding: 20px 18px; }
-  .announce h2 { font-size: 24px; }
-}

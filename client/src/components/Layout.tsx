@@ -20,7 +20,6 @@ import Profile from './Profile';
 import Wiki from './Wiki';
 import Admin from './Admin';
 import Raid from './Raid';
-import Announcement from './Announcement';
 import { api } from '../api';
 
 // La carte embarque PixiJS : elle n'est chargée qu'à la première ouverture.
@@ -216,7 +215,6 @@ export default function Layout() {
           {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
         </main>
       </div>
-      <Announcement />
       <nav className="nav" aria-label="Navigation">
         {TAB_ITEMS.map((n) => (
           <button key={n.path} className={page === n.path && !drawer ? 'active' : ''} onClick={() => (setDrawer(false), go(n.path))}>

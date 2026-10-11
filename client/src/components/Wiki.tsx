@@ -83,6 +83,7 @@ const RESOURCE_BUILDING: Partial<Record<BuildingKey, keyof Resources>> = { woodc
 
 /** Intitulé de la colonne « bonus » d'une fiche bâtiment. */
 function bonusLabel(key: BuildingKey): string {
+  if (key === 'farm') return 'Blé / h · population (places)';
   if (RESOURCE_BUILDING[key]) return `Production de ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} / h`;
   switch (key) {
     case 'townhall': return 'Durée des constructions';
@@ -95,6 +96,7 @@ function bonusLabel(key: BuildingKey): string {
 }
 
 function bonusAt(key: BuildingKey, level: number, speed: number): string {
+  if (key === 'farm') return `${fmt(resourceProduction(level) * speed)} · ${fmt(populationCapacity(level))}`;
   if (RESOURCE_BUILDING[key]) return fmt(resourceProduction(level) * speed);
   switch (key) {
     case 'townhall': return `x${(Math.pow(0.95, level - 1)).toFixed(2).replace('.', ',')} (−${pct(1 - Math.pow(0.95, level - 1))})`;
@@ -108,7 +110,10 @@ function bonusAt(key: BuildingKey, level: number, speed: number): string {
 
 function bonusSummary(key: BuildingKey, speed: number): string {
   if (RESOURCE_BUILDING[key]) {
-    const extra = key === 'farm' ? " La ferme loge aussi l'armée : ${fmt(populationCapacity(1))} places de population au niveau 1, ${fmt(populationCapacity(20))} au niveau 20." : '';
+    const extra =
+      key === 'farm'
+        ? ` La ferme loge aussi votre armée : chaque soldat occupe des places de population (1 pour un lancier, 4 pour un cavalier). Elle en offre ${fmt(populationCapacity(1))} au niveau 1, soit ${fmt(populationCapacity(1))} lanciers, et ${fmt(populationCapacity(20))} au niveau 20.`
+        : '';
     return `Produit ${fmt(resourceProduction(1) * speed)} ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} par heure au niveau 1, ${fmt(resourceProduction(20) * speed)} au niveau 20 (sans bâtiment : ${fmt(resourceProduction(0) * speed)} par heure).${extra}`;
   }
   switch (key) {
