@@ -5,9 +5,10 @@ import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { sendCommand } from '../src/game/commands';
 import { createNpc, ensureDailyNpc, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
+import { consecutiveScoutFailures, scoutWave } from '../src/game/npc-rules';
 import { alertAttackedNpcs, grudgesOf } from '../src/game/npc-tribes';
 import { env } from '../src/env';
-import { createVillage, setTroops } from '../src/game/village';
+import { createVillage, setTroops, syncVillage } from '../src/game/village';
 
 const HOUR = 3_600_000;
 const NOON = new Date('2030-01-15T12:00:00Z');
@@ -243,6 +244,69 @@ describe('PNJ agressifs', () => {
     ]);
     await tx((c) => npcThink(c, new Outbox(), npc, t));
     expect(await attacksOn(npc, v)).toHaveLength(0);
+  });
+
+  it('espionnage : plus d’éclaireurs après un échec, puis la cible est laissée tranquille après trois échecs', async () => {
+    expect([0, 1, 2, 3, 9].map((n) => scoutWave(n, 100))).toEqual([2, 10, 30, 30, 30]);
+    expect(scoutWave(2, 5)).toBe(5);
+    expect(scoutWave(1, 0)).toBe(0);
+    const ordered = [
+      { villageId: 1, ok: false, at: 60 },
+      { villageId: 2, ok: true, at: 50 },
+      { villageId: 1, ok: false, at: 40 },
+      { villageId: 2, ok: false, at: 30 },
+      { villageId: 1, ok: true, at: 20 },
+      { villageId: 1, ok: false, at: 10 },
+    ];
+    // Du plus récent au plus ancien : un renseignement obtenu remet le compte à zéro pour les échecs plus anciens.
+    expect([...consecutiveScoutFailures(ordered)]).toEqual([[1, { count: 2, lastAt: 60 }]]);
+
+    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 100 })));
+    const other = await makePlayer('Defenseur');
+    const v = await villageOf(other, home.x + 2, home.y + 2);
+    // Les autres joueurs restent sous protection : cette cible est la seule possible.
+    await pool.query("UPDATE players SET protection_until = CASE WHEN id = $1 THEN NULL ELSE '2031-01-01'::timestamptz END WHERE NOT is_npc", [other]);
+    const t = new Date(NOON.getTime() + 75 * HOUR);
+    const scoutsSent = async () =>
+      (await pool.query("SELECT (units->>'scout')::int AS n FROM commands WHERE player_id = $1 AND target_village_id = $2 AND type = 'attack' AND (units->>'scout')::int > 0", [npc, v])).rows.map((r) => r.n as number);
+    const failed = (at: Date) =>
+      pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`, [
+        npc,
+        JSON.stringify({ attacker: {}, defender: { village: { id: v } }, intel: null }),
+        at,
+      ]);
+
+    await tx((c) => npcThink(c, new Outbox(), npc, t));
+    expect(await scoutsSent()).toEqual([2]);
+
+    await pool.query('DELETE FROM commands');
+    await failed(new Date(t.getTime() - HOUR));
+    await tx((c) => npcThink(c, new Outbox(), npc, t));
+    expect(await scoutsSent()).toEqual([10]);
+
+    await pool.query('DELETE FROM commands');
+    await failed(new Date(t.getTime() - 2 * HOUR));
+    await tx((c) => npcThink(c, new Outbox(), npc, t));
+    expect(await scoutsSent()).toEqual([30]);
+
+    // Troisième échec : la cible est laissée tranquille.
+    await pool.query('DELETE FROM commands');
+    await failed(new Date(t.getTime() - 3 * HOUR));
+    await tx((c) => npcThink(c, new Outbox(), npc, t));
+    expect(await scoutsSent()).toEqual([]);
+    // La pause dure 12 heures après le dernier échec ; ensuite il y retourne avec la plus forte vague, pas de zéro (ici en journée : jamais d'espionnage chez un joueur la nuit).
+    // (Le PNJ a grandi entre-temps : on remet les deux villages à la même taille pour qu'il vise toujours ce joueur.)
+    const later = new Date(t.getTime() + 21 * HOUR);
+    await tx((c) => syncVillage(c, home.id, later));
+    await pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $1) WHERE id = $2', [home.id, v]);
+    await tx((c) => npcThink(c, new Outbox(), npc, later));
+    expect(await scoutsSent()).toEqual([30]);
+    // Les échecs sont retenus 36 heures : passé ce délai, il repart avec 2 éclaireurs.
+    await pool.query('DELETE FROM commands');
+    await tx((c) => npcThink(c, new Outbox(), npc, new Date(t.getTime() + 45 * HOUR)));
+    expect(await scoutsSent()).toEqual([2]);
   });
 
   it('trois nouveaux PNJ par jour, un toutes les 8 heures, jusqu’au plafond', async () => {

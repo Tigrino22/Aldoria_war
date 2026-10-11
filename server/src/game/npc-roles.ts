@@ -31,16 +31,22 @@ export function villageRoles(profile: NpcProfile, count: number): VillageRole[] 
   return roles;
 }
 
+/** Multiplicateur des effectifs visés : les fermes (jusqu'à ~4 700 habitants au niveau 20) logent des armées bien plus grosses. */
+export const TROOP_FACTOR = 3;
+
+/** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté, pour passer les éclaireurs d'un défenseur. */
+export const offenseScouts = (cap: number, difficulty: number) => Math.min(30, Math.round((4 + cap * 1.5) * Math.max(1, difficulty)));
+
 /** Armée visée par un village de rôle `role` au niveau `cap` : les unités dont les bâtiments manquent encore sont ignorées au recrutement. */
 export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, difficulty: number): UnitCounts {
   // Un village dont le rôle ne correspond pas au tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) y met moins d'efforts.
   const fit = (role === 'offense') === (profile !== 'builder') ? 1 : 0.6;
-  const scale = (n: number) => Math.round(n * cap * difficulty);
+  const scale = (n: number) => Math.round(n * cap * difficulty * TROOP_FACTOR);
   const t = emptyUnits();
   if (role === 'offense') {
     t.swordsman = scale(7 * fit);
     t.cavalry = scale(2 * fit);
-    t.scout = 3;
+    t.scout = offenseScouts(cap, difficulty);
     t.spearman = scale(1);
     if (profile === 'conqueror') t.ram = scale(1);
     // Quatre nobles font tomber la loyauté d'un village dans trois cas sur quatre (20 à 35 points chacun).
@@ -49,7 +55,7 @@ export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, 
     t.spearman = scale(5 * fit);
     t.halberdier = scale(5 * fit);
     t.swordsman = scale(1);
-    t.scout = 1;
+    t.scout = 2;
   }
   return t;
 }

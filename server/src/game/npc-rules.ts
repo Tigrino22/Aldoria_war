@@ -42,17 +42,22 @@ export function isQuiet(date: Date, timeZone: string, start: number, end: number
   return start <= end ? h >= start && h < end : h >= start || h < end;
 }
 
+/** Niveaux gagnés par jour de monde : le plafond atteint 20 au bout de 18 jours (difficulté ×1). */
+export const NPC_LEVELS_PER_DAY = 1;
+/** Niveaux d'avance de la ferme sur le plafond : elle loge l'armée, donc elle monte plus haut que le reste. */
+export const FARM_LEAD = 3;
+
 /** Niveau maximal que les PNJ visent selon l'âge du monde : ils suivent un rythme régulier, sans dépasser le niveau 20. */
 export function npcCap(worldDays: number, difficulty: number): number {
-  return Math.max(2, Math.min(20, 2 + Math.floor(Math.max(0, worldDays) * 0.5 * difficulty)));
+  return Math.max(2, Math.min(20, 2 + Math.floor(Math.max(0, worldDays) * NPC_LEVELS_PER_DAY * difficulty)));
 }
 
 /** Importance donnée à chaque bâtiment : plus le poids est fort, plus le PNJ le monte haut. */
 const BUILD_WEIGHTS: Record<NpcProfile, Record<BuildingKey, number>> = {
-  builder: { townhall: 1, woodcutter: 1.2, claypit: 1.2, ironmine: 1.1, farm: 1.2, warehouse: 1, market: 0.4, barracks: 0.8, wall: 1.1 },
-  raider: { townhall: 0.9, woodcutter: 0.9, claypit: 0.9, ironmine: 1.3, farm: 1.1, warehouse: 0.7, market: 0.1, barracks: 1.4, wall: 0.4 },
+  builder: { townhall: 1, woodcutter: 1.2, claypit: 1.2, ironmine: 1.1, farm: 1.7, warehouse: 1, market: 0.4, barracks: 0.8, wall: 1.1 },
+  raider: { townhall: 0.9, woodcutter: 0.9, claypit: 0.9, ironmine: 1.3, farm: 1.6, warehouse: 0.7, market: 0.1, barracks: 1.4, wall: 0.4 },
   // Les nobles demandent hôtel de ville et caserne au niveau 10 : le conquérant les monte en priorité.
-  conqueror: { townhall: 1.5, woodcutter: 1, claypit: 1, ironmine: 1.2, farm: 1.2, warehouse: 0.9, market: 0.1, barracks: 1.5, wall: 0.5 },
+  conqueror: { townhall: 1.5, woodcutter: 1, claypit: 1, ironmine: 1.2, farm: 1.7, warehouse: 0.9, market: 0.1, barracks: 1.5, wall: 0.5 },
 };
 
 /** Le prochain bâtiment à monter : le plus en retard par rapport à son poids, sous le plafond, conditions remplies. */
@@ -61,7 +66,7 @@ export function chooseBuilding(profile: NpcProfile, levels: Buildings, cap: numb
   let bestScore = Infinity;
   for (const key of BUILDING_KEYS) {
     const level = levels[key];
-    if (level >= Math.min(cap, BUILDINGS[key].maxLevel)) continue;
+    if (level >= Math.min(key === 'farm' ? cap + FARM_LEAD : cap, BUILDINGS[key].maxLevel)) continue;
     if (!meetsRequirements(levels, BUILDINGS[key].requires)) continue;
     // Le marché ne sert à rien à un PNJ avant que le reste ne soit bien avancé.
     if (key === 'market' && cap < 6) continue;
@@ -87,8 +92,51 @@ export function nextRecruit(
   return UNIT_KEYS.filter((k) => target[k] > owned[k] && meetsRequirements(buildings, UNITS[k].requires))
     .map((k) => ({ unit: k, deficit: target[k] - owned[k], ratio: (target[k] - owned[k]) / target[k] }))
     .sort((a, b) => b.ratio - a.ratio)
-    .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(15, Math.ceil(deficit / 3))) }));
+    .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(40, Math.ceil(deficit / 2))) }));
 }
+
+/** Éclaireurs envoyés selon le nombre d'échecs de suite : 2, puis 10, puis 30. */
+export const SCOUT_WAVES = [2, 10, 30] as const;
+
+/**
+ * Éclaireurs envoyés en mission : 2 d'abord, puis 10 et 30 après chaque échec (tous les éclaireurs tués), dans la limite de ceux dont le village dispose.
+ * Une défense qui compte autant d'éclaireurs que l'attaque les tue tous : il en faut bien davantage pour passer.
+ */
+export const scoutWave = (failures: number, available: number) => Math.max(0, Math.min(available, SCOUT_WAVES[Math.min(SCOUT_WAVES.length - 1, Math.max(0, failures))]));
+
+/** Échecs d'espionnage consécutifs après lesquels un PNJ laisse une cible tranquille un temps. */
+export const SCOUT_MAX_FAILURES = 3;
+/** Durée (en heures de jeu) pendant laquelle une cible abandonnée est laissée tranquille, à partir du dernier échec. */
+export const SCOUT_PAUSE_GAME_HOURS = 12;
+/** Durée (en heures de jeu) pendant laquelle les échecs sont retenus : après la pause, le PNJ reprend avec la vague où il s'était arrêté. */
+export const SCOUT_MEMORY_GAME_HOURS = 36;
+
+export interface ScoutFailures {
+  count: number;
+  /** Date (ms) du dernier échec. */
+  lastAt: number;
+}
+
+/** Échecs consécutifs par village, du plus récent au plus ancien : un renseignement obtenu remet le compte à zéro. `reports` est trié du plus récent au plus ancien. */
+export function consecutiveScoutFailures(reports: { villageId: number; ok: boolean; at: number }[]): Map<number, ScoutFailures> {
+  const failures = new Map<number, ScoutFailures>();
+  const done = new Set<number>();
+  for (const r of reports) {
+    if (done.has(r.villageId)) continue;
+    if (r.ok) {
+      done.add(r.villageId);
+      continue;
+    }
+    const known = failures.get(r.villageId);
+    if (known) known.count++;
+    else failures.set(r.villageId, { count: 1, lastAt: r.at });
+  }
+  return failures;
+}
+
+/** Une cible qui a résisté trois fois (ou plus) est laissée tranquille pendant la pause qui suit le dernier échec. */
+export const scoutPaused = (f: ScoutFailures | undefined, now: Date, worldSpeed: number) =>
+  !!f && f.count >= SCOUT_MAX_FAILURES && now.getTime() - f.lastAt < (SCOUT_PAUSE_GAME_HOURS * 3_600_000) / worldSpeed;
 
 /** Marge de sécurité demandée avant d'attaquer : la force d'attaque doit dépasser 1,3 fois la défense estimée. */
 export const ATTACK_MARGIN = 1.3;

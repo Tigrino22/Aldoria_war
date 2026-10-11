@@ -24,12 +24,17 @@ import {
   npcTribeNameCandidates,
   SOLO_PROFILES,
   chooseBuilding,
+  consecutiveScoutFailures,
   isQuiet,
   nextRecruit,
   npcCap,
   pickRaidUnits,
   pickWinningUnits,
   MIN_LOOT,
+  SCOUT_MEMORY_GAME_HOURS,
+  scoutPaused,
+  scoutWave,
+  type ScoutFailures,
   tribeMemberProfiles,
   tribeRelations,
   type NpcProfile,
@@ -62,6 +67,17 @@ const MAX_TRAIN = 6;
 const DAY_MS = 86_400_000;
 /** Délai minimal (en heures de jeu) entre deux missions d'espionnage d'un même PNJ. */
 const SCOUT_COOLDOWN_GAME_HOURS = 4;
+
+/** Échecs d'espionnage récents de ce PNJ, par village visé (voir `consecutiveScoutFailures`). */
+async function scoutFailures(c: Db, npcId: number, now: Date): Promise<Map<number, ScoutFailures>> {
+  const since = new Date(now.getTime() - (SCOUT_MEMORY_GAME_HOURS * 3_600_000) / env.worldSpeed);
+  const { rows } = await c.query(
+    `SELECT (data->'defender'->'village'->>'id')::int AS village_id, (data->'intel' IS NOT NULL AND data->'intel' <> 'null'::jsonb) AS ok, created_at
+     FROM reports WHERE player_id = $1 AND type = 'scout' AND created_at > $2 ORDER BY created_at DESC, id DESC LIMIT 300`,
+    [npcId, since],
+  );
+  return consecutiveScoutFailures(rows.map((r) => ({ villageId: r.village_id as number, ok: r.ok as boolean, at: new Date(r.created_at).getTime() })));
+}
 
 const isQuietAt = (d: Date) => isQuiet(d, env.npcTimezone, env.npcQuietStart, env.npcQuietEnd);
 
@@ -357,7 +373,12 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   }
 
   const warTribes = warEnemiesOf(tribe, now);
-  const all = await candidates(c, npcId, village, now, { rivals: tribe?.state.rivals ?? [], warTribes, grudges: await npcGrudgesOf(c, npcId, tribe, now) });
+  // Une cible dont les éclaireurs ont été tués trois fois de suite est laissée tranquille un temps : mieux vaut en viser une autre.
+  // Après la pause, le PNJ y retourne avec la plus forte vague d'éclaireurs.
+  const failures = await scoutFailures(c, npcId, now);
+  const all = (await candidates(c, npcId, village, now, { rivals: tribe?.state.rivals ?? [], warTribes, grudges: await npcGrudgesOf(c, npcId, tribe, now) })).filter(
+    (t) => !scoutPaused(failures.get(t.id), now, env.worldSpeed),
+  );
   const barbarians = all.filter((t) => t.ownerId === null);
   const rivalVillages = all.filter((t) => t.rival);
   // Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef ou le conquérant) : leur type ne règle que leur évolution.
@@ -397,7 +418,8 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
         await c.query("SELECT max(sent_at) AS at FROM commands WHERE player_id = $1 AND type = 'attack' AND coalesce((units->>'scout')::int, 0) > 0", [npcId])
       ).rows[0].at;
       if (lastScout && now.getTime() - new Date(lastScout).getTime() < (SCOUT_COOLDOWN_GAME_HOURS * 3_600_000) / env.worldSpeed) return;
-      const scouts = { ...emptyUnits(), scout: Math.min(2, home.scout) };
+      // Après un échec, on envoie bien plus d'éclaireurs : 2, puis 10, puis 30.
+      const scouts = { ...emptyUnits(), scout: scoutWave(failures.get(target.id)?.count ?? 0, home.scout) };
       if (arrivesQuiet(scouts)) return;
       await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units: scouts }, now);
       return;

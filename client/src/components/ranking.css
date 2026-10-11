@@ -48,3 +48,9 @@
 
 .wr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 @media (max-width: 800px) { .wr-grid { grid-template-columns: 1fr; } }
+
+/* Légende du score : discrète, sur une ligne qui passe à la ligne sur téléphone. */
+.wr-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-block: 2px 4px; }
+.wr-legend span { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.wr-legend b { color: var(--gold); font: 700 13px var(--display); font-variant-numeric: tabular-nums; }
+.wr-legend i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); font-style: normal; font-size: 11px; cursor: help; }
