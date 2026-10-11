@@ -26,6 +26,8 @@ export const env = {
   /** Effectif maximal d'une tribu de PNJ : tout PNJ sans tribu en rejoint une (0 = les PNJ restent solitaires). */
   npcTribeMax: count('NPC_TRIBE_MAX', 7),
   npcDaily: count('NPC_DAILY', 3),
+  // Riposte : un PNJ attaqué par un joueur lui en veut pendant 3 jours et contre-attaque (1 = activée, 0 = désactivée).
+  npcRevenge: count('NPC_REVENGE', 1) > 0 ? 1 : 0,
   npcMax: count('NPC_MAX', 200),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',

@@ -204,7 +204,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   /** Enregistre un ou plusieurs réglages ; une valeur `null` rétablit la valeur d'origine. */
   app.put('/api/admin/settings', async (req) => {
     await requireAdmin(req);
-    const values = z.record(z.string(), z.union([z.string(), z.number(), z.null()])).parse(req.body);
+    const values = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).parse(req.body);
     const unknown = Object.keys(values).find((k) => !SETTINGS.some((s) => s.key === k));
     if (unknown) throw new GameError(`Réglage inconnu : ${unknown}`);
     const error = await saveSettings(values as Partial<Record<SettingDef['key'], unknown>>);
@@ -231,6 +231,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         worldSpeed: env.worldSpeed,
         mapSize: env.mapSize,
         npcCount: env.npcCount,
+        npcRevenge: env.npcRevenge ? 'activée' : 'désactivée',
         npcDifficulty: env.npcDifficulty,
         npcTimezone: env.npcTimezone,
         quietHours: `${env.npcQuietStart} h → ${env.npcQuietEnd} h`,

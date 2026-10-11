@@ -7,15 +7,16 @@ import { env } from './env';
  * cours de partie fausserait les files de construction, les trajets en cours et les coordonnées.
  */
 export interface SettingDef {
-  key: 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
+  key: 'npcRevenge' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
   label: string;
   help: string;
-  type: 'number' | 'integer' | 'text';
+  type: 'number' | 'integer' | 'text' | 'boolean';
   min?: number;
   max?: number;
 }
 
 export const SETTINGS: SettingDef[] = [
+  { key: 'npcRevenge', label: 'Riposte des PNJ', help: 'Activée : un PNJ attaqué par un joueur contre-attaque pendant 3 jours. Désactivée : il ne riposte plus (il continue de défendre et d’attaquer comme d’habitude)', type: 'boolean' },
   { key: 'npcDifficulty', label: 'Difficulté des PNJ', help: '0,5 = facile, 1 = modérée, 1,5 = difficile', type: 'number', min: 0.25, max: 3 },
   { key: 'npcDaily', label: 'Nouveaux PNJ par jour', help: 'Un PNJ rejoint le monde chaque jour, jusqu’au maximum', type: 'integer', min: 0, max: 20 },
   { key: 'npcMax', label: 'Maximum de PNJ', help: 'Plafond du nombre de PNJ', type: 'integer', min: 0, max: 500 },
@@ -33,6 +34,12 @@ export const settingDefault = (key: SettingDef['key']) => defaults[key];
 
 /** Contrôle et convertit une valeur reçue ; renvoie un message d'erreur en français sinon. */
 export function parseSetting(def: SettingDef, raw: unknown): { value: number | string } | { error: string } {
+  if (def.type === 'boolean') {
+    const text = String(raw ?? '').trim().toLowerCase();
+    if (['1', 'true', 'oui', 'on'].includes(text)) return { value: 1 };
+    if (['0', 'false', 'non', 'off'].includes(text)) return { value: 0 };
+    return { error: `${def.label} : activé ou désactivé attendu` };
+  }
   if (def.type === 'text') {
     const text = String(raw ?? '').trim();
     try {
