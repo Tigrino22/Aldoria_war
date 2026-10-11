@@ -277,3 +277,14 @@ Page « Point de ralliement » du menu, distincte de « Troupes » (`#/ralliemen
 ## Remplir les entrepôts des PNJ (administration)
 
 Administration > PNJ : un curseur (0 à 100 %, par 5) et un bouton « Remplir » montent chaque ressource de tous les villages de PNJ jusqu'à cette part de la capacité de leur entrepôt (`POST /api/admin/npc/fill`, `server/src/game/npc-fill.ts`). Les villages sont mis à jour à l'instant présent avant le remplissage, et une ressource déjà au-dessus du seuil n'est jamais réduite.
+
+## Classement de guerre et statistiques du monde
+
+Migration 014 : compteurs `conquests`, `villages_lost`, `attack_wins`, `defense_wins` sur `players` et journal public `conquest_log` (qui a pris quel village à qui). Enregistrés à chaque bataille contre un village possédé (`server/src/game/war-stats.ts`, appelé par `handleAttack`) ; un village barbare ne compte pas. Les compteurs démarrent à zéro, sans reconstitution des batailles passées.
+
+| Élément | Règle |
+|---|---|
+| Score de guerre | 250 par village conquis + 5 par bataille gagnée (attaque ou défense) + 1 par 50 d'adversaires battus (`WAR_POINTS`) |
+| Classement | Onglet « Guerre » de la page Classement (`GET /api/ranking/war/players`, `/tribes`, `/feed`) : podium, tableau, dernières conquêtes, guerres de tribus en cours. Seuls les scores > 0 figurent au tableau |
+| Statistiques du monde | Page `#/monde` (`GET /api/world/stats`, `server/src/game/world-stats.ts`, partagée avec l'onglet Statistiques de l'administration) : totaux et moyennes uniquement, aucun nom de joueur ni village précis |
+

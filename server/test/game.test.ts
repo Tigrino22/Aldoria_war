@@ -139,6 +139,15 @@ describe('jeu', () => {
     expect(owner.loyalty).toBe(25);
     const defenderReport = (await pool.query("SELECT title FROM reports WHERE player_id = $1 ORDER BY id DESC LIMIT 1", [defender])).rows[0];
     expect(defenderReport.title).toMatch(/conquis/);
+
+    // Classement de guerre : une conquête, des victoires pour l'attaquant, une défaite pour le défenseur, et une ligne au journal public.
+    const war = (await pool.query('SELECT id, conquests, villages_lost, attack_wins, defense_wins FROM players WHERE id = ANY($1)', [[attacker, defender]])).rows;
+    const [a, d] = [war.find((r) => r.id === attacker), war.find((r) => r.id === defender)];
+    expect(a).toMatchObject({ conquests: 1, villages_lost: 0, defense_wins: 0 });
+    expect(a.attack_wins).toBeGreaterThanOrEqual(3);
+    expect(d).toMatchObject({ conquests: 0, villages_lost: 1, attack_wins: 0 });
+    const log = (await pool.query('SELECT conqueror_id, loser_id, village_name, x, y FROM conquest_log')).rows;
+    expect(log).toEqual([{ conqueror_id: attacker, loser_id: defender, village_name: 'Cible', x: 12, y: 10 }]);
   });
 
   it('les renforts défendent un allié', async () => {

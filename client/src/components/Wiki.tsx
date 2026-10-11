@@ -485,6 +485,16 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           « Attaque » compte les troupes tuées quand vous attaquez, « Défense » celles tuées quand on vous attaque (les renforts partagent ce total avec le propriétaire du village, selon leur poids). Ces chiffres
           figurent sur les profils des joueurs et des tribus. Seuls les combats livrés depuis la mise en place de ces classements sont comptés.
         </p>
+        <p>
+          <b>Classement de guerre :</b> l'onglet « Guerre » classe joueurs et tribus (la somme de leurs membres) selon un score de guerre : 250 points par village conquis à un adversaire (joueur ou PNJ, jamais un village barbare),
+          5 points par bataille gagnée contre un village occupé, en attaque comme en défense, et 1 point par 50 d'adversaires battus. Le tableau montre aussi les villages perdus. Un podium met les trois premiers en avant,
+          et deux listes donnent les dernières conquêtes du monde et les guerres de tribus en cours. Les compteurs démarrent à la mise en place du classement : les batailles passées ne sont pas reconstituées.
+        </p>
+        <h3>Statistiques du monde</h3>
+        <p>
+          La page « Statistiques du monde » (menu Social) est ouverte à tous les joueurs : nombre de joueurs, de PNJ, de tribus et de villages, points moyens par village, activité des dernières 24 heures (attaques, conquêtes, joueurs actifs),
+          troupes et ressources de tout le monde, taille des villages et niveau moyen des bâtiments. Ce ne sont que des totaux et des moyennes : jamais le détail d'un joueur ou d'un village, ni leurs troupes ou leurs ressources.
+        </p>
       </>
     ),
     compte: (
