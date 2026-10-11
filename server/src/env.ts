@@ -28,6 +28,8 @@ export const env = {
   npcDaily: count('NPC_DAILY', 3),
   // Riposte : un PNJ attaqué par un joueur lui en veut pendant 3 jours et contre-attaque (1 = activée, 0 = désactivée).
   npcRevenge: count('NPC_REVENGE', 1) > 0 ? 1 : 0,
+  /** Guerres entre tribus de PNJ (1 = activées), modifiables à chaud depuis l'administration. */
+  npcWars: count('NPC_WARS', 1) > 0 ? 1 : 0,
   npcMax: count('NPC_MAX', 200),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',

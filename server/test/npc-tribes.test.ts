@@ -6,11 +6,44 @@ import { Outbox } from '../src/notify';
 import { createNpc, ensureNpcTribes, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
 import { tribeMemberProfiles, tribeRelations } from '../src/game/npc-rules';
 import { alertTribes, npcTribeOf, saveTribeState } from '../src/game/npc-tribes';
+import { WAR_DAYS, npcGrudgesOf, planWars, refreshWars, warEnemiesOf, type WarTribe } from '../src/game/npc-wars';
+import { env } from '../src/env';
 import { createVillage, getTroops, setTroops } from '../src/game/village';
 import { sendCommand } from '../src/game/commands';
 
 const NOON = new Date('2030-01-15T12:00:00Z');
 const NIGHT = new Date('2030-01-15T22:00:00Z');
+
+describe('guerres entre tribus de PNJ', () => {
+  const T0 = new Date('2030-01-15T12:00:00Z');
+  const tribe = (id: number, over: Partial<WarTribe> = {}): WarTribe => ({ id, allies: [], rivals: [], war: null, nextWarAt: T0.toISOString(), villages: 3, ...over });
+
+  it('déclare une guerre réciproque, contre une rivale de préférence, jamais contre une alliée', () => {
+    const tribes = [tribe(1, { allies: [2], rivals: [3] }), tribe(2, { allies: [1], rivals: [3], nextWarAt: new Date(T0.getTime() + 1e9).toISOString() }), tribe(3, { rivals: [1, 2] })];
+    const updates = planWars(tribes, T0, () => 0);
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    expect(byId.get(1)!.war!.enemyId).toBe(3);
+    expect(byId.get(3)!.war!.enemyId).toBe(1);
+    expect(byId.get(2)).toBeUndefined();
+    expect(Date.parse(byId.get(1)!.war!.until)).toBe(T0.getTime() + WAR_DAYS * 86_400_000);
+  });
+
+  it('une tribu déjà en guerre n’en déclare pas une seconde, et sans adversaire possible elle réessaie plus tard', () => {
+    const until = new Date(T0.getTime() + 1e9).toISOString();
+    const busy = planWars([tribe(1, { war: { enemyId: 2, until } }), tribe(2, { war: { enemyId: 1, until } }), tribe(3)], T0, () => 0);
+    expect(busy.map((u) => u.id)).toEqual([3]);
+    expect(busy[0].war).toBeNull();
+    expect(Date.parse(busy[0].nextWarAt!)).toBeGreaterThan(T0.getTime());
+  });
+
+  it('une guerre échue ou dont l’ennemi n’a plus de village se termine par une trêve', () => {
+    const over = new Date(T0.getTime() - 1000).toISOString();
+    const ended = planWars([tribe(1, { war: { enemyId: 2, until: over }, nextWarAt: null }), tribe(2, { war: { enemyId: 1, until: over }, nextWarAt: null })], T0, () => 0);
+    expect(ended.every((u) => u.war === null && Date.parse(u.nextWarAt!) > T0.getTime())).toBe(true);
+    const gone = planWars([tribe(1, { war: { enemyId: 2, until: new Date(T0.getTime() + 1e9).toISOString() }, nextWarAt: null }), tribe(2, { villages: 0 })], T0, () => 0);
+    expect(gone.find((u) => u.id === 1)!.war).toBeNull();
+  });
+});
 
 describe('règles des tribus de PNJ', () => {
   it('les tribus s’allient deux par deux et se déclarent rivales de leurs voisines', () => {
@@ -184,6 +217,79 @@ describe('tribus de PNJ', () => {
     await tx((c) => npcThink(c, new Outbox(), a, NIGHT));
     const hit = (await pool.query("SELECT 1 FROM commands WHERE player_id = $1 AND type = 'attack' AND target_village_id = $2", [a, vb.id])).rows;
     expect(hit).toHaveLength(1);
+  });
+
+  it('en guerre, un PNJ frappe un village ennemi hors de sa portée habituelle, et plus rien quand les guerres sont coupées', async () => {
+    await pool.query('TRUNCATE commands, reports RESTART IDENTITY CASCADE');
+    const [t1, , t3] = (await pool.query('SELECT id FROM tribes ORDER BY id')).rows;
+    const a = (await pool.query('SELECT p.id FROM players p WHERE tribe_id = $1 ORDER BY p.id LIMIT 1 OFFSET 1', [t1.id])).rows[0].id;
+    const b = (await pool.query('SELECT p.id FROM players p WHERE tribe_id = $1 ORDER BY p.id LIMIT 1', [t3.id])).rows[0].id;
+    const [va] = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [a])).rows;
+    const [vb] = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [b])).rows;
+    await pool.query('UPDATE villages SET x = $2, y = $3 WHERE id = $1', [vb.id, va.x + 30, va.y]);
+    await pool.query('UPDATE villages SET x = 0, y = 0 WHERE owner_id IS NULL');
+    await tx(async (c) => {
+      await setTroops(c, va.id, va.id, { ...emptyUnits(), swordsman: 200, cavalry: 100, scout: 5 });
+      await c.query(
+        `INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`,
+        [a, JSON.stringify({ attacker: {}, defender: { village: { id: vb.id } }, intel: { resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, buildings: { wall: 0 }, troops: emptyUnits() } }), NOON],
+      );
+    });
+    // Compte les mouvements (assaut ou espionnage) vers les villages de la tribu ennemie.
+    const hits = async () =>
+      (
+        await pool.query(
+          "SELECT 1 FROM commands cm JOIN villages v ON v.id = cm.target_village_id JOIN players o ON o.id = v.owner_id WHERE cm.player_id = $1 AND cm.type = 'attack' AND o.tribe_id = $2",
+          [a, t3.id],
+        )
+      ).rows.length;
+    setNpcRandom(() => 0.1);
+    // Sans guerre, le village est trop loin pour un pillage ordinaire.
+    await tx((c) => npcThink(c, new Outbox(), a, NOON));
+    expect(await hits()).toBe(0);
+
+    await pool.query("UPDATE tribes SET npc_state = npc_state || $2::jsonb WHERE id = $1", [t1.id, JSON.stringify({ war: { enemyId: t3.id, until: new Date(NOON.getTime() + 86_400_000).toISOString() } })]);
+    const inWar = await tx((c) => npcTribeOf(c, a));
+    expect(warEnemiesOf(inWar, NOON)).toEqual([t3.id]);
+    // Une guerre dont la date est passée ne compte plus.
+    expect(warEnemiesOf(inWar, new Date(NOON.getTime() + 2 * 86_400_000))).toEqual([]);
+    // Coupée depuis l'administration, elle n'a aucun effet, sans redémarrage.
+    env.npcWars = 0;
+    expect(warEnemiesOf(inWar, NOON)).toEqual([]);
+    await tx((c) => npcThink(c, new Outbox(), a, NOON));
+    expect(await hits()).toBe(0);
+    env.npcWars = 1;
+    // Les reconnaissances des essais précédents ne doivent pas bloquer le nouvel envoi d'espions.
+    await pool.query('DELETE FROM commands WHERE player_id = $1', [a]);
+    await tx((c) => setTroops(c, va.id, va.id, { ...emptyUnits(), swordsman: 200, cavalry: 100, scout: 5 }));
+    await tx((c) => npcThink(c, new Outbox(), a, NOON));
+    expect(await hits()).toBeGreaterThan(0);
+  });
+
+  it('un PNJ attaqué par un PNJ d’une autre tribu lui en veut, sauf si la riposte est coupée', async () => {
+    const [t1, , t3] = (await pool.query('SELECT id FROM tribes ORDER BY id')).rows;
+    const a = (await pool.query('SELECT p.id FROM players p WHERE tribe_id = $1 ORDER BY p.id LIMIT 1 OFFSET 1', [t1.id])).rows[0].id;
+    const b = (await pool.query('SELECT p.id FROM players p WHERE tribe_id = $1 ORDER BY p.id LIMIT 1', [t3.id])).rows[0].id;
+    const [va] = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [a])).rows;
+    const [vb] = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [b])).rows;
+    await tx(async (c) => {
+      await setTroops(c, vb.id, vb.id, { ...emptyUnits(), swordsman: 30 });
+      await sendCommand(c, new Outbox(), b, vb.id, { type: 'attack', targetId: va.id, units: { ...emptyUnits(), swordsman: 20 } }, NOON);
+    });
+    const victim = await tx((c) => npcTribeOf(c, a));
+    expect(await tx((c) => npcGrudgesOf(c, a, victim, NOON))).toEqual([b]);
+    env.npcRevenge = 0;
+    expect(await tx((c) => npcGrudgesOf(c, a, victim, NOON))).toEqual([]);
+    env.npcRevenge = 1;
+  });
+
+  it('refreshWars déclare les guerres en base', async () => {
+    await pool.query("UPDATE tribes SET npc_state = (npc_state - 'war') || jsonb_build_object('nextWarAt', $1::text)", [new Date(NOON.getTime() - 1000).toISOString()]);
+    await refreshWars(NOON, () => 0);
+    const rows = (await pool.query("SELECT id, npc_state->'war' AS war FROM tribes ORDER BY id")).rows;
+    expect(rows.every((r) => r.war && r.war.enemyId !== r.id)).toBe(true);
+    const byId = new Map(rows.map((r) => [r.id, r.war.enemyId as number]));
+    for (const [id, enemy] of byId) expect(byId.get(enemy)).toBe(id);
   });
 
   it('processNpcs réveille et fait réfléchir les PNJ sans erreur', async () => {

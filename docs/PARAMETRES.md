@@ -195,4 +195,17 @@ Elle n'est visible que pour les pseudos listés dans la variable d'environnement
 
 ### Réglages modifiables depuis l'administration
 
-Onglet « Monde » : difficulté des PNJ, nouveaux PNJ par jour, maximum de PNJ, taille maximale des tribus de PNJ, heures calmes et fuseau. Les valeurs sont enregistrées en base (`world_settings`), s'appliquent tout de suite et remplacent les variables d'environnement au redémarrage ; « Rétablir » revient à la valeur d'origine. La vitesse du monde et la taille de la carte restent des variables Render (les changer en cours de partie fausserait les constructions, les trajets et les coordonnées).
+Onglet « Monde » : interrupteurs de la riposte des PNJ et des guerres entre tribus de PNJ, difficulté des PNJ, nouveaux PNJ par jour, maximum de PNJ, taille maximale des tribus de PNJ, heures calmes et fuseau. Les valeurs sont enregistrées en base (`world_settings`), s'appliquent tout de suite et remplacent les variables d'environnement au redémarrage ; « Rétablir » revient à la valeur d'origine. La vitesse du monde et la taille de la carte restent des variables Render (les changer en cours de partie fausserait les constructions, les trajets et les coordonnées).
+
+## Guerres entre PNJ
+
+| Règle | Valeur |
+|---|---|
+| Riposte | Un PNJ attaqué par un joueur **ou par un PNJ d'une autre tribu** lui en veut 3 jours (interrupteur « Riposte des PNJ ») |
+| Guerre de tribus | Une tribu déclare la guerre à une autre, rivale de préférence, jamais à une alliée ; la guerre est réciproque et dure 4 jours réels |
+| Trêve | Au moins 2 jours réels (plus un délai aléatoire) avant qu'une tribu ne redéclare la guerre |
+| Cibles en guerre | Villages de la tribu ennemie jusqu'à 40 cases (20 pour un pillage ordinaire), choisis en priorité (9 fois sur 10) avant joueurs et barbares |
+| Style de frappe | Au moins 70 % de l'armée offensive, sans seuil de butin ; le train de nobles part comme d'habitude, d'où les conquêtes entre PNJ |
+| Interrupteur | « Guerres entre tribus de PNJ » (variable `NPC_WARS`, 1 par défaut) : coupé, plus de nouvelle guerre ni de frappe de guerre |
+
+Code : `server/src/game/npc-wars.ts` (règles pures `planWars`, déclaration en base, rancunes entre PNJ), consommé par `attackStep` dans `npc.ts`.

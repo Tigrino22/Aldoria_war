@@ -36,6 +36,7 @@ import {
   type NpcProfile,
 } from './npc-rules';
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
+import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
 
 /** Nombre maximal d'échanges (acceptations ou publications) d'un PNJ par village et par réflexion. */
@@ -268,28 +269,41 @@ interface Candidate {
   ownerId: number | null;
   /** Village d'un PNJ d'une tribu rivale : cible permise à toute heure. */
   rival: boolean;
+  /** Village d'un ennemi déclaré : tribu en guerre contre la nôtre, ou PNJ qui nous a attaqués. */
+  enemy: boolean;
   /** Points de tous les villages du propriétaire (0 pour un village barbare). */
   ownerPoints: number;
   dist: number;
 }
 
-async function candidates(
-  c: Db,
-  npcId: number,
-  from: { id: number; x: number; y: number },
-  now: Date,
-  rivals: number[],
-): Promise<Candidate[]> {
+/** Qui un PNJ peut viser en plus des barbares et des joueurs : les tribus rivales, les tribus en guerre et les PNJ qui l'ont attaqué. */
+interface Hostiles {
+  rivals: number[];
+  warTribes: number[];
+  grudges: number[];
+}
+
+async function candidates(c: Db, npcId: number, from: { id: number; x: number; y: number }, now: Date, hostiles: Hostiles): Promise<Candidate[]> {
   const { rows } = await c.query(
-    `SELECT v.id, v.x, v.y, v.owner_id, (p.is_npc IS TRUE) AS rival, coalesce((SELECT sum(w.points) FROM villages w WHERE w.owner_id = v.owner_id), 0)::int AS owner_points FROM villages v LEFT JOIN players p ON p.id = v.owner_id
-     WHERE v.id <> $1 AND (v.x - $2)^2 + (v.y - $3)^2 <= $5
+    `SELECT v.id, v.x, v.y, v.owner_id, p.tribe_id AS owner_tribe, (p.is_npc IS TRUE) AS rival, coalesce((SELECT sum(w.points) FROM villages w WHERE w.owner_id = v.owner_id), 0)::int AS owner_points FROM villages v LEFT JOIN players p ON p.id = v.owner_id
+     WHERE v.id <> $1
+       AND ((v.x - $2)^2 + (v.y - $3)^2 <= $5 OR (p.tribe_id = ANY($8::int[]) AND (v.x - $2)^2 + (v.y - $3)^2 <= $9))
        AND (v.owner_id IS NULL
             OR (NOT p.is_npc AND (p.protection_until IS NULL OR p.protection_until <= $4))
-            OR (p.is_npc AND p.tribe_id = ANY($7::int[])))
+            OR (p.is_npc AND (p.tribe_id = ANY($7::int[]) OR p.tribe_id = ANY($8::int[]) OR p.id = ANY($10::int[]))))
        AND NOT EXISTS (SELECT 1 FROM commands cm WHERE cm.target_village_id = v.id AND cm.player_id = $6 AND NOT cm.processed)`,
-    [from.id, from.x, from.y, now, RAID_RADIUS * RAID_RADIUS, npcId, rivals],
+    [from.id, from.x, from.y, now, RAID_RADIUS * RAID_RADIUS, npcId, hostiles.rivals, hostiles.warTribes, WAR_RADIUS * WAR_RADIUS, hostiles.grudges],
   );
-  return rows.map((r) => ({ id: r.id, x: r.x, y: r.y, ownerId: r.owner_id, rival: r.rival, ownerPoints: r.owner_points, dist: Math.hypot(r.x - from.x, r.y - from.y) }));
+  return rows.map((r) => ({
+    id: r.id,
+    x: r.x,
+    y: r.y,
+    ownerId: r.owner_id,
+    rival: r.rival,
+    enemy: r.rival && (hostiles.warTribes.includes(r.owner_tribe) || hostiles.grudges.includes(r.owner_id)),
+    ownerPoints: r.owner_points,
+    dist: Math.hypot(r.x - from.x, r.y - from.y),
+  }));
 }
 
 /**
@@ -338,7 +352,8 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     await saveTribeState(c, tribe);
   }
 
-  const all = await candidates(c, npcId, village, now, tribe?.state.rivals ?? []);
+  const warTribes = warEnemiesOf(tribe, now);
+  const all = await candidates(c, npcId, village, now, { rivals: tribe?.state.rivals ?? [], warTribes, grudges: await npcGrudgesOf(c, npcId, tribe, now) });
   const barbarians = all.filter((t) => t.ownerId === null);
   const rivalVillages = all.filter((t) => t.rival);
   // Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef ou le conquérant) : leur type ne règle que leur évolution.
@@ -353,10 +368,13 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const aggressive = !quiet && isLeader && opCooldownOk ? sameSize : [];
   const players = [...new Set([...revenge, ...aggressive])];
   // Un Bâtisseur se développe surtout en pillant les barbares et ne s'en prend que de temps en temps à un joueur.
-  // Les PNJ en guerre préfèrent frapper les villages rivaux plutôt que les barbares.
-  const prey = rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
+  // Les ennemis déclarés (guerre de tribu, PNJ qui nous a attaqués) passent avant tout ; viennent ensuite les rivaux, puis les barbares.
+  const enemyVillages = all.filter((t) => t.enemy);
+  const prey = enemyVillages.length && rng() < 0.9 ? enemyVillages : rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
   const revengePool = players.filter((t) => revenge.includes(t));
-  const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < (profile === 'builder' ? 0.15 : 0.4)) ? players : prey;
+  // Quand une guerre ou une vengeance contre un autre PNJ occupe la tribu, les joueurs passent au second plan.
+  const playerChance = enemyVillages.length ? 0.1 : profile === 'builder' ? 0.15 : 0.4;
+  const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < playerChance) ? players : prey;
   if (pool.length === 0) return;
   const target = pool.map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
 
@@ -378,8 +396,8 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       return;
     }
     // Les troupes dépendent du butin : assez pour gagner et emporter l'essentiel du stock, toute l'armée s'il le faut.
-    // Pour se venger, un PNJ frappe fort : au moins 70 % de son armée offensive.
-    const avenging = hostileToPlayer && grudges.includes(target.ownerId!);
+    // Pour se venger ou faire la guerre, un PNJ frappe fort : au moins 70 % de son armée offensive.
+    const avenging = (hostileToPlayer && grudges.includes(target.ownerId!)) || target.enemy;
     const raid = pickRaidUnits(attackers, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
     if (!raid) return;
     const units = raid.units;
@@ -537,6 +555,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
 export async function processNpcs(now: Date, limit = 25): Promise<number> {
   await alertTribes(now);
   await alertAttackedNpcs(now);
+  await refreshWars(now);
   await tx((c) => ensureDailyNpc(c, now));
   {
     const outbox = new Outbox();
