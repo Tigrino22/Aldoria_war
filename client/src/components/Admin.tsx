@@ -444,7 +444,7 @@ export default function Admin() {
                           className={`switch ${on ? 'on' : ''}`}
                           onClick={() => saveSettings({ [st.key]: on ? 0 : 1 }, on ? `${st.label} : désactivée` : `${st.label} : activée`)}
                         >
-                          <span className="switch-knob" />
+                          <span className="switch-track"><span className="switch-knob" /></span>
                           <span className="switch-label">{on ? 'Activée' : 'Désactivée'}</span>
                         </button>
                       </div>
