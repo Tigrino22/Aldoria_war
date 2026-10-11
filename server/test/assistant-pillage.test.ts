@@ -51,8 +51,25 @@ describe('assistant de pillage : villages barbares et pastilles', () => {
     expect(byName.Propre.lastLoot).toBe(150);
     expect(byName.Perdu.intel).toMatchObject({ wall: 3, troops: { spearman: 50 } });
     expect(byName.Jamais.intel).toBeNull();
+    expect(byName.Jamais.lootable).toBeNull();
+    expect(byName.Propre.lootable).toBeNull();
     expect(byName.Loin).toBeUndefined();
     expect(res.json()[0].name).toBe('Jamais');
+
+    // Un espionnage avec réserves donne un butin estimé.
+    await pool.query('INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, $2, $3, $4, now())', [
+      playerId, 'scout', 'x', JSON.stringify({ attacker: {}, defender: { village: { id: ids.never } }, intel: { resources: { wood: 500, clay: 500, iron: 500, wheat: 500 }, buildings: STARTING_BUILDINGS, troops: emptyUnits() } }),
+    ]);
+    // Une attaque en route vers « Propre » le marque comme ciblé.
+    await pool.query(
+      `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, sent_at, arrive_at)
+       VALUES ('attack', $1, $2, $1, $3, $4, now(), now() + interval '1 hour')`,
+      [home.id, ids.clean, playerId, JSON.stringify({ ...emptyUnits(), spearman: 1 })],
+    );
+    const again = Object.fromEntries((await app.inject({ method: 'GET', url: `/api/villages/${home.id}/raid-targets?radius=10`, headers })).json().map((t: any) => [t.name, t]));
+    expect(again.Jamais.lootable.total).toBeGreaterThan(0);
+    expect(again.Propre.underAttack).toBe(true);
+    expect(again.Pertes.underAttack).toBe(false);
 
     // Seul le propriétaire du village de départ peut interroger.
     const other = await app.inject({ method: 'POST', url: '/api/auth/register', payload: { username: 'Curieux', password: 'secret123' } });

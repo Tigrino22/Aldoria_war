@@ -54,6 +54,7 @@ const SECTIONS = [
   { id: 'construction', title: 'Construction' },
   { id: 'armee', title: 'Recrutement et entretien' },
   { id: 'combat', title: 'Attaque, combat et pillage' },
+  { id: 'pillage', title: 'Assistant de pillage' },
   { id: 'espionnage', title: 'Espionnage' },
   { id: 'muraille', title: 'Muraille et béliers' },
   { id: 'conquete', title: 'Nobles et conquête' },
@@ -260,9 +261,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
             mais le blé qu'ils consommaient est immédiatement libéré. Seules les troupes présentes au village peuvent être dissoutes (pas celles en mouvement ni en renfort chez un autre).
           </li>
           <li>
-            <b>Assistant de pillage :</b> l'entrée « Assistant de pillage » du menu liste les villages barbares autour de votre village actif (rayon de 10, 20 ou 30 cases). Enregistrez un modèle de troupes, puis envoyez-le
-            en un clic sur un village, ou sur plusieurs villages cochés d'un coup (tant qu'il reste assez de troupes). Une pastille indique le résultat de votre dernière attaque : gris, jamais attaqué ; bleu, espionné ;
-            rouge, attaque perdue ; jaune, victoire avec pertes ; vert, victoire sans perte.
+            <b>Assistant de pillage :</b> une page dédiée pour piller les villages barbares en un clic, avec deux modèles de troupes. Voir <a href="#/wiki/pillage">le guide de l'assistant de pillage</a>.
           </li>
         </ul>
       </>
@@ -287,6 +286,48 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           l'{B('warehouse')} du défenseur est protégée. Le butin revient avec les troupes (dans la limite de votre entrepôt).
         </p>
         <p>Chaque attaque produit un rapport pour l'attaquant et le défenseur. Si tous vos soldats meurent, vous ne voyez pas les troupes adverses. Le défenseur est alerté dès le départ d'une attaque.</p>
+      </>
+    ),
+    pillage: (
+      <>
+        <p>
+          L'entrée <b>« Assistant de pillage »</b> du menu liste les villages barbares autour de votre village actif et permet de les attaquer en un clic, sans repasser par la carte ni ressaisir les troupes.
+        </p>
+        <h3>Mode d'emploi</h3>
+        <ol>
+          <li>
+            <b>Enregistrez vos modèles.</b> Il y a deux modèles d'attaque, <b>A</b> et <b>B</b> : indiquez le nombre de chaque unité à envoyer puis « Enregistrer ». Par exemple A pour de petits pillages
+            rapides à la cavalerie légère, B pour un gros détachement face à un village mieux défendu. Les modèles sont mémorisés sur votre appareil.
+          </li>
+          <li>
+            <b>Choisissez le rayon</b> (10, 20 ou 30 cases autour du village actif) et le tri : distance, points, butin estimé ou dernier butin.
+          </li>
+          <li>
+            <b>Cliquez sur A ou B</b> à côté d'un village pour l'attaquer avec ce modèle. Pour en attaquer plusieurs, cochez-les puis utilisez « Envoyer A » ou « Envoyer B » en bas de page : l'envoi
+            s'arrête quand il ne reste plus assez de troupes dans le village.
+          </li>
+        </ol>
+        <h3>Ce que vous voyez sur chaque village</h3>
+        <ul>
+          <li>
+            <b>Butin estimé</b> (« ≈ 1 240 pillables ») : calculé d'après votre <b>dernier rapport où un éclaireur a vu les réserves</b> du village (un espionnage réussi, ou des éclaireurs survivants
+            d'une attaque victorieuse). On ajoute la production depuis ce rapport (dans la limite de l'{B('warehouse')}), puis on retire vos pillages arrivés depuis et la cachette, que l'on ne peut
+            pas voler. C'est une estimation : survolez-la pour le détail par ressource.
+          </li>
+          <li>
+            <b>« ? à espionner »</b> : aucun éclaireur n'a encore vu ce village. Envoyez-y quelques {U('scout')}s pour obtenir une estimation.
+          </li>
+          <li>
+            <b>Attaque suicidaire</b> : d'après ce que vous savez de sa défense (muraille comprise), le modèle indiqué perdrait. Le bouton correspondant passe en rouge. Cette information peut être périmée : la défense a pu changer depuis.
+          </li>
+          <li>
+            <b>La pastille</b> donne le résultat de votre dernière attaque : gris, jamais attaqué ; bleu, espionné ; rouge, attaque perdue ; jaune, victoire avec pertes ; vert, victoire sans perte.
+          </li>
+          <li>
+            <b>Villages masqués</b> : dès qu'une de vos attaques est en route vers un village, il disparaît de la liste jusqu'à son arrivée, pour éviter d'envoyer deux fois des troupes au même endroit.
+          </li>
+        </ul>
+        <p>Pour les règles du combat et du pillage, voir <a href="#/wiki/combat">Attaque, combat et pillage</a>.</p>
       </>
     ),
     espionnage: (

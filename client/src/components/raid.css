@@ -25,3 +25,19 @@
 .raid-foot .warn { color: #f0c36a; }
 .btn.gold { background: var(--gold); border-color: var(--gold); color: #fff; }
 .raid-danger { margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--danger); }
+.raid-model + .raid-model { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.raid-model h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; }
+.raid-slot { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 13px; }
+.slot-A { background: #2f6fdc; border-color: #2f6fdc; color: #fff; }
+.slot-B { background: #7a4fb8; border-color: #7a4fb8; color: #fff; }
+.raid-loot { display: flex; flex-direction: column; align-items: flex-end; min-width: 76px; text-align: right; }
+.raid-loot.unknown b { color: var(--muted); }
+.raid-send { display: flex; gap: 6px; flex: none; }
+.raid-slot-btn { min-width: 38px; font-weight: 700; }
+.raid-slot-btn.danger { background: var(--danger); border-color: var(--danger); }
+.raid-slot-btn:disabled { opacity: 0.45; }
+@media (max-width: 560px) {
+  .raid-list li { flex-wrap: wrap; }
+  .raid-who { flex-basis: calc(100% - 40px); }
+  .raid-loot { margin-left: 30px; align-items: flex-start; text-align: left; flex: 1; }
+}
