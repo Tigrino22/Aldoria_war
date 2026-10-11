@@ -86,9 +86,14 @@ export async function defendStep(c: Db, outbox: Outbox, npcId: number, villageId
     );
     if (already.rows.length) continue;
     const troops = await getTroops(c, villageId, villageId);
-    // Les défenseurs partent, mais le village garde de quoi tenir : 60 % des lanciers, 30 % des épéistes.
-    const units: UnitCounts = { ...emptyUnits(), spearman: Math.floor(troops.spearman * 0.6), swordsman: Math.floor(troops.swordsman * 0.3) };
-    if (units.spearman + units.swordsman < 5) continue;
+    // Les défenseurs partent, mais le village garde de quoi tenir : 60 % des lanciers et des hallebardiers, 30 % des épéistes.
+    const units: UnitCounts = {
+      ...emptyUnits(),
+      spearman: Math.floor(troops.spearman * 0.6),
+      halberdier: Math.floor(troops.halberdier * 0.6),
+      swordsman: Math.floor(troops.swordsman * 0.3),
+    };
+    if (units.spearman + units.halberdier + units.swordsman < 5) continue;
     const target = await loadVillage(c, threat.vid);
     const arrival = now.getTime() + travelTime(units, home, target, env.worldSpeed) * 1000;
     if (arrival >= new Date(threat.arrive_at).getTime() - 2_000) continue;

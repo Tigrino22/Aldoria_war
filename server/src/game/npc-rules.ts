@@ -13,6 +13,10 @@ import {
   wallDuringCombat,
 } from '@aldoria/shared';
 
+import { armyTarget, type VillageRole } from './npc-roles';
+
+export { NOBLES_PER_CONQUEST } from './npc-roles';
+
 // Règles pures des PNJ : pas de base de données ni d'horloge ici, pour pouvoir les tester facilement.
 
 export type NpcProfile = 'builder' | 'raider' | 'conqueror';
@@ -70,47 +74,16 @@ export function chooseBuilding(profile: NpcProfile, levels: Buildings, cap: numb
   return best;
 }
 
-/** Nobles envoyés avec chaque assaut d'un conquérant. */
-export const NOBLES_PER_CONQUEST = 4;
-
-/** Armée visée par le PNJ au niveau `cap` (les unités dont il n'a pas encore les bâtiments sont ignorées au recrutement). */
-export function armyTarget(profile: NpcProfile, cap: number, difficulty: number): UnitCounts {
-  const scale = (n: number) => Math.round(n * cap * difficulty);
-  const t = emptyUnits();
-  if (profile === 'builder') {
-    t.spearman = scale(4);
-    t.halberdier = scale(3);
-    t.swordsman = scale(3);
-    t.scout = 2;
-  } else if (profile === 'conqueror') {
-    t.swordsman = scale(5);
-    t.cavalry = scale(2);
-    t.ram = scale(1);
-    t.spearman = scale(2);
-    t.halberdier = scale(1);
-    t.scout = 4;
-    // Quatre nobles font tomber la loyauté d'un village dans trois cas sur quatre (20 à 35 points chacun).
-    t.noble = cap >= 10 ? NOBLES_PER_CONQUEST : 0;
-  } else {
-    t.swordsman = scale(6);
-    t.cavalry = scale(2);
-    t.spearman = scale(2);
-    t.halberdier = scale(1);
-    t.scout = 4;
-    t.noble = cap >= 10 ? NOBLES_PER_CONQUEST : 0;
-  }
-  return t;
-}
-
 /** Unité à recruter en priorité : celle qui manque le plus par rapport à la cible, parmi celles qu'il peut recruter. */
 export function nextRecruit(
   profile: NpcProfile,
+  role: VillageRole,
   buildings: Buildings,
   owned: UnitCounts,
   cap: number,
   difficulty: number,
 ): { unit: (typeof UNIT_KEYS)[number]; count: number }[] {
-  const target = armyTarget(profile, cap, difficulty);
+  const target = armyTarget(profile, role, cap, difficulty);
   return UNIT_KEYS.filter((k) => target[k] > owned[k] && meetsRequirements(buildings, UNITS[k].requires))
     .map((k) => ({ unit: k, deficit: target[k] - owned[k], ratio: (target[k] - owned[k]) / target[k] }))
     .sort((a, b) => b.ratio - a.ratio)

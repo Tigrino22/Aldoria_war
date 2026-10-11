@@ -103,10 +103,9 @@ export function warEnemiesOf(tribe: TribeInfo | null, now: Date): number[] {
 
 /**
  * PNJ d'une autre tribu qui ont attaqué ce PNJ, sa tribu ou une tribu alliée au cours des trois derniers jours : ils ripostent contre eux.
- * Suit le même interrupteur que la riposte contre les joueurs.
+ * Toujours active : l'interrupteur « Riposte des PNJ » ne coupe que la riposte contre les joueurs (voir `grudgesOf`).
  */
 export async function npcGrudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, now: Date): Promise<number[]> {
-  if (!env.npcRevenge) return [];
   const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];
   const { rows } = await c.query(
     `SELECT DISTINCT cm.player_id FROM commands cm

@@ -201,7 +201,8 @@ Onglet « Monde » : interrupteurs de la riposte des PNJ et des guerres entre tr
 
 | Règle | Valeur |
 |---|---|
-| Riposte | Un PNJ attaqué par un joueur **ou par un PNJ d'une autre tribu** lui en veut 3 jours (interrupteur « Riposte des PNJ ») |
+| Riposte contre les joueurs | Un PNJ attaqué par un joueur lui en veut 3 jours (interrupteur « Riposte des PNJ ») |
+| Riposte entre PNJ | Un PNJ attaqué par un PNJ d'une autre tribu lui en veut 3 jours ; toujours active, l'interrupteur de riposte ne la coupe pas |
 | Guerre de tribus | Une tribu déclare la guerre à une autre, rivale de préférence, jamais à une alliée ; la guerre est réciproque et dure 4 jours réels |
 | Trêve | Au moins 2 jours réels (plus un délai aléatoire) avant qu'une tribu ne redéclare la guerre |
 | Cibles en guerre | Villages de la tribu ennemie jusqu'à 40 cases (20 pour un pillage ordinaire), choisis en priorité (9 fois sur 10) avant joueurs et barbares |
@@ -209,3 +210,22 @@ Onglet « Monde » : interrupteurs de la riposte des PNJ et des guerres entre tr
 | Interrupteur | « Guerres entre tribus de PNJ » (variable `NPC_WARS`, 1 par défaut) : coupé, plus de nouvelle guerre ni de frappe de guerre |
 
 Code : `server/src/game/npc-wars.ts` (règles pures `planWars`, déclaration en base, rancunes entre PNJ), consommé par `attackStep` dans `npc.ts`.
+
+## Recrutement des PNJ : villages offensifs et défensifs
+
+Chaque village d'un PNJ a un rôle (code : `server/src/game/npc-roles.ts`), qui fixe les seules unités qu'on y recrute.
+
+| Rôle | Unités recrutées (par niveau visé) |
+|---|---|
+| Offensif | épéistes ×7, cavaliers ×2, 3 éclaireurs, garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
+| Défensif | lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), 1 éclaireur |
+
+Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) recrute ses unités principales à 60 %.
+
+| Profil | Part de villages offensifs | Avec un seul village |
+|---|---|---|
+| Bâtisseur | 30 % | défensif |
+| Pillard | 70 % | offensif |
+| Conquérant | 60 % | offensif |
+
+Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaque rôle ; les offensifs sont répartis régulièrement (ex. 2 villages : le premier défensif, le second offensif). Dans une tribu, les profils sont déjà mélangés (chef pillard, un conquérant, des bâtisseurs et des pillards), donc certains membres sont offensifs et d'autres défensifs. Les renforts qu'un PNJ envoie à sa tribu menacée comptent aussi les hallebardiers.
