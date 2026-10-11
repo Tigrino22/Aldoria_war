@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { STARTING_BUILDINGS, emptyUnits } from '@aldoria/shared';
+import { STARTING_BUILDINGS, emptyUnits, populationCapacity, populationOf } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents } from '../src/game/commands';
 import { createNpc, ensureNpcs, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
-import { armyTarget, villageRoles } from '../src/game/npc-roles';
+import { FARM_LEAD, armyTarget, villageRoles } from '../src/game/npc-roles';
 import { chooseBuilding, isQuiet, nextRecruit, npcCap, pickWinningUnits } from '../src/game/npc-rules';
 import { createVillage, getTroops, setTroops } from '../src/game/village';
 
@@ -95,9 +95,21 @@ describe('règles des PNJ', () => {
     expect(off.halberdier).toBe(0);
     expect(def.spearman + def.halberdier).toBeGreaterThan(5 * def.swordsman);
     expect([def.cavalry, def.ram, def.noble]).toEqual([0, 0, 0]);
-    // Un pillard défend moins fort qu'un bâtisseur, un bâtisseur attaque moins fort qu'un pillard.
-    expect(armyTarget('raider', 'defense', 20, 1).halberdier).toBeLessThan(armyTarget('builder', 'defense', 20, 1).halberdier);
-    expect(armyTarget('builder', 'offense', 20, 1).swordsman).toBeLessThan(armyTarget('raider', 'offense', 20, 1).swordsman);
+  });
+
+  it('l\'armée visée remplit la ferme visée, à tous les niveaux et dans tous les rôles', () => {
+    for (const cap of [2, 5, 10, 17, 20]) {
+      const room = populationCapacity(Math.min(20, cap + FARM_LEAD));
+      for (const profile of ['builder', 'raider', 'conqueror'] as const) {
+        for (const role of ['offense', 'defense'] as const) {
+          const pop = populationOf(armyTarget(profile, role, cap, 1));
+          expect(pop).toBeLessThanOrEqual(room);
+          expect(pop).toBeGreaterThan(room - 20);
+        }
+      }
+    }
+    // Une difficulté de 0,5 ne remplit que la moitié.
+    expect(populationOf(armyTarget('raider', 'defense', 10, 0.5))).toBeLessThan(populationCapacity(13) * 0.55);
   });
 
   it('le recrutement suit le rôle du village', () => {

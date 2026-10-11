@@ -13,9 +13,9 @@ import {
   wallDuringCombat,
 } from '@aldoria/shared';
 
-import { armyTarget, type VillageRole } from './npc-roles';
+import { armyTarget, FARM_LEAD, type VillageRole } from './npc-roles';
 
-export { NOBLES_PER_CONQUEST } from './npc-roles';
+export { FARM_LEAD, NOBLES_PER_CONQUEST } from './npc-roles';
 
 // Règles pures des PNJ : pas de base de données ni d'horloge ici, pour pouvoir les tester facilement.
 
@@ -44,9 +44,6 @@ export function isQuiet(date: Date, timeZone: string, start: number, end: number
 
 /** Niveaux gagnés par jour de monde : le plafond atteint 20 au bout de 18 jours (difficulté ×1). */
 export const NPC_LEVELS_PER_DAY = 1;
-/** Niveaux d'avance de la ferme sur le plafond : elle loge l'armée, donc elle monte plus haut que le reste. */
-export const FARM_LEAD = 3;
-
 /** Niveau maximal que les PNJ visent selon l'âge du monde : ils suivent un rythme régulier, sans dépasser le niveau 20. */
 export function npcCap(worldDays: number, difficulty: number): number {
   return Math.max(2, Math.min(20, 2 + Math.floor(Math.max(0, worldDays) * NPC_LEVELS_PER_DAY * difficulty)));
