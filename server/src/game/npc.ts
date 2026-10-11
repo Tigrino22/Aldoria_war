@@ -553,8 +553,8 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
       if (after === before) break;
     }
   }
-  // Les rapports d'un PNJ ne servent qu'à ses décisions récentes.
-  await c.query("DELETE FROM reports WHERE player_id = $1 AND created_at < $2", [npcId, new Date(now.getTime() - 2 * DAY_MS)]);
+  // Les rapports d'un PNJ ne servent qu'à ses décisions récentes et au suivi des guerres de l'administration (72 h au plus).
+  await c.query("DELETE FROM reports WHERE player_id = $1 AND created_at < $2", [npcId, new Date(now.getTime() - 3 * DAY_MS)]);
   return angry;
 }
 

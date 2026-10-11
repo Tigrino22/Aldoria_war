@@ -94,6 +94,26 @@ export function planWars(tribes: WarTribe[], now: Date, rnd: () => number): WarU
   return [...changed].sort((a, b) => a - b).map((id) => ({ id, war: state.get(id)!.war, nextWarAt: state.get(id)!.nextWarAt }));
 }
 
+export interface WarLogEntry {
+  kind: 'declared' | 'ended';
+  tribeA: number;
+  tribeB: number;
+}
+
+/** Déclarations et fins de guerre que provoquent les mises à jour de `planWars` (une entrée par paire de tribus). */
+export function warLogEntries(before: WarTribe[], updates: WarUpdate[]): WarLogEntry[] {
+  const old = new Map(before.map((t) => [t.id, t.war]));
+  const entries = new Map<string, WarLogEntry>();
+  for (const u of updates) {
+    const was = old.get(u.id) ?? null;
+    if (!!was === !!u.war) continue;
+    const enemy = (u.war ?? was)!.enemyId;
+    const [a, b] = u.id < enemy ? [u.id, enemy] : [enemy, u.id];
+    entries.set(`${u.war ? 'declared' : 'ended'}:${a}:${b}`, { kind: u.war ? 'declared' : 'ended', tribeA: a, tribeB: b });
+  }
+  return [...entries.values()];
+}
+
 /** Tribus ennemies de la tribu d'un PNJ en ce moment (vide si les guerres sont désactivées ou si la guerre est finie). */
 export function warEnemiesOf(tribe: TribeInfo | null, now: Date): number[] {
   const war = tribe?.state.war;
@@ -134,7 +154,15 @@ export async function refreshWars(now: Date, rnd: () => number = Math.random) {
     nextWarAt: r.npc_state?.nextWarAt ?? null,
     villages: r.villages,
   }));
-  for (const u of planWars(tribes, now, rnd)) {
+  const updates = planWars(tribes, now, rnd);
+  for (const e of warLogEntries(tribes, updates)) {
+    await pool.query(
+      `INSERT INTO npc_war_log (at, kind, tribe_a, tribe_b, tag_a, tag_b)
+       VALUES ($1, $2, $3, $4, (SELECT tag FROM tribes WHERE id = $3), (SELECT tag FROM tribes WHERE id = $4))`,
+      [now, e.kind, e.tribeA, e.tribeB],
+    );
+  }
+  for (const u of updates) {
     await pool.query("UPDATE tribes SET npc_state = npc_state || jsonb_build_object('war', $2::jsonb, 'nextWarAt', $3::jsonb) WHERE id = $1", [
       u.id,
       JSON.stringify(u.war),
