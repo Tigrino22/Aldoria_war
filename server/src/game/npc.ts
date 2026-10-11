@@ -54,6 +54,8 @@ const delayMs = () => Math.max(30_000, ((10 + rng() * 10) * 60_000) / Math.sqrt(
 const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 /** Rayon (en cases) dans lequel un PNJ cherche des cibles. */
 const RAID_RADIUS = 20;
+/** Épéistes qui accompagnent chaque noble d'un train. */
+const NOBLE_ESCORT = 2;
 /** Nombre maximal de nobles dans un train. */
 const MAX_TRAIN = 6;
 const DAY_MS = 86_400_000;
@@ -398,14 +400,17 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     // Les troupes dépendent du butin : assez pour gagner et emporter l'essentiel du stock, toute l'armée s'il le faut.
     // Pour se venger ou faire la guerre, un PNJ frappe fort : au moins 70 % de son armée offensive.
     const avenging = (hostileToPlayer && grudges.includes(target.ownerId!)) || target.enemy;
-    const raid = pickRaidUnits(attackers, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
+    // Chaque noble du train part avec une petite escorte d'épéistes (un noble seul ne survit pas à la défense de base) : on la met de côté avant de choisir l'assaut.
+    let nobles = trainSize();
+    if (nobles > 0) nobles = Math.min(nobles, Math.floor(Math.max(0, attackers.swordsman - 5) / NOBLE_ESCORT));
+    if (nobles < 2) nobles = 0;
+    const raid = pickRaidUnits({ ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
     if (!raid) return;
     const units = raid.units;
-    const nobles = trainSize();
     // Hors riposte et conquête, un pillage ne vaut le déplacement que s'il y a de quoi remplir les sacs.
     if (!avenging && nobles === 0 && raid.loot < MIN_LOOT) return;
     // Tous les envois arrivent à la suite : l'assaut d'abord, puis un noble par seconde.
-    const single = { ...emptyUnits(), noble: 1 };
+    const single = { ...emptyUnits(), noble: 1, swordsman: NOBLE_ESCORT };
     const naturals = [arrivalOf(units, target), ...(nobles ? [arrivalOf(single, target)] : [])];
     const landTime = Math.max(...naturals.map((d) => d.getTime()));
     if (hostileToPlayer && isQuietAt(new Date(landTime + nobles * 1000))) return;

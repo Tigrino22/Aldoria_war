@@ -196,7 +196,7 @@ export default function Layout() {
           {page === 'village' && route[1] !== 'hotel' && <VillageView />}
           {(page === 'hotel' || (page === 'village' && route[1] === 'hotel')) && (village ? <TownHall v={village} /> : <p className="muted">Chargement du village…</p>)}
           {page === 'caserne' && <Barracks />}
-          {page === 'troupes' && <RallyPoint />}
+          {page === 'troupes' && <RallyPoint focus={route[1]} />}
           {page === 'pillage' && <Raid />}
           {page === 'carte' && (
             <Suspense fallback={<p className="muted">Chargement de la carte…</p>}>

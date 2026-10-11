@@ -130,7 +130,7 @@ function unitNote(key: UnitKey): string | null {
   switch (key) {
     case 'scout': return "Envoyé seul, il espionne au lieu de combattre. Accompagnant une attaque victorieuse, les éclaireurs survivants rapportent ce qu'il reste dans le village.";
     case 'ram': return `Abaisse la muraille de façon progressive : 1 bélier pour le niveau 1, 2 pour le niveau 2, et ainsi de suite (niveau 20 : ${ramsToBreakWall(20)} béliers au total). Les niveaux sont retirés en partant du plus haut, pendant le combat puis, avec les béliers survivants, après une victoire.`;
-    case 'noble': return `Chaque noble survivant d'une attaque victorieuse fait baisser la loyauté de ${NOBLE_LOYALTY_MIN} à ${NOBLE_LOYALTY_MAX} points. À 0, le village est conquis.`;
+    case 'noble': return `Si au moins un noble survit à une attaque victorieuse, la loyauté baisse de ${NOBLE_LOYALTY_MIN} à ${NOBLE_LOYALTY_MAX} points, quel que soit le nombre de nobles de l'attaque. Pour la faire tomber plus vite, envoyez les nobles dans des attaques séparées (train de nobles). À 0, le village est conquis.`;
     default: return null;
   }
 }
@@ -266,6 +266,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
             mais les places de population qu'ils occupaient sont immédiatement libérées. Seules les troupes présentes au village peuvent être dissoutes (pas celles en mouvement ni en renfort chez un autre).
           </li>
           <li>
+            <b>Ordres du Point de ralliement :</b> on y envoie une attaque ou un soutien vers des coordonnées, tout de suite ou pour une heure d'arrivée précise : les troupes sont alors réservées et partent seules à l'heure
+            qui convient, et l'on peut annuler l'ordre tant qu'il n'est pas parti. Depuis la carte, « Ouvrir au point de ralliement » mène à la même page.
+          </li>
+          <li>
             <b>Assistant de pillage :</b> une page dédiée pour piller les villages barbares en un clic, avec deux modèles de troupes. Voir <a href="#/wiki/pillage">le guide de l'assistant de pillage</a>.
           </li>
         </ul>
@@ -362,7 +366,11 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
       <>
         <p>Chaque village a une loyauté de 100. Pour prendre un village (joueur ou barbare), il faut l'attaquer avec des {U('noble')}s.</p>
         <ul>
-          <li>Si l'attaque est victorieuse, chaque noble survivant fait baisser la loyauté de {NOBLE_LOYALTY_MIN} à {NOBLE_LOYALTY_MAX} points (tirage au hasard).</li>
+          <li>Si l'attaque est victorieuse et qu'au moins un noble survit, la loyauté baisse de {NOBLE_LOYALTY_MIN} à {NOBLE_LOYALTY_MAX} points (tirage au hasard), quel que soit le nombre de nobles : un seul tirage par attaque. Pour conquérir plus vite, lancez un train de nobles : une attaque par noble.</li>
+          <li>
+            <b>Train de nobles :</b> le Point de ralliement l'organise : l'assaut nettoie la défense, puis chaque noble part dans sa propre attaque, une seconde après le précédent. Un noble seul ne survit pas à la
+            défense de base d'un village : chacun part avec une petite escorte d'épéistes (2 par défaut).
+          </li>
           <li>La loyauté remonte de {fmt(LOYALTY_REGEN_PER_HOUR * s)} point{LOYALTY_REGEN_PER_HOUR * s > 1 ? 's' : ''} par heure, jusqu'à 100.</li>
           <li>À 0, le village est à vous : sa loyauté repart à {LOYALTY_AFTER_CONQUEST}, un noble s'y installe pour gouverner (il disparaît de l'armée) et les autres survivants deviennent la garnison.</li>
           <li>L'ancien propriétaire perd les constructions et recrutements en cours ainsi que toutes les troupes de ce village, y compris celles qui étaient en dehors.</li>

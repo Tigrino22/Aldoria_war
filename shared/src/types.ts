@@ -77,6 +77,16 @@ export interface CommandView {
   arriveAt: string;
 }
 
+/** Un ordre planifié depuis le point de ralliement : un ou plusieurs mouvements réservés, qui partent à l'heure voulue. */
+export interface PlannedOrderView {
+  groupId: string;
+  type: 'attack' | 'support';
+  origin: { id: number; name: string; x: number; y: number };
+  target: { id: number; name: string; x: number; y: number; ownerName: string | null };
+  /** Mouvements pas encore partis (un assaut, puis ses nobles un par un pour un train de nobles). */
+  parts: { id: number; units: UnitCounts; departAt: string; arriveAt: string }[];
+}
+
 export interface VillageState {
   id: number;
   name: string;

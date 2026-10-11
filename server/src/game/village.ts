@@ -104,7 +104,8 @@ export async function addTroops(c: Db, villageId: number, homeId: number, units:
 export async function computePopulation(c: Db, villageId: number): Promise<number> {
   const { rows } = await c.query(
     `SELECT units FROM troops WHERE home_village_id = $1
-     UNION ALL SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed`,
+     UNION ALL SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed
+     UNION ALL SELECT units FROM planned_commands WHERE origin_village_id = $1`,
     [villageId],
   );
   let population = rows.reduce((sum, r) => sum + populationOf(normalizeUnits(r.units)), 0);

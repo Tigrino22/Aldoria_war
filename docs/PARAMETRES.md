@@ -229,3 +229,18 @@ Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur 
 | Conquérant | 60 % | offensif |
 
 Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaque rôle ; les offensifs sont répartis régulièrement (ex. 2 villages : le premier défensif, le second offensif). Dans une tribu, les profils sont déjà mélangés (chef pillard, un conquérant, des bâtisseurs et des pillards), donc certains membres sont offensifs et d'autres défensifs. Les renforts qu'un PNJ envoie à sa tribu menacée comptent aussi les hallebardiers.
+
+## Point de ralliement : ordres planifiés et train de nobles
+
+Page « Troupes » (`#/troupes`, ou `#/troupes/x,y` depuis la carte). Code : `server/src/game/orders.ts` (base de données), `shared/src/orders.ts` (découpe des ordres, aussi utilisée par le client pour afficher le plan avant l'envoi), `client/src/components/RallyOrders.tsx`.
+
+| Règle | Valeur |
+|---|---|
+| Ordre | Attaque ou soutien vers un village (coordonnées), depuis le village actif ; tout de suite ou à une heure d'arrivée précise |
+| Heure d'arrivée précise | Les troupes sont retirées du village à la planification (réservées, comptées dans la population) et partent à `arrivée - trajet` ; 14 jours au plus à l'avance ; annulables avant le départ (les troupes reviennent) |
+| Cible devenue inattaquable | Au départ, si la cible est sous protection ou devenue la nôtre, l'ordre est annulé et les troupes rentrent |
+| Départ en retard (serveur arrêté) | Plus de 5 s après l'heure prévue : l'heure d'arrivée précise est abandonnée, les troupes partent aussitôt |
+| Village d'origine conquis | Les ordres planifiés depuis ce village disparaissent avec lui |
+| Loyauté | Une attaque victorieuse avec au moins un noble survivant fait baisser la loyauté de 20 à 35, **une seule fois**, quel que soit le nombre de nobles |
+| Train de nobles | L'assaut, puis un mouvement par noble (avec une escorte, 2 épéistes par défaut), chacun arrivant 1 s (1 à 10 s) après le précédent. Un noble seul ne survit pas à la défense de base d'un village |
+| PNJ | Leur train de nobles suit la même règle : 2 épéistes d'escorte par noble |

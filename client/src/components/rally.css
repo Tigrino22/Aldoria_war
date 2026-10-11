@@ -1,0 +1,10 @@
+.rally-form { display: flex; flex-direction: column; gap: 12px; }
+.rally-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.rally-row input[type='number'] { width: 80px; }
+.rally-row #rally-target { width: 120px; }
+.rally-choice { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.rally-train { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.rally-train legend { padding: 0 6px; font-weight: 600; }
+.rally-plan { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.rally-plan li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.rally-order { flex-wrap: wrap; }

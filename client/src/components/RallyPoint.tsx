@@ -4,6 +4,7 @@ import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { CancelButton, Cost, Countdown, Panel, PlayerLink, UnitIcon, UnitList } from '../ui';
+import { OrderForm, PlannedOrders } from './RallyOrders';
 import './disband.css';
 
 const TYPE_LABEL = { attack: 'Attaque', support: 'Renfort', return: 'Retour', trade: 'Marchands', trade_return: 'Retour des marchands' } as const;
@@ -87,7 +88,7 @@ function DisbandDialog({ v, unit, onClose }: { v: VillageState; unit: UnitKey; o
   );
 }
 
-export default function RallyPoint() {
+export default function RallyPoint({ focus }: { focus?: string }) {
   const { village: v, run, refreshVillage } = useGame();
   const [disband, setDisband] = useState<UnitKey | null>(null);
   if (!v) return <p className="muted">Chargement…</p>;
@@ -106,6 +107,8 @@ export default function RallyPoint() {
 
   return (
     <div className="stack">
+      <OrderForm v={v} focus={focus} />
+      <PlannedOrders />
       <Panel title="Troupes au village">
         {UNIT_KEYS.some((k) => v.troopsHome[k] > 0) ? (
           <>
@@ -146,7 +149,7 @@ export default function RallyPoint() {
         ) : (
           <p className="muted">Aucune troupe au village. Recrutez à la caserne.</p>
         )}
-        <p className="muted small">Pour attaquer ou envoyer des renforts, choisissez un village sur la carte.</p>
+        <p className="muted small">Pour une attaque rapide, choisissez un village sur la carte ; ici, vous organisez vos ordres.</p>
       </Panel>
 
       <Panel title="Mouvements entrants">

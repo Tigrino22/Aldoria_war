@@ -36,6 +36,7 @@ import { tx, type Db } from '../db';
 import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
+import { launchDueOrders } from './orders';
 import { createReport } from './reports';
 import { VillageRow, addTroops, busyMerchants, getTroops, loadVillage, resourcesOf, saveVillage, setTroops, syncVillage } from './village';
 
@@ -87,6 +88,43 @@ export async function insertCommand(
 
 // ---------- Envoi ----------
 
+/** Refuse l'attaque d'un village à soi, ou d'un joueur encore sous protection ; attaquer un autre joueur met fin à sa propre protection. */
+export async function assertCanAttack(c: Db, playerId: number, target: VillageRow, now: Date, endOwnProtection = true) {
+  if (target.owner_id === playerId) throw new GameError('Pour vos propres villages, envoyez plutôt un renfort');
+  if (!target.owner_id) return;
+  const { rows } = await c.query('SELECT protection_until FROM players WHERE id = $1', [target.owner_id]);
+  if (rows[0]?.protection_until && new Date(rows[0].protection_until) > now) throw new GameError('Ce joueur est encore sous protection débutant');
+  if (endOwnProtection) await c.query('UPDATE players SET protection_until = NULL WHERE id = $1 AND protection_until > $2', [playerId, now]);
+}
+
+/**
+ * Met en route des troupes déjà retirées du village d'origine : crée le mouvement et prévient le joueur visé.
+ * `arriveAt` est l'heure d'arrivée voulue ; par défaut, départ immédiat.
+ */
+export async function dispatchCommand(
+  c: Db,
+  outbox: Outbox,
+  cmd: { type: 'attack' | 'support'; playerId: number; origin: VillageRow; target: VillageRow; units: UnitCounts; sentAt: Date; arriveAt?: Date },
+) {
+  const arriveAt = cmd.arriveAt ?? new Date(cmd.sentAt.getTime() + travelTime(cmd.units, cmd.origin, cmd.target, env.worldSpeed) * 1000);
+  const id = await insertCommand(c, {
+    type: cmd.type,
+    originId: cmd.origin.id,
+    targetId: cmd.target.id,
+    homeId: cmd.origin.id,
+    playerId: cmd.playerId,
+    units: cmd.units,
+    sentAt: cmd.sentAt,
+    arriveAt,
+  });
+  outbox.push(cmd.playerId, { type: 'village', villageId: cmd.origin.id });
+  if (cmd.target.owner_id && cmd.target.owner_id !== cmd.playerId) {
+    if (cmd.type === 'attack') outbox.push(cmd.target.owner_id, { type: 'incoming', villageId: cmd.target.id, arriveAt: arriveAt.toISOString() });
+    outbox.push(cmd.target.owner_id, { type: 'village', villageId: cmd.target.id });
+  }
+  return { id, arriveAt };
+}
+
 export async function sendCommand(
   c: Db,
   outbox: Outbox,
@@ -105,36 +143,10 @@ export async function sendCommand(
   const available = await getTroops(c, origin.id, origin.id);
   if (!hasUnits(available, units)) throw new GameError("Vous n'avez pas assez de troupes au village");
 
-  if (input.type === 'attack') {
-    if (target.owner_id === playerId) throw new GameError('Pour vos propres villages, envoyez plutôt un renfort');
-    if (target.owner_id) {
-      const { rows } = await c.query('SELECT protection_until FROM players WHERE id = $1', [target.owner_id]);
-      if (rows[0]?.protection_until && new Date(rows[0].protection_until) > now) {
-        throw new GameError('Ce joueur est encore sous protection débutant');
-      }
-      // Attaquer un autre joueur met fin à sa propre protection.
-      await c.query('UPDATE players SET protection_until = NULL WHERE id = $1 AND protection_until > $2', [playerId, now]);
-    }
-  }
+  if (input.type === 'attack') await assertCanAttack(c, playerId, target, now);
 
   await setTroops(c, origin.id, origin.id, subtractUnits(available, units));
-  const arriveAt = new Date(now.getTime() + travelTime(units, origin, target, env.worldSpeed) * 1000);
-  const id = await insertCommand(c, {
-    type: input.type,
-    originId: origin.id,
-    targetId: target.id,
-    homeId: origin.id,
-    playerId,
-    units,
-    sentAt: now,
-    arriveAt,
-  });
-  outbox.push(playerId, { type: 'village', villageId: origin.id });
-  if (target.owner_id && target.owner_id !== playerId) {
-    if (input.type === 'attack') outbox.push(target.owner_id, { type: 'incoming', villageId: target.id, arriveAt: arriveAt.toISOString() });
-    outbox.push(target.owner_id, { type: 'village', villageId: target.id });
-  }
-  return { id, arriveAt };
+  return dispatchCommand(c, outbox, { type: input.type, playerId, origin, target, units, sentAt: now });
 }
 
 /**
@@ -412,8 +424,9 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
   if (result.attackerWins) {
     if (survivors.noble > 0) {
       const before = target.loyalty;
-      let drop = 0;
-      for (let i = 0; i < survivors.noble; i++) drop += NOBLE_LOYALTY_MIN + Math.floor(rng() * (NOBLE_LOYALTY_MAX - NOBLE_LOYALTY_MIN + 1));
+      // Un seul tirage par attaque, quel que soit le nombre de nobles survivants : pour faire tomber la loyauté en plusieurs fois,
+      // il faut envoyer les nobles dans des attaques séparées (le « train de nobles »).
+      const drop = NOBLE_LOYALTY_MIN + Math.floor(rng() * (NOBLE_LOYALTY_MAX - NOBLE_LOYALTY_MIN + 1));
       target.loyalty = Math.max(0, before - drop);
       loyalty = { before: Math.floor(before), after: Math.floor(target.loyalty) };
       conquered = target.loyalty <= 0;
@@ -505,6 +518,7 @@ async function conquer(c: Db, outbox: Outbox, target: VillageRow, newOwner: numb
   // Les troupes de l'ancien propriétaire qui étaient hors du village sont perdues.
   await c.query('DELETE FROM troops WHERE home_village_id = $1 OR village_id = $1', [target.id]);
   await c.query('UPDATE commands SET processed = true WHERE home_village_id = $1 AND NOT processed', [target.id]);
+  await c.query('DELETE FROM planned_commands WHERE origin_village_id = $1', [target.id]);
   // Un noble s'installe pour gouverner ; le reste de l'armée devient la garnison du village.
   const garrison = { ...survivors, noble: Math.max(0, survivors.noble - 1) };
   await setTroops(c, target.id, target.id, garrison);
@@ -540,7 +554,7 @@ async function handleReturn(c: Db, outbox: Outbox, cmd: any) {
 
 /** Traite, dans l'ordre chronologique exact, tous les mouvements arrivés à destination. */
 export async function processDueEvents(now: Date): Promise<number> {
-  let processed = 0;
+  let processed = await launchDueOrders(now);
   for (;;) {
     const outbox = new Outbox();
     const handled = await tx(async (c) => {
