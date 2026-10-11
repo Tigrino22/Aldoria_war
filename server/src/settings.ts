@@ -7,7 +7,7 @@ import { env } from './env';
  * cours de partie fausserait les files de construction, les trajets en cours et les coordonnées.
  */
 export interface SettingDef {
-  key: 'npcRevenge' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
+  key: 'npcRevenge' | 'npcWars' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
   label: string;
   help: string;
   type: 'number' | 'integer' | 'text' | 'boolean';
@@ -16,7 +16,8 @@ export interface SettingDef {
 }
 
 export const SETTINGS: SettingDef[] = [
-  { key: 'npcRevenge', label: 'Riposte des PNJ', help: 'Activée : un PNJ attaqué par un joueur contre-attaque pendant 3 jours. Désactivée : il ne riposte plus (il continue de défendre et d’attaquer comme d’habitude)', type: 'boolean' },
+  { key: 'npcRevenge', label: 'Riposte des PNJ', help: 'Activée : un PNJ attaqué par un joueur ou par un PNJ d’une autre tribu contre-attaque pendant 3 jours. Désactivée : il ne riposte plus (il continue de défendre et d’attaquer comme d’habitude)', type: 'boolean' },
+  { key: 'npcWars', label: 'Guerres entre tribus de PNJ', help: 'Activées : les tribus de PNJ se déclarent la guerre pour quelques jours, se pillent et cherchent à se conquérir. Désactivées : plus de nouvelle guerre ni de frappe contre une tribu ennemie (les rivalités habituelles restent)', type: 'boolean' },
   { key: 'npcDifficulty', label: 'Difficulté des PNJ', help: '0,5 = facile, 1 = modérée, 1,5 = difficile', type: 'number', min: 0.25, max: 3 },
   { key: 'npcDaily', label: 'Nouveaux PNJ par jour', help: 'Un PNJ rejoint le monde chaque jour, jusqu’au maximum', type: 'integer', min: 0, max: 20 },
   { key: 'npcMax', label: 'Maximum de PNJ', help: 'Plafond du nombre de PNJ', type: 'integer', min: 0, max: 500 },

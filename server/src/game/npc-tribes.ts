@@ -4,6 +4,7 @@ import { env } from '../env';
 import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { sendCommand } from './commands';
+import type { TribeWar } from './npc-wars';
 import { getTroops, loadVillage } from './village';
 
 /** Opération coordonnée : tous les membres frappent la même cible dans une fenêtre d'arrivée. */
@@ -27,6 +28,10 @@ export interface TribeState {
   lastOpAt?: string;
   /** Attaques déjà signalées aux membres (pour ne pas les réveiller en boucle). */
   alerted?: number[];
+  /** Guerre en cours contre une autre tribu de PNJ (voir npc-wars.ts). */
+  war?: TribeWar | null;
+  /** Date à partir de laquelle la tribu peut déclarer une nouvelle guerre. */
+  nextWarAt?: string | null;
 }
 
 export interface TribeInfo {
