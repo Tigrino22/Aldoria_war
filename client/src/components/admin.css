@@ -34,3 +34,29 @@
 .war-col i.conquest { background: var(--gold); }
 .war-col span { position: absolute; bottom: -15px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--muted); }
 .war-truce { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.admin { min-width: 0; }
+.admin .tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.admin .tabs::-webkit-scrollbar { display: none; }
+.admin .tabs button { flex: 1 0 auto; white-space: nowrap; padding: 8px 14px; }
+.admin-chips { flex-wrap: wrap; }
+.admin-fill { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.admin-fill input[type='range'] { flex: 1 1 180px; min-width: 0; padding: 0; accent-color: var(--gold); }
+.admin-fill-val { min-width: 52px; text-align: right; font-size: 20px; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .admin-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .admin-kpi { padding: 8px 10px; }
+  .admin-kpi b { font-size: 20px; }
+  .admin-kpi i { font-size: 11px; }
+  .admin-table td, .admin-table th { padding: 6px 5px; font-size: 13px; }
+}
+/* Journal d'activité : sur téléphone, chaque ligne devient une petite carte (heure et PNJ, puis action et résultat). */
+@media (max-width: 640px) {
+  .admin-events thead { display: none; }
+  .admin-events tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .admin-events tr:last-child { border-bottom: 0; }
+  .admin-events td { border: 0; padding: 0; }
+  .admin-events td:nth-child(1) { grid-column: 2; grid-row: 1; text-align: right; font-size: 12px; }
+  .admin-events td:nth-child(2) { grid-column: 1; grid-row: 1; font-weight: 700; }
+  .admin-events td:nth-child(3) { grid-column: 1; grid-row: 2; color: var(--muted); }
+  .admin-events td:nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
+}

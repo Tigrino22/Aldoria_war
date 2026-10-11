@@ -5,6 +5,7 @@ import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { env } from '../env';
 import { forbidden } from '../errors';
+import { fillNpcWarehouses } from '../game/npc-fill';
 import { isQuiet } from '../game/npc-rules';
 import { warOverview } from '../game/npc-war-report';
 import { GameError } from '../errors';
@@ -218,6 +219,13 @@ export default async function adminRoutes(app: FastifyInstance) {
     const error = await saveSettings(values as Partial<Record<SettingDef['key'], unknown>>);
     if (error) throw new GameError(error);
     return settingsView();
+  });
+
+  /** Remplit les entrepôts de tous les PNJ jusqu'à un pourcentage de leur capacité (jamais en dessous de ce qu'ils ont). */
+  app.post('/api/admin/npc/fill', async (req) => {
+    await requireAdmin(req);
+    const { percent } = z.object({ percent: z.number().min(0).max(100) }).parse(req.body);
+    return fillNpcWarehouses(percent, new Date());
   });
 
   /** Totaux du monde et paramètres actifs. */

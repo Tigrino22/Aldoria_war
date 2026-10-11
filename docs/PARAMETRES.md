@@ -273,3 +273,7 @@ Page « Point de ralliement » du menu, distincte de « Troupes » (`#/ralliemen
 | Vitesses différentes | Chaque mouvement part à `arrivée - son propre trajet` (selon son unité la plus lente) : cavaliers plus tard, nobles plus tôt, pour que tous arrivent à l'heure voulue |
 | Train de nobles | L'assaut, puis un mouvement par noble (avec l'escorte choisie par le joueur, 2 épéistes par défaut ; nombre de nobles plafonné par les nobles et escortes disponibles : 3 attaques au lieu de 4 si l'escorte manque), chacun arrivant 1 s (1 à 10 s) après le précédent. Un noble seul ne survit pas à la défense de base d'un village |
 | PNJ | Leur train de nobles suit la même règle : 2 épéistes d'escorte par noble |
+
+## Remplir les entrepôts des PNJ (administration)
+
+Administration > PNJ : un curseur (0 à 100 %, par 5) et un bouton « Remplir » montent chaque ressource de tous les villages de PNJ jusqu'à cette part de la capacité de leur entrepôt (`POST /api/admin/npc/fill`, `server/src/game/npc-fill.ts`). Les villages sont mis à jour à l'instant présent avant le remplissage, et une ressource déjà au-dessus du seuil n'est jamais réduite.
