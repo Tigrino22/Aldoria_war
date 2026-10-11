@@ -37,7 +37,7 @@ export async function spawnVillage(c: Db, playerId: number, username: string, no
 export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
   const p = (
     await c.query(
-      `SELECT p.id, p.username, p.protection_until, p.created_at, t.id AS tribe_id, t.name AS tribe_name, t.tag AS tribe_tag
+      `SELECT p.id, p.username, p.protection_until, t.id AS tribe_id, t.name AS tribe_name, t.tag AS tribe_tag
        FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE p.id = $1`,
       [playerId],
     )
@@ -63,7 +63,6 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
       username: p.username,
       tribe: p.tribe_id ? { id: p.tribe_id, name: p.tribe_name, tag: p.tribe_tag } : null,
       protectionUntil: p.protection_until ? new Date(p.protection_until).toISOString() : null,
-      createdAt: new Date(p.created_at).toISOString(),
       points: villages.reduce((s, v) => s + v.points, 0),
     },
     villages,

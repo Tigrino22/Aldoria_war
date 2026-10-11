@@ -13,8 +13,6 @@ export interface PlayerSummary {
   username: string;
   tribe: { id: number; name: string; tag: string } | null;
   protectionUntil: string | null;
-  /** Date d'inscription du joueur. */
-  createdAt: string;
   points: number;
 }
 
