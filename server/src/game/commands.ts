@@ -27,6 +27,7 @@ import {
   resolveCombat,
   subtractUnits,
   totalUnits,
+  upkeepOf,
   travelTime,
   villagePoints,
   warehouseCapacity,
@@ -305,6 +306,7 @@ async function handleScouting(c: Db, outbox: Outbox, cmd: any, target: VillageRo
       arriveAt: new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed) * 1000),
     });
   }
+  await addKills(c, target.owner_id, 'defense', upkeepOf(attackerLosses));
   const side = (v: VillageRow, name: string | null) => ({ playerName: name, village: { id: v.id, name: v.name, x: v.x, y: v.y } });
   const attackerName = await playerName(c, attackerId);
   const defenderName = await playerName(c, target.owner_id);
@@ -320,6 +322,13 @@ async function handleScouting(c: Db, outbox: Outbox, cmd: any, target: VillageRo
     await createReport(c, outbox, target.owner_id, 'scout', `Des éclaireurs de ${attackerName ?? 'un inconnu'} ont été repérés à ${label(target)}`, defView, at);
   }
   if (attackerId) outbox.push(attackerId, { type: 'village', villageId: origin.id });
+}
+
+/** Ajoute des adversaires battus à un joueur (ignoré s'il n'y a personne ou rien à compter). */
+export async function addKills(c: Db, playerId: number | null, kind: 'attack' | 'defense', amount: number) {
+  if (!playerId || amount <= 0) return;
+  const column = kind === 'attack' ? 'kills_attack' : 'kills_defense';
+  await c.query(`UPDATE players SET ${column} = ${column} + $2 WHERE id = $1`, [playerId, amount]);
 }
 
 const floorResources = (r: Resources): Resources => ({ wood: Math.floor(r.wood), clay: Math.floor(r.clay), iron: Math.floor(r.iron), wheat: Math.floor(r.wheat) });
@@ -357,6 +366,33 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
     await setTroops(c, target.id, defenderRows[i].home_village_id, subtractUnits(defenders[i], loss));
   }
   const survivors = subtractUnits(attackers, result.attackerLosses);
+
+  // Adversaires battus : l'attaquant gagne la valeur en blé des défenseurs tués, les défenseurs celle des attaquants tués.
+  // Le second montant est réparti entre le propriétaire du village et ceux qui y ont des renforts, selon la valeur des troupes présentes.
+  await addKills(c, attackerId, 'attack', upkeepOf(defenderLossesTotal));
+  const killedByDefense = upkeepOf(result.attackerLosses);
+  if (killedByDefense > 0) {
+    const homeIds = [...new Set(defenderRows.map((r) => r.home_village_id as number))];
+    const homeOwners = new Map<number, number | null>(
+      (await c.query('SELECT id, owner_id FROM villages WHERE id = ANY($1)', [homeIds])).rows.map((r) => [r.id, r.owner_id]),
+    );
+    const weights = new Map<number, number>();
+    defenderRows.forEach((r, i) => {
+      const owner = r.home_village_id === target.id ? target.owner_id : homeOwners.get(r.home_village_id) ?? null;
+      if (owner) weights.set(owner, (weights.get(owner) ?? 0) + upkeepOf(defenders[i]));
+    });
+    if (target.owner_id && !weights.has(target.owner_id)) weights.set(target.owner_id, 0);
+    const totalWeight = [...weights.values()].reduce((a, b) => a + b, 0);
+    let given = 0;
+    for (const [owner, w] of weights) {
+      if (owner === target.owner_id) continue;
+      const share = totalWeight > 0 ? Math.floor((killedByDefense * w) / totalWeight) : 0;
+      given += share;
+      await addKills(c, owner, 'defense', share);
+    }
+    // Le reste, y compris l'arrondi, revient au propriétaire du village (ou au premier défenseur s'il n'a pas de propriétaire).
+    await addKills(c, target.owner_id ?? weights.keys().next().value ?? null, 'defense', killedByDefense - given);
+  }
 
   let loot: Resources | null = null;
   let loyalty: AttackReportData['loyalty'] = null;

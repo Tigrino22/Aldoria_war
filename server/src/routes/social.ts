@@ -186,7 +186,8 @@ export default async function socialRoutes(app: FastifyInstance) {
     if (!t) throw notFound('Tribu introuvable');
     const members = (
       await pool.query(
-        `SELECT p.id, p.username, count(v.id)::int AS villages, coalesce(sum(v.points), 0)::int AS points
+        `SELECT p.id, p.username, count(v.id)::int AS villages, coalesce(sum(v.points), 0)::int AS points,
+                p.kills_attack::float8 AS "killsAttack", p.kills_defense::float8 AS "killsDefense"
          FROM players p LEFT JOIN villages v ON v.owner_id = p.id WHERE p.tribe_id = $1 GROUP BY p.id ORDER BY points DESC`,
         [id],
       )
@@ -205,6 +206,8 @@ export default async function socialRoutes(app: FastifyInstance) {
       members,
       invites,
       points: members.reduce((s, m) => s + m.points, 0),
+      killsAttack: members.reduce((s, m) => s + m.killsAttack, 0),
+      killsDefense: members.reduce((s, m) => s + m.killsDefense, 0),
     };
   });
 
@@ -279,7 +282,7 @@ export default async function socialRoutes(app: FastifyInstance) {
     const { name } = z.object({ name: z.string().trim().min(1).max(60) }).parse(req.params);
     const p = (
       await pool.query(
-        `SELECT p.id, p.username, p.is_npc, p.created_at, p.protection_until, t.id AS tribe_id, t.tag, t.name AS tribe_name
+        `SELECT p.id, p.username, p.is_npc, p.created_at, p.protection_until, p.kills_attack::float8 AS kills_attack, p.kills_defense::float8 AS kills_defense, t.id AS tribe_id, t.tag, t.name AS tribe_name
          FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE lower(p.username) = lower($1)`,
         [name],
       )
@@ -314,28 +317,43 @@ export default async function socialRoutes(app: FastifyInstance) {
       protected: !!p.protection_until && new Date(p.protection_until) > new Date(),
       points,
       rank,
+      killsAttack: p.kills_attack,
+      killsDefense: p.kills_defense,
       tribe: p.tribe_id ? { id: p.tribe_id, tag: p.tag, name: p.tribe_name } : null,
       villages,
     };
   });
 
   // ---------- Classements ----------
+  // `?type=points` (défaut), `attack` (adversaires battus en attaque) ou `defense` (adversaires battus en défense).
+  const rankingQuery = z.object({ type: z.enum(['points', 'attack', 'defense']).default('points') });
+  const rankingOrder = { points: 'points', attack: '"killsAttack"', defense: '"killsDefense"' } as const;
+
   app.get('/api/ranking/players', async (req) => {
     await requirePlayer(req);
+    const { type } = rankingQuery.parse(req.query);
+    const order = type === 'points' ? 'points DESC' : `${rankingOrder[type]} DESC, points DESC`;
     const { rows } = await pool.query(
-      `SELECT p.id, p.username, t.tag, count(v.id)::int AS villages, coalesce(sum(v.points), 0)::int AS points
+      `SELECT p.id, p.username, t.tag, count(v.id)::int AS villages, coalesce(sum(v.points), 0)::int AS points,
+              p.kills_attack::float8 AS "killsAttack", p.kills_defense::float8 AS "killsDefense"
        FROM players p LEFT JOIN villages v ON v.owner_id = p.id LEFT JOIN tribes t ON t.id = p.tribe_id
-       GROUP BY p.id, t.tag ORDER BY points DESC, p.id LIMIT 100`,
+       GROUP BY p.id, t.tag ORDER BY ${order}, p.id LIMIT 100`,
     );
     return rows.map((r, i) => ({ rank: i + 1, ...r }));
   });
 
   app.get('/api/ranking/tribes', async (req) => {
     await requirePlayer(req);
+    const { type } = rankingQuery.parse(req.query);
+    const order = type === 'points' ? 'points DESC' : `${rankingOrder[type]} DESC, points DESC`;
+    // Les adversaires battus d'une tribu sont ceux de ses membres actuels, comme pour les points.
     const { rows } = await pool.query(
-      `SELECT t.id, t.name, t.tag, count(DISTINCT p.id)::int AS members, count(v.id)::int AS villages, coalesce(sum(v.points), 0)::int AS points
-       FROM tribes t JOIN players p ON p.tribe_id = t.id LEFT JOIN villages v ON v.owner_id = p.id
-       GROUP BY t.id ORDER BY points DESC, t.id LIMIT 100`,
+      `SELECT t.id, t.name, t.tag, count(p.id)::int AS members,
+              coalesce(sum(vs.villages), 0)::int AS villages, coalesce(sum(vs.points), 0)::int AS points,
+              coalesce(sum(p.kills_attack), 0)::float8 AS "killsAttack", coalesce(sum(p.kills_defense), 0)::float8 AS "killsDefense"
+       FROM tribes t JOIN players p ON p.tribe_id = t.id
+       LEFT JOIN (SELECT owner_id, count(*) AS villages, sum(points) AS points FROM villages GROUP BY owner_id) vs ON vs.owner_id = p.id
+       GROUP BY t.id ORDER BY ${order}, t.id LIMIT 100`,
     );
     return rows.map((r, i) => ({ rank: i + 1, ...r }));
   });
