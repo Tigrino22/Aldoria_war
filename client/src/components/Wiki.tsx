@@ -476,6 +476,12 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           pouvez enregistrer des modèles d'armée pour les réutiliser.
         </p>
         <h3>Classement</h3>
+        <p>La page Classement a trois onglets, chacun pour les joueurs et pour les tribus (les chiffres d'une tribu sont la somme de ceux de ses membres) :</p>
+        <ul>
+          <li><b>Joueurs et Tribus :</b> classement général par points, avec deux variantes, « Attaque » et « Défense », qui comptent les adversaires battus.</li>
+          <li><b>Guerre :</b> classement de guerre (conquêtes, villages perdus, batailles gagnées), podium, dernières conquêtes du monde et guerres de tribus en cours.</li>
+          <li>La page « Statistiques du monde », dans le menu Social, donne les totaux et moyennes de toute la carte.</li>
+        </ul>
         <p>
           Les points d'un joueur sont la somme des points de ses villages, et ceux d'un village la somme des points de ses bâtiments (un bâtiment au niveau N vaut N×(N+1)/2 points). Le
           classement des tribus additionne les points de leurs membres.
