@@ -45,6 +45,11 @@ describe('règles du marché', () => {
     expect(npcAccepts(npc, { give: 'clay', giveAmount: 500, want: 'wood', wantAmount: 800 })).toBe(false);
     expect(npcAccepts(npc, { give: 'iron', giveAmount: 800, want: 'wood', wantAmount: 800 })).toBe(false);
     expect(npcAccepts(npc, { give: 'clay', giveAmount: 800, want: 'iron', wantAmount: 800 })).toBe(false);
+    // Sans excédent, il paie avec une ressource qui reste au moins à moitié pleine.
+    const calm = { stock: R(6000, 1000, 6500, 5000), capacity: 10000 };
+    expect(marketNeeds(calm).surplus).toEqual([]);
+    expect(npcAccepts(calm, { give: 'clay', giveAmount: 800, want: 'iron', wantAmount: 800 })).toBe(true);
+    expect(npcAccepts(calm, { give: 'clay', giveAmount: 800, want: 'iron', wantAmount: 2000 })).toBe(false);
   });
 });
 

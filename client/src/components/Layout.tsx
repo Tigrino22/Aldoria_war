@@ -13,6 +13,7 @@ import Market from './Market';
 import Account from './Account';
 import ResourceBar from './ResourceBar';
 import Tribe from './Tribe';
+import TownHall from './TownHall';
 import VillageView from './VillageView';
 import Overview from './Overview';
 import Profile from './Profile';
@@ -37,7 +38,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Village',
     items: [
       { path: 'village', label: 'Vue du village', img: NAV_IMG.village },
-      { path: 'village/hotel', label: 'Hôtel de ville', img: buildingImg('townhall', 15) },
+      { path: 'hotel', label: 'Hôtel de ville', img: buildingImg('townhall', 15) },
       { path: 'caserne', label: 'Caserne', img: NAV_IMG.caserne },
       { path: 'marche', label: 'Marché', img: buildingImg('market', 15) },
       { path: 'marche/offres', label: 'Offres du marché', img: buildingImg('market', 15) },
@@ -107,7 +108,7 @@ function TopResources() {
 }
 
 export default function Layout() {
-  const { me, villageId, setVillageId, logout, run, refreshMe } = useGame();
+  const { me, village, villageId, setVillageId, logout, run, refreshMe } = useGame();
   const [route, go] = useRoute();
   const page = route[0] ?? 'village';
   const [drawer, setDrawer] = useState(false);
@@ -193,7 +194,8 @@ export default function Layout() {
           </button>
         </aside>
         <main className="content">
-          {page === 'village' && <VillageView />}
+          {page === 'village' && route[1] !== 'hotel' && <VillageView />}
+          {(page === 'hotel' || (page === 'village' && route[1] === 'hotel')) && (village ? <TownHall v={village} /> : <p className="muted">Chargement du village…</p>)}
           {page === 'caserne' && <Barracks />}
           {page === 'troupes' && <RallyPoint />}
           {page === 'pillage' && <Raid />}

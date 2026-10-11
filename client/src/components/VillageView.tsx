@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   BUILDINGS,
   BUILDING_KEYS,
@@ -16,7 +16,6 @@ import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { CancelButton, Cost, Countdown, liveResources, Panel } from '../ui';
 import Quests from './Quests';
-import TownHall from './TownHall';
 import { effect, effectiveLevels } from './buildingInfo';
 
 
@@ -102,13 +101,8 @@ import IncomingDetail from './IncomingDetail';
 
 export default function VillageView() {
   const { village: v, world, me, run, refreshMe, setVillage } = useGame();
-  const [route, go] = useRoute();
-  // #/village/hotel (menu) ouvre directement la fenêtre de l'hôtel de ville.
-  const [selected, setSelected] = useState<BuildingKey | null>(route[1] === 'hotel' ? 'townhall' : null);
-  // Le lien du menu change seulement l'ancre quand on est déjà sur le village : on suit l'ancre.
-  useEffect(() => {
-    if (route[1] === 'hotel') setSelected('townhall');
-  }, [route[1]]);
+  const [, go] = useRoute();
+  const [selected, setSelected] = useState<BuildingKey | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
   if (!v) return <p className="muted">Chargement du village…</p>;
@@ -169,7 +163,7 @@ export default function VillageView() {
             key={k}
             className={`spot ${selected === k ? 'selected' : ''} ${levels[k] > v.buildings[k] ? 'building' : ''}`}
             style={{ left: `${SPOTS[k].x}%`, top: `${SPOTS[k].y}%`, width: `${SPOT_WIDTH}%`, zIndex: Math.round(SPOTS[k].y) }}
-            onClick={() => setSelected(selected === k ? null : k)}
+            onClick={() => (k === 'townhall' ? go('hotel') : setSelected(selected === k ? null : k))}
             aria-label={`${BUILDINGS[k].name}, niveau ${v.buildings[k]}`}
           >
             <img src={buildingImg(k, v.buildings[k])} alt="" />
@@ -181,8 +175,7 @@ export default function VillageView() {
         ))}
       </div>
 
-      {selected && selected !== 'townhall' && <BuildingPanel v={v} k={selected} onClose={() => setSelected(null)} />}
-      {selected === 'townhall' && <TownHall v={v} onClose={() => (setSelected(null), route[1] === 'hotel' && go('village'))} />}
+      {selected && <BuildingPanel v={v} k={selected} onClose={() => setSelected(null)} />}
 
       <Quests />
 

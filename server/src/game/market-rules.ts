@@ -8,6 +8,8 @@ import { OFFER_LIFETIME_HOURS, MIN_RATE, MAX_RATE, MIN_OFFER_AMOUNT, MAX_PLAYER_
 /** Au-dessus de cette part de l'entrepôt, une ressource est en excédent pour un PNJ ; en dessous de la seconde, en manque. */
 export const SURPLUS_SHARE = 0.7;
 export const SHORTAGE_SHARE = 0.25;
+/** Sans excédent, un PNJ ne paie qu'avec une ressource qui reste au moins à moitié pleine après l'échange. */
+const HALF_FULL = 0.5;
 
 /** Une offre est équilibrée si le taux (demandé / donné) reste entre 0,5 et 2. */
 export function rateOk(give: number, want: number): boolean {
@@ -46,14 +48,17 @@ export function planOffer(npc: NpcStock, profile: 'builder' | 'raider' | 'conque
   return rateOk(giveAmount, wantAmount) ? { give, giveAmount, want, wantAmount } : null;
 }
 
-/** Un PNJ accepte une offre qui lui apporte une ressource en manque contre une en excédent, sans le laisser à court. */
+/**
+ * Un PNJ accepte une offre qui lui apporte une ressource en manque contre une ressource dont il n'a pas besoin (en excédent, ou à défaut assez
+ * remplie pour que le paiement ne l'appauvrisse pas), sans le laisser à court. Il vérifie donc les offres existantes avant d'en publier une.
+ */
 export function npcAccepts(npc: NpcStock, offer: { give: Resource; giveAmount: number; want: Resource; wantAmount: number }): boolean {
   const { surplus, shortage } = marketNeeds(npc);
   // « give » est ce que le PNJ reçoit, « want » ce qu'il paie.
-  if (!shortage.includes(offer.give) || !surplus.includes(offer.want)) return false;
+  if (!shortage.includes(offer.give) || shortage.includes(offer.want)) return false;
   if (npc.stock[offer.want] < offer.wantAmount) return false;
   const left = (npc.stock[offer.want] - offer.wantAmount) / npc.capacity;
-  if (left < SURPLUS_SHARE - 0.25) return false;
+  if (left < (surplus.includes(offer.want) ? SURPLUS_SHARE - 0.25 : HALF_FULL)) return false;
   // Le taux ne doit pas lui être trop défavorable.
   return offer.giveAmount / offer.wantAmount >= 0.9;
 }
