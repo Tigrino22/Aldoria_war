@@ -38,6 +38,7 @@ import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { launchDueOrders } from './orders';
 import { createReport } from './reports';
+import { recordBattle } from './war-stats';
 import { VillageRow, addTroops, busyMerchants, getTroops, loadVillage, resourcesOf, saveVillage, setTroops, syncVillage } from './village';
 
 let rng: () => number = Math.random;
@@ -458,6 +459,7 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
     });
   }
   await saveVillage(c, target);
+  await recordBattle(c, { attackerId, defenderId: previousOwner, attackerWins: result.attackerWins, conquered, village: target, at });
 
   const attackerName = await playerName(c, attackerId);
   const defenderName = await playerName(c, previousOwner);

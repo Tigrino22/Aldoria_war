@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin';
 import marketRoutes from './routes/market';
 import questRoutes from './routes/quests';
 import socialRoutes from './routes/social';
+import statsRoutes from './routes/stats';
 import villageRoutes from './routes/village';
 
 export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] } = {}) {
@@ -65,6 +66,7 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   await app.register(adminRoutes);
   await app.register(questRoutes);
   await app.register(socialRoutes);
+  await app.register(statsRoutes);
 
   // En production, le même serveur distribue aussi le site (le client utilise des routes en #, donc
   // tout chemin inconnu hors /api renvoie la page d'accueil).

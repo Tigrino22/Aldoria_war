@@ -1,0 +1,50 @@
+/* Classement de guerre */
+.wr-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-block: 6px; }
+.wr-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; padding: 22px 10px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); min-width: 0; }
+.wr-card.me { outline: 2px solid var(--accent); }
+.wr-card.gold { border-color: var(--gold); background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 22%, var(--panel-2)), var(--panel-2)); }
+.wr-card.silver { border-color: #9aa3ad; background: linear-gradient(180deg, color-mix(in srgb, #9aa3ad 22%, var(--panel-2)), var(--panel-2)); }
+.wr-card.bronze { border-color: #a8693a; background: linear-gradient(180deg, color-mix(in srgb, #a8693a 22%, var(--panel-2)), var(--panel-2)); }
+.wr-rank { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 14px var(--display); color: #fff; background: var(--muted); box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); }
+.wr-card.gold .wr-rank { background: var(--gold); }
+.wr-card.silver .wr-rank { background: #8a939d; }
+.wr-card.bronze .wr-rank { background: #a8693a; }
+.wr-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-score { font: 700 26px var(--display); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.wr-score-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.wr-mini { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.wr-tag { color: var(--muted); }
+.wr-npc { margin-left: 6px; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); vertical-align: middle; }
+.wr-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.wr-table .wr-total { font-weight: 700; }
+.wr-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.wr-feed li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.wr-feed li:last-child { border-bottom: 0; }
+.wr-feed i { flex: none; font-style: normal; white-space: nowrap; }
+.wr-vs { color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) {
+  .wr-podium { grid-template-columns: 1fr; gap: 18px; padding-top: 8px; }
+  .wr-card { flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; text-align: left; padding: 12px 12px 12px 44px; }
+  .wr-rank { top: 50%; left: 14px; transform: translateY(-50%); }
+  .wr-name { flex: 1 1 100%; }
+  .wr-score { font-size: 22px; }
+  .wr-score-label { flex: 1; padding-left: 8px; }
+  .wr-mini { flex: 1 1 100%; margin: 0; }
+  /* Tableau : chaque ligne devient une carte (rang, nom et score, puis quatre chiffres sur une ligne). */
+  .wr-table thead { display: none; }
+  .wr-table tr { display: grid; grid-template-columns: 28px repeat(4, minmax(0, 1fr)); gap: 6px 8px; padding: 10px 4px; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .wr-table td { border: 0; padding: 0; text-align: left; }
+  .wr-table td:nth-child(1) { grid-column: 1; grid-row: 1; color: var(--muted); }
+  .wr-table td.wr-who { grid-column: 2 / 5; grid-row: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .wr-table td.wr-total { grid-column: 5; grid-row: 1; font-size: 18px; text-align: right; }
+  .wr-table td[data-label] { grid-row: 2; font-size: 14px; }
+  .wr-table td[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .wr-table td[data-label]:nth-child(3) { grid-column: 2; }
+  .wr-table td[data-label]:nth-child(4) { grid-column: 3; }
+  .wr-table td[data-label]:nth-child(5) { grid-column: 4; }
+  .wr-table td[data-label]:nth-child(6) { grid-column: 5; text-align: right; }
+  .wr-hide-m { display: none; }
+}
+
+.wr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 800px) { .wr-grid { grid-template-columns: 1fr; } }
