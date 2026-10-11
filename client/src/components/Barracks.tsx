@@ -5,7 +5,9 @@ import {
   UNITS,
   UNIT_KEYS,
   type BuildingKey,
+  type UnitCounts,
   type UnitKey,
+  emptyUnits,
   meetsRequirements,
   recruitTime,
   resourceProduction,
@@ -44,6 +46,19 @@ export default function Barracks() {
     return Math.max(0, max);
   };
 
+  // Effectifs du village : présents, en formation, et partis (attaque, renfort en route, retour, stationnés ailleurs).
+  const training = emptyUnits();
+  for (const q of v.recruitQueue) training[q.unit] += q.count - q.delivered;
+  const away = emptyUnits();
+  const addAway = (units: UnitCounts | null) => {
+    if (units) for (const k of UNIT_KEYS) away[k] += units[k];
+  };
+  for (const c of v.outgoing) if (c.type === 'attack' || c.type === 'support') addAway(c.units);
+  for (const c of v.incoming) if (c.type === 'return') addAway(c.units);
+  for (const g of v.supportAway) addAway(g.units);
+  const total = (k: UnitKey) => v.troopsHome[k] + training[k] + away[k];
+  const owned = UNIT_KEYS.filter((k) => total(k) > 0);
+
   const recruit = (k: UnitKey) =>
     run(async () => {
       const count = Number(counts[k]);
@@ -57,6 +72,41 @@ export default function Barracks() {
         <p className="muted small">
           Blé disponible pour de nouvelles troupes : <b>{fmt(freeWheat)}</b> par heure (à vitesse x1). Améliorez la ferme pour nourrir une plus grande armée.
         </p>
+        <h3>Troupes du village</h3>
+        {owned.length ? (
+          <div className="table-wrap">
+            <table className="troop-table barracks-troops">
+              <thead>
+                <tr>
+                  <th>Unité</th>
+                  <th>Au village</th>
+                  <th>En formation</th>
+                  <th title="En attaque, en renfort ou sur le chemin du retour">Dehors</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {owned.map((k) => (
+                  <tr key={k}>
+                    <td>
+                      <span className="row nowrap" title={UNITS[k].name}>
+                        <UnitIcon unit={k} size={24} /> <span className="unit-name">{UNITS[k].name}</span>
+                      </span>
+                    </td>
+                    <td>
+                      <b>{fmt(v.troopsHome[k])}</b>
+                    </td>
+                    <td className={training[k] ? '' : 'muted'}>{fmt(training[k])}</td>
+                    <td className={away[k] ? '' : 'muted'}>{fmt(away[k])}</td>
+                    <td>{fmt(total(k))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted">Le village n'a encore aucune troupe.</p>
+        )}
         <div className="unit-cards">
           {UNIT_KEYS.map((k) => {
             const def = UNITS[k];
@@ -71,7 +121,18 @@ export default function Barracks() {
                     <h3>{def.name}</h3>
                     <p className="muted small">{def.description}</p>
                   </div>
+                  <div className="unit-owned" title="Troupes présentes au village">
+                    <b>{fmt(v.troopsHome[k])}</b>
+                    <span>au village</span>
+                  </div>
                 </header>
+                {(training[k] > 0 || away[k] > 0) && (
+                  <p className="muted small unit-owned-more">
+                    {training[k] > 0 && <>+{fmt(training[k])} en formation</>}
+                    {training[k] > 0 && away[k] > 0 && ' · '}
+                    {away[k] > 0 && <>{fmt(away[k])} hors du village</>}
+                  </p>
+                )}
                 <dl className="stats">
                   <div><dt>Attaque</dt><dd>{def.attack}</dd></div>
                   <div><dt>Déf. infanterie</dt><dd>{def.defenseInfantry}</dd></div>

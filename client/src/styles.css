@@ -203,6 +203,16 @@ textarea { width: 100%; resize: vertical; }
 .unit-card { border: 1px solid var(--line); background: var(--panel-2); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .unit-card header { display: flex; gap: 10px; align-items: center; }
 .unit-card.locked { opacity: 0.7; }
+.unit-card header > div:nth-child(2) { flex: 1; min-width: 0; }
+.unit-owned { display: flex; flex-direction: column; align-items: center; min-width: 64px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.unit-owned b { font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.unit-owned span { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.unit-owned-more { margin: -4px 0 0; }
+.barracks-troops { margin-bottom: 12px; }
+@media (max-width: 600px) {
+  .barracks-troops th, .barracks-troops td { padding: 6px 4px; font-size: 13px; }
+  .barracks-troops .unit-name { display: none; }
+}
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; margin: 0; }
 .stats div { display: flex; flex-direction: column; }
 .stats dt { font-size: 11px; color: var(--muted); }
