@@ -5,7 +5,8 @@ import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { sendCommand } from '../src/game/commands';
 import { createNpc, ensureDailyNpc, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
-import { alertAttackedNpcs } from '../src/game/npc-tribes';
+import { alertAttackedNpcs, grudgesOf } from '../src/game/npc-tribes';
+import { env } from '../src/env';
 import { createVillage, setTroops } from '../src/game/village';
 
 const HOUR = 3_600_000;
@@ -67,6 +68,28 @@ describe('PNJ agressifs', () => {
     const revenge = await attacksOn(npc, base);
     expect(revenge).toHaveLength(1);
     expect(revenge[0].swordsman).toBeGreaterThan(0);
+  });
+
+  it('la riposte se désactive à chaud : le PNJ attaqué n’en veut plus à personne et n’est plus réveillé', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
+    const player = await makePlayer('Vindicatif');
+    const base = await villageOf(player, home.x + 2, home.y - 2, { swordsman: 20 });
+    await pool.query('UPDATE players SET protection_until = NULL');
+    await tx((c) => sendCommand(c, new Outbox(), player, base, { type: 'attack', targetId: home.id, units: { swordsman: 20 } }, NOON));
+    await pool.query('UPDATE players SET npc_next_action_at = $2 WHERE id = $1', [npc, new Date(NOON.getTime() + 10 * HOUR)]);
+
+    env.npcRevenge = 0;
+    try {
+      expect(await tx((c) => grudgesOf(c, npc, null, NOON))).toEqual([]);
+      await alertAttackedNpcs(NOON);
+      const asleep = (await pool.query('SELECT npc_next_action_at FROM players WHERE id = $1', [npc])).rows[0].npc_next_action_at;
+      expect(new Date(asleep).getTime()).toBeGreaterThan(NOON.getTime());
+    } finally {
+      env.npcRevenge = 1;
+    }
+    expect(await tx((c) => grudgesOf(c, npc, null, NOON))).toEqual([player]);
   });
 
   it('un PNJ attaqué ne riposte pas pendant les heures calmes', async () => {

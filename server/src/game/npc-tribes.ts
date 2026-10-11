@@ -132,6 +132,8 @@ export const GRUDGE_DAYS = 3;
 
 /** Joueurs qui ont attaqué ce PNJ, sa tribu ou une tribu alliée au cours des 3 derniers jours : le PNJ leur en veut. */
 export async function grudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, now: Date): Promise<number[]> {
+  // Riposte désactivée depuis l'administration : aucun PNJ n'en veut à personne.
+  if (!env.npcRevenge) return [];
   const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];
   const { rows } = await c.query(
     `SELECT DISTINCT cm.player_id FROM commands cm
@@ -149,6 +151,7 @@ export async function grudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, n
  * sans attendre sa prochaine réflexion. Chaque attaque n'est signalée qu'une fois.
  */
 export async function alertAttackedNpcs(now: Date) {
+  if (!env.npcRevenge) return;
   const { rows } = await pool.query(
     `SELECT cm.id, o.id AS owner_id, o.npc_state FROM commands cm
      JOIN villages v ON v.id = cm.target_village_id

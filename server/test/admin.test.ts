@@ -28,12 +28,19 @@ describe('administration', () => {
     expect(env.npcQuietStart).toBe(23);
     expect((await pool.query('SELECT value FROM world_settings WHERE key = $1', ['npcDifficulty'])).rows[0].value).toBe('1.5');
 
+    const off = await put(chef, { npcRevenge: false });
+    expect(off.statusCode).toBe(200);
+    expect(env.npcRevenge).toBe(0);
+    expect(off.json().find((s: { key: string }) => s.key === 'npcRevenge').value).toBe(0);
+    expect((await put(chef, { npcRevenge: 'oui' })).statusCode).toBe(200);
+    expect(env.npcRevenge).toBe(1);
+
     for (const bad of [{ npcDifficulty: 10 }, { npcQuietStart: 1.5 }, { npcTimezone: 'Mars/Olympus' }, { vitesse: 5 }]) {
       expect((await put(chef, bad)).statusCode, JSON.stringify(bad)).toBe(400);
     }
     expect(env.npcDifficulty).toBe(1.5);
 
-    const reset = await put(chef, { npcDifficulty: null, npcQuietStart: null });
+    const reset = await put(chef, { npcDifficulty: null, npcQuietStart: null, npcRevenge: null });
     expect(reset.statusCode).toBe(200);
     expect(env.npcDifficulty).toBe(before);
     expect((await pool.query('SELECT count(*)::int AS n FROM world_settings')).rows[0].n).toBe(0);

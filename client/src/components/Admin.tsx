@@ -56,7 +56,7 @@ interface AdminSetting {
   key: string;
   label: string;
   help: string;
-  type: 'number' | 'integer' | 'text';
+  type: 'number' | 'integer' | 'text' | 'boolean';
   min: number | null;
   max: number | null;
   value: number | string;
@@ -80,6 +80,7 @@ const SETTING_LABEL: Record<string, string> = {
   worldSpeed: 'Vitesse du monde',
   mapSize: 'Taille de la carte',
   npcCount: 'Nombre de PNJ',
+  npcRevenge: 'Riposte des PNJ',
   npcDifficulty: 'Difficulté des PNJ',
   npcTimezone: 'Fuseau des heures calmes',
   quietHours: 'Heures calmes',
@@ -123,7 +124,7 @@ export default function Admin() {
     if (tab === 'world' && !settings) run(async () => setSettings(await api<AdminSetting[]>('/api/admin/settings')));
   }, [tab, settings, run]);
 
-  const saveSettings = (values: Record<string, string | null>, done: string) =>
+  const saveSettings = (values: Record<string, string | number | null>, done: string) =>
     run(async () => {
       setSettings(await api<AdminSetting[]>('/api/admin/settings', { method: 'PUT', body: values }));
       setDraft({});
@@ -427,6 +428,28 @@ export default function Admin() {
             ) : (
               <div className="admin-settings">
                 {settings.map((st) => {
+                  if (st.type === 'boolean') {
+                    const on = Number(st.value) > 0;
+                    return (
+                      <div key={st.key} className="admin-setting">
+                        <span>
+                          <b>{st.label}</b>
+                          <i className="muted small">{st.help}</i>
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={on}
+                          aria-label={st.label}
+                          className={`switch ${on ? 'on' : ''}`}
+                          onClick={() => saveSettings({ [st.key]: on ? 0 : 1 }, on ? `${st.label} : désactivée` : `${st.label} : activée`)}
+                        >
+                          <span className="switch-knob" />
+                          <span className="switch-label">{on ? 'Activée' : 'Désactivée'}</span>
+                        </button>
+                      </div>
+                    );
+                  }
                   const shown = draft[st.key] ?? String(st.value);
                   const changed = String(st.value) !== String(st.default);
                   return (
