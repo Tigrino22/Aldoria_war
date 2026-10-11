@@ -169,7 +169,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const stock = Object.fromEntries(RESOURCES.map((r) => [r, villages.reduce((sum, v) => sum + Number(v[r]), 0)]));
     const production = Object.fromEntries(RESOURCES.map((r) => [r, 0])) as Record<(typeof RESOURCES)[number], number>;
     for (const v of villages) {
-      const rates = productionRates(v.buildings as Buildings, 0, env.worldSpeed);
+      const rates = productionRates(v.buildings as Buildings, env.worldSpeed);
       for (const r of RESOURCES) production[r] += rates[r];
     }
     const resources = RESOURCES.map((resource) => ({ resource, total: stock[resource], perVillage: n ? stock[resource] / n : 0, perHour: production[resource] }));

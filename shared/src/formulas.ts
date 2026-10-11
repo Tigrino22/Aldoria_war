@@ -7,8 +7,8 @@ import {
   HIDDEN_SHARE,
   MERCHANT_CAPACITY,
   MERCHANT_SPEED,
-  RAMS_PER_WALL_LEVEL_DESTROYED,
-  RAMS_PER_WALL_LEVEL_IN_COMBAT,
+  POPULATION_BASE,
+  POPULATION_GROWTH,
   RESOURCES,
   Resources,
   UNITS,
@@ -20,7 +20,7 @@ import {
 
 export const emptyResources = (): Resources => ({ wood: 0, clay: 0, iron: 0, wheat: 0 });
 
-export const emptyUnits = (): UnitCounts => ({ spearman: 0, swordsman: 0, scout: 0, cavalry: 0, ram: 0, noble: 0 });
+export const emptyUnits = (): UnitCounts => ({ spearman: 0, halberdier: 0, swordsman: 0, scout: 0, cavalry: 0, ram: 0, noble: 0 });
 
 export function normalizeUnits(raw: Partial<UnitCounts> | null | undefined): UnitCounts {
   const units = emptyUnits();
@@ -77,17 +77,22 @@ export function warehouseCapacity(level: number): number {
 
 export const hiddenResources = (warehouseLevel: number) => Math.round(warehouseCapacity(warehouseLevel) * HIDDEN_SHARE);
 
-export function upkeepOf(units: UnitCounts): number {
-  return UNIT_KEYS.reduce((sum, k) => sum + units[k] * UNITS[k].upkeep, 0);
+export function populationOf(units: UnitCounts): number {
+  return UNIT_KEYS.reduce((sum, k) => sum + units[k] * UNITS[k].population, 0);
 }
 
-/** Production horaire réelle (vitesse du monde incluse). Le blé est net de l'entretien des troupes. */
-export function productionRates(buildings: Buildings, upkeep: number, worldSpeed: number): Resources {
+/** Population maximale (places d'armée) d'un village selon le niveau de sa ferme. */
+export function populationCapacity(farmLevel: number): number {
+  return farmLevel <= 0 ? 0 : Math.round(POPULATION_BASE * Math.pow(POPULATION_GROWTH, farmLevel - 1));
+}
+
+/** Production horaire réelle (vitesse du monde incluse). */
+export function productionRates(buildings: Buildings, worldSpeed: number): Resources {
   return {
     wood: resourceProduction(buildings.woodcutter) * worldSpeed,
     clay: resourceProduction(buildings.claypit) * worldSpeed,
     iron: resourceProduction(buildings.ironmine) * worldSpeed,
-    wheat: (resourceProduction(buildings.farm) - upkeep) * worldSpeed,
+    wheat: resourceProduction(buildings.farm) * worldSpeed,
   };
 }
 
@@ -140,12 +145,26 @@ export const merchantCount = (marketLevel: number) => (marketLevel <= 0 ? 0 : Ma
 export const merchantsNeeded = (res: Resources) =>
   Math.ceil(RESOURCES.reduce((sum, r) => sum + res[r], 0) / MERCHANT_CAPACITY);
 
-/** Niveau de muraille pris en compte pendant le combat, une fois les béliers passés. */
-export const wallDuringCombat = (wall: number, rams: number) => Math.max(0, wall - Math.floor(rams / RAMS_PER_WALL_LEVEL_IN_COMBAT));
+/**
+ * Niveau de muraille une fois abaissé par des béliers. L'abaissement est progressif : le niveau N coûte N béliers,
+ * en commençant par le niveau le plus haut (muraille 3 : 3 béliers pour passer à 2, puis 2 pour passer à 1, puis 1).
+ * Abattre entièrement une muraille de niveau N demande donc N × (N + 1) / 2 béliers.
+ */
+export function wallAfterRams(wall: number, rams: number): number {
+  let level = Math.max(0, Math.floor(wall));
+  let left = Math.max(0, Math.floor(rams));
+  while (level > 0 && left >= level) {
+    left -= level;
+    level -= 1;
+  }
+  return level;
+}
 
-/** Niveau de muraille après une victoire, selon les béliers survivants. */
-export const wallAfterRams = (wall: number, survivingRams: number) =>
-  Math.max(0, wall - Math.floor(survivingRams / RAMS_PER_WALL_LEVEL_DESTROYED));
+/** Niveau de muraille pris en compte pendant le combat, une fois les béliers passés. */
+export const wallDuringCombat = (wall: number, rams: number) => wallAfterRams(wall, rams);
+
+/** Béliers nécessaires pour abattre entièrement une muraille de ce niveau. */
+export const ramsToBreakWall = (wall: number) => (wall * (wall + 1)) / 2;
 
 /** Pertes d'éclaireurs : tous si la défense en a autant ou plus, sinon (défense / attaque)^1.5. */
 export function scoutLosses(attacking: number, defending: number): number {

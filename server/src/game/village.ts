@@ -22,12 +22,13 @@ import {
   meetsRequirements,
   merchantCount,
   normalizeUnits,
+  populationCapacity,
   productionRates,
   recruitTime,
   resourceProduction,
   scaleResources,
   totalUnits,
-  upkeepOf,
+  populationOf,
   villagePoints,
   warehouseCapacity,
 } from '@aldoria/shared';
@@ -99,25 +100,25 @@ export async function addTroops(c: Db, villageId: number, homeId: number, units:
   await setTroops(c, villageId, homeId, addUnits(current, units));
 }
 
-/** Entretien (blé par heure) de toutes les troupes appartenant au village, où qu'elles soient, y compris en recrutement. */
-export async function computeUpkeep(c: Db, villageId: number): Promise<number> {
+/** Population occupée par toutes les troupes appartenant au village, où qu'elles soient, y compris en recrutement. */
+export async function computePopulation(c: Db, villageId: number): Promise<number> {
   const { rows } = await c.query(
     `SELECT units FROM troops WHERE home_village_id = $1
      UNION ALL SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed`,
     [villageId],
   );
-  let upkeep = rows.reduce((sum, r) => sum + upkeepOf(normalizeUnits(r.units)), 0);
+  let population = rows.reduce((sum, r) => sum + populationOf(normalizeUnits(r.units)), 0);
   const queue = await c.query('SELECT unit, count - delivered AS remaining FROM recruit_queue WHERE village_id = $1', [villageId]);
-  for (const r of queue.rows) upkeep += UNITS[r.unit as UnitKey].upkeep * Number(r.remaining);
-  return upkeep;
+  for (const r of queue.rows) population += UNITS[r.unit as UnitKey].population * Number(r.remaining);
+  return population;
 }
 
 // ---------- Synchronisation dans le temps ----------
 
-function produce(v: VillageRow, from: Date, to: Date, upkeep: number) {
+function produce(v: VillageRow, from: Date, to: Date) {
   const hours = (to.getTime() - from.getTime()) / 3_600_000;
   if (hours <= 0) return;
-  const rates = productionRates(v.buildings, upkeep, env.worldSpeed);
+  const rates = productionRates(v.buildings, env.worldSpeed);
   const cap = warehouseCapacity(v.buildings.warehouse);
   for (const r of RESOURCES) {
     const next = v[r] + rates[r] * hours;
@@ -134,7 +135,6 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
   const v = await loadVillage(c, id, true);
   if (at.getTime() <= new Date(v.resources_at).getTime()) return v;
   const start = new Date(v.resources_at);
-  const upkeep = await computeUpkeep(c, id);
 
   const builds = await c.query(
     'SELECT id, building, level, finish_at FROM build_queue WHERE village_id = $1 AND finish_at <= $2 ORDER BY finish_at, id',
@@ -142,13 +142,13 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
   );
   let t = start;
   for (const b of builds.rows) {
-    produce(v, t, b.finish_at, upkeep);
+    produce(v, t, b.finish_at);
     const key = b.building as BuildingKey;
     v.buildings[key] = Math.max(v.buildings[key], b.level);
     t = b.finish_at;
   }
   if (builds.rows.length) await c.query('DELETE FROM build_queue WHERE id = ANY($1)', [builds.rows.map((b) => b.id)]);
-  produce(v, t, at, upkeep);
+  produce(v, t, at);
 
   const hours = (at.getTime() - start.getTime()) / 3_600_000;
   v.loyalty = Math.min(100, v.loyalty + hours * LOYALTY_REGEN_PER_HOUR * env.worldSpeed);
@@ -302,9 +302,9 @@ export async function enqueueRecruit(c: Db, villageId: number, unit: UnitKey, co
   const v = await syncVillage(c, villageId, now);
   if (!meetsRequirements(v.buildings, def.requires)) throw new GameError('Conditions non remplies pour cette unité');
 
-  const upkeep = await computeUpkeep(c, villageId);
-  if (resourceProduction(v.buildings.farm) - upkeep - def.upkeep * count < 0) {
-    throw new GameError('Votre ferme ne produit pas assez de blé pour nourrir ces troupes');
+  const population = await computePopulation(c, villageId);
+  if (population + def.population * count > populationCapacity(v.buildings.farm)) {
+    throw new GameError('Votre ferme ne peut pas loger ces troupes : améliorez-la pour agrandir la population');
   }
   pay(v, scaleResources(def.cost, count));
 
@@ -362,7 +362,7 @@ export function toCommandView(r: any, showUnits: boolean): CommandView {
 }
 
 export async function villageState(c: Db, v: VillageRow, viewerId: number): Promise<VillageState> {
-  const upkeep = await computeUpkeep(c, v.id);
+  const population = await computePopulation(c, v.id);
   const buildQueue = (await c.query('SELECT * FROM build_queue WHERE village_id = $1 ORDER BY finish_at, id', [v.id])).rows;
   const recruitQueue = (await c.query('SELECT * FROM recruit_queue WHERE village_id = $1 ORDER BY start_at, id', [v.id])).rows;
   const incoming = (await c.query(`${COMMAND_SELECT} WHERE c.target_village_id = $1 AND NOT c.processed ORDER BY c.arrive_at`, [v.id]))
@@ -381,7 +381,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     points: v.points,
     loyalty: Math.floor(v.loyalty),
     resources: resourcesOf(v),
-    rates: productionRates(v.buildings, upkeep, env.worldSpeed),
+    rates: productionRates(v.buildings, env.worldSpeed),
     capacity: warehouseCapacity(v.buildings.warehouse),
     syncedAt: new Date(v.resources_at).toISOString(),
     buildings: v.buildings,
@@ -395,7 +395,8 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
       unitSeconds: q.unit_seconds,
       queuedAt: new Date(q.queued_at).toISOString(),
     })),
-    upkeep,
+    population,
+    populationMax: populationCapacity(v.buildings.farm),
     troopsHome: await getTroops(c, v.id, v.id),
     supportHere: await troopGroups(c, 'here', v.id),
     supportAway: await troopGroups(c, 'away', v.id),

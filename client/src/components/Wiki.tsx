@@ -17,8 +17,7 @@ import {
   OFFER_LIFETIME_HOURS,
   NOBLE_LOYALTY_MAX,
   NOBLE_LOYALTY_MIN,
-  RAMS_PER_WALL_LEVEL_DESTROYED,
-  RAMS_PER_WALL_LEVEL_IN_COMBAT,
+  ramsToBreakWall,
   RESOURCES,
   RESOURCE_NAMES,
   STARTING_BUILDINGS,
@@ -31,6 +30,7 @@ import {
   hiddenResources,
   merchantCount,
   recruitTime,
+  populationCapacity,
   resourceProduction,
   villagePoints,
   wallBonus,
@@ -52,7 +52,7 @@ const SECTIONS = [
   { id: 'debuter', title: 'Bien débuter' },
   { id: 'ressources', title: 'Ressources et production' },
   { id: 'construction', title: 'Construction' },
-  { id: 'armee', title: 'Recrutement et entretien' },
+  { id: 'armee', title: 'Recrutement et population' },
   { id: 'combat', title: 'Attaque, combat et pillage' },
   { id: 'pillage', title: 'Assistant de pillage' },
   { id: 'espionnage', title: 'Espionnage' },
@@ -108,7 +108,7 @@ function bonusAt(key: BuildingKey, level: number, speed: number): string {
 
 function bonusSummary(key: BuildingKey, speed: number): string {
   if (RESOURCE_BUILDING[key]) {
-    const extra = key === 'farm' ? " Le blé nourrit aussi l'armée : l'entretien des troupes est retiré de cette production." : '';
+    const extra = key === 'farm' ? " La ferme loge aussi l'armée : ${fmt(populationCapacity(1))} places de population au niveau 1, ${fmt(populationCapacity(20))} au niveau 20." : '';
     return `Produit ${fmt(resourceProduction(1) * speed)} ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} par heure au niveau 1, ${fmt(resourceProduction(20) * speed)} au niveau 20 (sans bâtiment : ${fmt(resourceProduction(0) * speed)} par heure).${extra}`;
   }
   switch (key) {
@@ -124,7 +124,7 @@ function bonusSummary(key: BuildingKey, speed: number): string {
 function unitNote(key: UnitKey): string | null {
   switch (key) {
     case 'scout': return "Envoyé seul, il espionne au lieu de combattre. Accompagnant une attaque victorieuse, les éclaireurs survivants rapportent ce qu'il reste dans le village.";
-    case 'ram': return `Pendant le combat, la muraille perd 1 niveau tous les ${RAMS_PER_WALL_LEVEL_IN_COMBAT} béliers. Après une victoire, chaque groupe de ${RAMS_PER_WALL_LEVEL_DESTROYED} béliers survivants détruit 1 niveau de muraille.`;
+    case 'ram': return `Abaisse la muraille de façon progressive : 1 bélier pour le niveau 1, 2 pour le niveau 2, et ainsi de suite (niveau 20 : ${ramsToBreakWall(20)} béliers au total). Les niveaux sont retirés en partant du plus haut, pendant le combat puis, avec les béliers survivants, après une victoire.`;
     case 'noble': return `Chaque noble survivant d'une attaque victorieuse fait baisser la loyauté de ${NOBLE_LOYALTY_MIN} à ${NOBLE_LOYALTY_MAX} points. À 0, le village est conquis.`;
     default: return null;
   }
@@ -224,7 +224,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           Un bâtiment de ressource produit {fmt(resourceProduction(1) * s)} par heure au niveau 1 et +20 % par niveau, jusqu'à {fmt(resourceProduction(20) * s)} par heure au niveau 20.
         </p>
         <p>
-          <b>Le blé</b> nourrit vos troupes : la production affichée est nette de l'entretien de toute votre armée (troupes au village, en renfort, en route et en recrutement). Si elle devient négative, le stock baisse jusqu'à 0.
+          <b>Le blé</b> sert à construire et à recruter. Il ne nourrit pas l'armée : la taille de vos troupes est limitée par la population que loge votre {B('farm')}.
         </p>
         <p>
           <b>Stockage :</b> l'{B('warehouse')} fixe le maximum de chaque ressource ({fmt(warehouseCapacity(1))} au niveau 1, {fmt(warehouseCapacity(20))} au niveau 20). Une ressource pleine ne produit plus, tout ce qui
@@ -253,12 +253,12 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>Chaque unité demande un niveau de caserne (et parfois d'autres bâtiments) : voir les <a href="#/wiki/troupes">fiches des troupes</a>.</li>
           <li>Chaque niveau de caserne au-delà du premier réduit de 6 % la durée de recrutement.</li>
           <li>
-            <b>Entretien :</b> chaque unité consomme du blé par heure. On ne peut recruter que si la production de la {B('farm')} couvre l'entretien de toute l'armée, recrues comprises
-            (les valeurs de la caserne sont données à vitesse x1).
+            <b>Population :</b> chaque unité occupe des places de population, offertes par la {B('farm')}. On ne peut recruter que s'il reste assez de places pour toute l'armée,
+            recrues et troupes parties au combat comprises. Le blé reste une ressource comme les autres.
           </li>
           <li>
             <b>Dissolution :</b> depuis le Point de ralliement, le bouton « Dissoudre » renvoie des soldats stationnés dans le village à la vie civile. L'action est définitive et ne rembourse rien,
-            mais le blé qu'ils consommaient est immédiatement libéré. Seules les troupes présentes au village peuvent être dissoutes (pas celles en mouvement ni en renfort chez un autre).
+            mais les places de population qu'ils occupaient sont immédiatement libérées. Seules les troupes présentes au village peuvent être dissoutes (pas celles en mouvement ni en renfort chez un autre).
           </li>
           <li>
             <b>Assistant de pillage :</b> une page dédiée pour piller les villages barbares en un clic, avec deux modèles de troupes. Voir <a href="#/wiki/pillage">le guide de l'assistant de pillage</a>.
@@ -346,8 +346,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
         <p>La {B('wall')} ajoute +{pct(WALL_BONUS_PER_LEVEL)} de défense par niveau (+{pct(wallBonus(20) - 1)} au niveau 20) à toutes les troupes du village.</p>
         <p>Les {U('ram')}s servent à la contourner :</p>
         <ul>
-          <li>Pendant le combat, la muraille compte 1 niveau de moins tous les {RAMS_PER_WALL_LEVEL_IN_COMBAT} béliers envoyés.</li>
-          <li>Après une victoire, chaque groupe de {RAMS_PER_WALL_LEVEL_DESTROYED} béliers survivants détruit réellement 1 niveau de muraille (le défenseur perd aussi les points correspondants).</li>
+          <li>Le coût est progressif : le niveau N de muraille demande N béliers, en partant du niveau le plus haut. Une muraille de niveau 3 tombe d'un niveau avec 3 béliers, puis d'un autre avec 2, puis le dernier avec 1.</li>
+          <li>Abattre une muraille de niveau 10 demande {ramsToBreakWall(10)} béliers, de niveau 20 : {ramsToBreakWall(20)}.</li>
+          <li>Pendant le combat, la muraille compte ces niveaux en moins pour les béliers envoyés.</li>
+          <li>Après une victoire, les béliers survivants détruisent réellement ces niveaux (le défenseur perd aussi les points correspondants).</li>
         </ul>
       </>
     ),
@@ -368,7 +370,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
         <p>« Envoyer un renfort » envoie des troupes défendre un autre village : un des vôtres ou celui d'un allié.</p>
         <ul>
           <li>Les renforts combattent avec la garnison et profitent de la muraille du village qui les accueille.</li>
-          <li>Leur entretien en blé reste à la charge de leur village d'origine.</li>
+          <li>Leurs places de population restent occupées dans leur village d'origine.</li>
           <li>Depuis la page Troupes, vous pouvez rappeler vos renforts, ou renvoyer chez eux ceux qu'on vous a envoyés.</li>
           <li>Pour vos propres villages, utilisez toujours le renfort : on ne peut pas attaquer ses propres villages.</li>
         </ul>
@@ -587,7 +589,7 @@ function UnitIndex() {
               <th>Déf. inf.</th>
               <th>Déf. cav.</th>
               <th>Butin</th>
-              <th>Entretien</th>
+              <th>Population</th>
             </tr>
           </thead>
           <tbody>
@@ -604,7 +606,7 @@ function UnitIndex() {
                   <td>{u.defenseInfantry}</td>
                   <td>{u.defenseCavalry}</td>
                   <td>{u.carry}</td>
-                  <td>{u.upkeep} blé/h</td>
+                  <td>{u.population}</td>
                 </tr>
               );
             })}
@@ -637,7 +639,7 @@ function UnitSheet({ k }: { k: UnitKey }) {
         <div><dt>Défense contre la cavalerie</dt><dd>{u.defenseCavalry}</dd></div>
         <div><dt>Vitesse</dt><dd>{duration((u.speed * 60) / world.speed)} par case</dd></div>
         <div><dt>Butin transporté</dt><dd>{u.carry}</dd></div>
-        <div><dt>Entretien</dt><dd>{u.upkeep} blé / h</dd></div>
+        <div><dt>Population</dt><dd>{u.population}</dd></div>
       </dl>
       <h3>Durée de recrutement (vitesse x{world.speed})</h3>
       <div className="table-wrap">

@@ -27,7 +27,7 @@ import {
   resolveCombat,
   subtractUnits,
   totalUnits,
-  upkeepOf,
+  populationOf,
   travelTime,
   villagePoints,
   warehouseCapacity,
@@ -306,7 +306,7 @@ async function handleScouting(c: Db, outbox: Outbox, cmd: any, target: VillageRo
       arriveAt: new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed) * 1000),
     });
   }
-  await addKills(c, target.owner_id, 'defense', upkeepOf(attackerLosses));
+  await addKills(c, target.owner_id, 'defense', populationOf(attackerLosses));
   const side = (v: VillageRow, name: string | null) => ({ playerName: name, village: { id: v.id, name: v.name, x: v.x, y: v.y } });
   const attackerName = await playerName(c, attackerId);
   const defenderName = await playerName(c, target.owner_id);
@@ -369,8 +369,8 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
 
   // Adversaires battus : l'attaquant gagne la valeur en blé des défenseurs tués, les défenseurs celle des attaquants tués.
   // Le second montant est réparti entre le propriétaire du village et ceux qui y ont des renforts, selon la valeur des troupes présentes.
-  await addKills(c, attackerId, 'attack', upkeepOf(defenderLossesTotal));
-  const killedByDefense = upkeepOf(result.attackerLosses);
+  await addKills(c, attackerId, 'attack', populationOf(defenderLossesTotal));
+  const killedByDefense = populationOf(result.attackerLosses);
   if (killedByDefense > 0) {
     const homeIds = [...new Set(defenderRows.map((r) => r.home_village_id as number))];
     const homeOwners = new Map<number, number | null>(
@@ -379,7 +379,7 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
     const weights = new Map<number, number>();
     defenderRows.forEach((r, i) => {
       const owner = r.home_village_id === target.id ? target.owner_id : homeOwners.get(r.home_village_id) ?? null;
-      if (owner) weights.set(owner, (weights.get(owner) ?? 0) + upkeepOf(defenders[i]));
+      if (owner) weights.set(owner, (weights.get(owner) ?? 0) + populationOf(defenders[i]));
     });
     if (target.owner_id && !weights.has(target.owner_id)) weights.set(target.owner_id, 0);
     const totalWeight = [...weights.values()].reduce((a, b) => a + b, 0);

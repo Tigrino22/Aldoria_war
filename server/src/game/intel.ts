@@ -5,7 +5,7 @@ import {
   normalizeUnits,
   productionRates,
   subtractUnits,
-  upkeepOf,
+  populationOf,
   warehouseCapacity,
   type AttackReportData,
   type Intel,
@@ -51,7 +51,7 @@ export function estimateLoot(
   const seen = (rows[base].data as { intel: Intel }).intel;
   const seenAt = new Date(rows[base].created_at);
   const hours = Math.max(0, (now.getTime() - seenAt.getTime()) / 3_600_000);
-  const rates = productionRates(seen.buildings, troops ? upkeepOf(troops) : 0, worldSpeed);
+  const rates = productionRates(seen.buildings, worldSpeed);
   const cap = warehouseCapacity(seen.buildings.warehouse);
   const hidden = hiddenResources(seen.buildings.warehouse);
   const taken = emptyResources();

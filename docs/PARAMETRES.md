@@ -77,7 +77,7 @@ Produit du fer. Prérequis : aucun. Coût x1.25 et durée x1.2 par niveau.
 | 20 | 5204 / 4510 / 4857 / 1735 | 3 h 11 |
 
 ### Ferme
-Produit du blé, qui nourrit aussi vos troupes. Prérequis : aucun. Coût x1.26 et durée x1.2 par niveau.
+Produit du blé et loge votre armée (population). Prérequis : aucun. Coût x1.26 et durée x1.2 par niveau.
 
 | Niveau | Coût | Durée |
 |---|---|---|
@@ -145,9 +145,10 @@ Chaque niveau d'hôtel de ville réduit toutes les durées de 5 % (niveau 20 : d
 
 ## Unités (vitesse x1)
 
-| Unité | Coût (bois / argile / fer / blé) | Entretien blé/h | Recrutement caserne 1 | caserne 10 | caserne 20 | Attaque | Déf. inf. | Déf. cav. | Vitesse (min/case) | Butin |
+| Unité | Coût (bois / argile / fer / blé) | Population | Recrutement caserne 1 | caserne 10 | caserne 20 | Attaque | Déf. inf. | Déf. cav. | Vitesse (min/case) | Butin |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Lancier | 50 / 30 / 10 / 20 | 1 | 3 min 00 | 1 min 43 | 56 s | 10 | 15 | 45 | 18 | 25 |
+| Hallebardier (caserne 4) | 40 / 30 / 50 / 20 | 1 | 4 min 00 | 2 min 17 | 1 min 14 | 15 | 45 | 25 | 20 | 10 |
 | Épéiste | 30 / 30 / 70 / 20 | 1 | 4 min 20 | 2 min 29 | 1 min 20 | 40 | 20 | 10 | 22 | 15 |
 | Éclaireur | 50 / 50 / 20 / 10 | 2 | 5 min 00 | 2 min 52 | 1 min 33 | 0 | 2 | 1 | 9 | 0 |
 | Cavalier | 125 / 100 / 250 / 40 | 4 | 10 min 00 | 5 min 44 | 3 min 05 | 120 | 30 | 40 | 10 | 80 |
@@ -155,6 +156,10 @@ Chaque niveau d'hôtel de ville réduit toutes les durées de 5 % (niveau 20 : d
 | Noble | 4000 / 5000 / 5000 / 2000 | 100 | 1 h 00 | 34 min 23 | 18 min 31 | 30 | 100 | 50 | 35 | 0 |
 
 Chaque niveau de caserne réduit le temps de recrutement de 6 %.
+
+**Population** : chaque unité occupe des places de population (colonne ci-dessus), recrues et troupes parties au combat comprises. La ferme en offre 240 au niveau 1, +17 % par niveau (environ 4 800 au niveau 20). Le blé ne nourrit plus l'armée : c'est une ressource comme les autres.
+
+**Béliers** : abaissement progressif de la muraille, le niveau N demande N béliers en partant du niveau le plus haut. Abattre une muraille de niveau N demande N × (N + 1) / 2 béliers (niveau 10 : 55, niveau 20 : 210). La règle vaut pendant le combat et, avec les survivants, après une victoire.
 
 ## Marché
 

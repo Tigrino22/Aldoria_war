@@ -81,7 +81,7 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
   },
   farm: {
     name: 'Ferme',
-    description: 'Produit du blé, qui nourrit aussi vos troupes.',
+    description: 'Produit du blé et loge votre armée : chaque niveau ajoute de la population.',
     maxLevel: 20,
     baseCost: { wood: 45, clay: 40, iron: 30, wheat: 0 },
     costFactor: 1.26,
@@ -148,7 +148,7 @@ export const STARTING_RESOURCES: Resources = { wood: 500, clay: 500, iron: 500, 
 /** Nombre maximum de constructions en file d'attente par village. */
 export const BUILD_QUEUE_LIMIT = 2;
 
-export const UNIT_KEYS = ['spearman', 'swordsman', 'scout', 'cavalry', 'ram', 'noble'] as const;
+export const UNIT_KEYS = ['spearman', 'halberdier', 'swordsman', 'scout', 'cavalry', 'ram', 'noble'] as const;
 export type UnitKey = (typeof UNIT_KEYS)[number];
 export type UnitCounts = Record<UnitKey, number>;
 
@@ -158,7 +158,8 @@ export interface UnitDef {
   kind: 'infantry' | 'cavalry';
   cost: Resources;
   /** Blé consommé par heure et par unité. */
-  upkeep: number;
+  /** Places de population occupées dans le village d'origine (limitées par la ferme). */
+  population: number;
   attack: number;
   defenseInfantry: number;
   defenseCavalry: number;
@@ -177,7 +178,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     description: 'Défenseur bon marché, redoutable contre la cavalerie.',
     kind: 'infantry',
     cost: { wood: 50, clay: 30, iron: 10, wheat: 20 },
-    upkeep: 1,
+    population: 1,
     attack: 10,
     defenseInfantry: 15,
     defenseCavalry: 45,
@@ -186,12 +187,26 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     time: 180,
     requires: { barracks: 1 },
   },
+  halberdier: {
+    name: 'Hallebardier',
+    description: "Le rempart contre l'infanterie : sa hallebarde arrête les épéistes.",
+    kind: 'infantry',
+    cost: { wood: 40, clay: 30, iron: 50, wheat: 20 },
+    population: 1,
+    attack: 15,
+    defenseInfantry: 45,
+    defenseCavalry: 25,
+    speed: 20,
+    carry: 10,
+    time: 240,
+    requires: { barracks: 4 },
+  },
   swordsman: {
     name: 'Épéiste',
     description: "L'attaquant polyvalent.",
     kind: 'infantry',
     cost: { wood: 30, clay: 30, iron: 70, wheat: 20 },
-    upkeep: 1,
+    population: 1,
     attack: 40,
     defenseInfantry: 20,
     defenseCavalry: 10,
@@ -205,7 +220,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     description: "Espionne un village : ressources, bâtiments et troupes. Envoyé seul, il ne combat pas.",
     kind: 'cavalry',
     cost: { wood: 50, clay: 50, iron: 20, wheat: 10 },
-    upkeep: 2,
+    population: 2,
     attack: 0,
     defenseInfantry: 2,
     defenseCavalry: 1,
@@ -219,7 +234,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     description: 'Rapide et capable de rapporter un gros butin.',
     kind: 'cavalry',
     cost: { wood: 125, clay: 100, iron: 250, wheat: 40 },
-    upkeep: 4,
+    population: 4,
     attack: 120,
     defenseInfantry: 30,
     defenseCavalry: 40,
@@ -233,7 +248,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     description: 'Abaisse la muraille pendant le combat et la détruit en partie après une victoire.',
     kind: 'infantry',
     cost: { wood: 300, clay: 200, iron: 200, wheat: 40 },
-    upkeep: 5,
+    population: 5,
     attack: 2,
     defenseInfantry: 20,
     defenseCavalry: 50,
@@ -247,7 +262,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     description: "Fait baisser la loyauté d'un village ennemi. À 0, le village est à vous.",
     kind: 'infantry',
     cost: { wood: 4000, clay: 5000, iron: 5000, wheat: 2000 },
-    upkeep: 100,
+    population: 100,
     attack: 30,
     defenseInfantry: 100,
     defenseCavalry: 50,
@@ -257,6 +272,10 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     requires: { barracks: 10, townhall: 10 },
   },
 };
+
+/** Population (places d'armée) offerte par la ferme : base au niveau 1, puis croissance par niveau. */
+export const POPULATION_BASE = 240;
+export const POPULATION_GROWTH = 1.17;
 
 /** Défense de base d'un village, même vide. */
 export const BASE_VILLAGE_DEFENSE = 20;
@@ -278,10 +297,6 @@ export const BEGINNER_PROTECTION_HOURS = 120;
 export const MERCHANT_CAPACITY = 1000;
 /** Minutes pour parcourir une case à vitesse x1 (marchands). */
 export const MERCHANT_SPEED = 6;
-/** Pendant le combat, la muraille perd un niveau pour ce nombre de béliers. */
-export const RAMS_PER_WALL_LEVEL_IN_COMBAT = 8;
-/** Après une victoire, chaque groupe de ce nombre de béliers survivants détruit un niveau de muraille. */
-export const RAMS_PER_WALL_LEVEL_DESTROYED = 4;
 
 /** Annulation d'une construction, d'un recrutement ou d'un mouvement : remboursement total pendant ce délai (secondes réelles). */
 export const CANCEL_GRACE_SECONDS = 120;

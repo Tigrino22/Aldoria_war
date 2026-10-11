@@ -78,10 +78,10 @@ Toutes les valeurs (production, coûts, durées, unités) sont résumées dans [
 
 - Comptes (pseudo + mot de passe), protection débutant de 5 jours (divisée par la vitesse du monde)
 - 4 ressources, 9 bâtiments sur 20 niveaux, file de construction de 2
-- 6 unités (lancier, épéiste, éclaireur, cavalier, bélier, noble), recrutement progressif, entretien en blé
+- 7 unités (lancier, hallebardier, épéiste, éclaireur, cavalier, bélier, noble), recrutement progressif, population limitée par la ferme
 - Marché : les marchands livrent des ressources à vos autres villages ou à d'autres joueurs, puis rentrent
 - Espionnage : des éclaireurs envoyés seuls rapportent ressources, bâtiments et troupes sans combattre
-- Béliers : ils abaissent la muraille pendant le combat et la détruisent en partie après une victoire
+- Béliers : abaissement progressif de la muraille (le niveau N demande N béliers), pendant le combat puis après une victoire
 - Carte de 100 × 100 avec villages barbares, déplacement et zoom à la souris ou au doigt
 - Attaques, pillage avec ressources cachées par l'entrepôt, renforts entre joueurs, rappel des troupes
 - Conquête par les nobles (loyauté), regain de loyauté avec le temps, relance si l'on perd son dernier village

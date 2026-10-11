@@ -70,7 +70,7 @@ describe('administration', () => {
 
     const stats = (await app.inject({ method: 'GET', url: '/api/admin/stats', headers: boss })).json();
     expect(stats.villages).toBeGreaterThan(0);
-    expect(stats.troops).toHaveLength(6);
+    expect(stats.troops).toHaveLength(7);
     expect(stats.resources).toHaveLength(4);
     expect(JSON.stringify(stats)).not.toContain('Patron');
 
