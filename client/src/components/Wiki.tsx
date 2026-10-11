@@ -442,6 +442,13 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           Ils peuvent en revanche piller les villages barbares à toute heure. Hors heures calmes, un PNJ ne s'en prend sans raison qu'à un joueur de force comparable (70 à 150 % de ses points),
           jamais à un joueur sous protection débutant, mais il riposte contre qui l'a attaqué, lui ou sa tribu.
         </p>
+        <p>
+          <b>Riposte et guerres des PNJ :</b> si la riposte est activée sur le monde, un PNJ attaqué par un joueur lui en veut pendant 3 jours, de même que les PNJ de sa tribu et des tribus alliées.
+          Si le joueur appartient à une tribu, la tribu du PNJ lui déclare en plus la guerre pour 4 jours. Indépendamment de la riposte, les tribus de PNJ se font la guerre entre elles
+          et peuvent aussi déclarer la guerre à une tribu de joueurs sans provocation (4 jours, puis une trêve de plusieurs jours). Pendant une guerre, leurs membres frappent les villages ennemis, même éloignés,
+          mais jamais pendant les heures calmes ni un joueur sous protection débutant. Chaque village de PNJ a un rôle, offensif ou défensif : seuls les villages offensifs partent en attaque,
+          les défensifs gardent leurs troupes pour protéger la tribu. Les guerres et la riposte se coupent séparément depuis l'administration du monde.
+        </p>
       </>
     ),
     social: (
