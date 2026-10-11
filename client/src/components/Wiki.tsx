@@ -456,7 +456,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
         <p>
           Deux autres classements, pour les joueurs comme pour les tribus, comptent les adversaires battus : chaque troupe ennemie tuée vaut le blé qu'elle consomme par heure (un lancier 1, un cavalier 4).
           « Attaque » compte les troupes tuées quand vous attaquez, « Défense » celles tuées quand on vous attaque (les renforts partagent ce total avec le propriétaire du village, selon leur poids). Ces chiffres
-          figurent sur les profils des joueurs et des tribus, et seuls les combats livrés depuis cette fonctionnalité sont comptés.
+          figurent sur les profils des joueurs et des tribus. Seuls les combats livrés depuis la mise en place de ces classements sont comptés.
         </p>
       </>
     ),
