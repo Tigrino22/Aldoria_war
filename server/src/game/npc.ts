@@ -489,11 +489,14 @@ async function economyStep(c: Db, npcId: number, profile: NpcProfile, role: Vill
     for (const k of Object.keys(owned) as (keyof UnitCounts)[]) owned[k] += u[k];
   }
   for (const choice of nextRecruit(profile, role, v.buildings, owned, cap, env.npcDifficulty).slice(0, 3)) {
-    try {
-      await enqueueRecruit(c, villageId, choice.unit, choice.count, now);
-      return;
-    } catch (err) {
-      if (!(err instanceof GameError)) throw err;
+    // Trop cher ou trop de monde pour la ferme : on réduit le lot de moitié jusqu'à ce qu'il passe.
+    for (let count = choice.count; count >= 1; count = Math.floor(count / 2)) {
+      try {
+        await enqueueRecruit(c, villageId, choice.unit, count, now);
+        return;
+      } catch (err) {
+        if (!(err instanceof GameError)) throw err;
+      }
     }
   }
 }

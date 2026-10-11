@@ -1,4 +1,4 @@
-import { type UnitCounts, emptyUnits } from '@aldoria/shared';
+import { type UnitCounts, UNITS, emptyUnits, populationCapacity, populationOf } from '@aldoria/shared';
 import type { NpcProfile } from './npc-rules';
 
 /** Nobles envoyés avec chaque assaut d'un conquérant. */
@@ -31,31 +31,35 @@ export function villageRoles(profile: NpcProfile, count: number): VillageRole[] 
   return roles;
 }
 
-/** Multiplicateur des effectifs visés : les fermes (jusqu'à ~4 700 habitants au niveau 20) logent des armées bien plus grosses. */
-export const TROOP_FACTOR = 3;
+/** Niveaux d'avance de la ferme sur le plafond : elle loge l'armée, donc elle monte plus haut que le reste. */
+export const FARM_LEAD = 3;
+
+/** Niveau de ferme visé selon le plafond de niveau : la population de ce niveau est l'effectif à atteindre. */
+export const farmTarget = (cap: number) => Math.min(20, cap + FARM_LEAD);
 
 /** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté, pour passer les éclaireurs d'un défenseur. */
 export const offenseScouts = (cap: number, difficulty: number) => Math.min(30, Math.round((4 + cap * 1.5) * Math.max(1, difficulty)));
 
-/** Armée visée par un village de rôle `role` au niveau `cap` : les unités dont les bâtiments manquent encore sont ignorées au recrutement. */
+/**
+ * Armée visée par un village de rôle `role` au niveau `cap` : les unités dont les bâtiments manquent encore sont ignorées au recrutement.
+ * Les proportions dépendent du rôle ; l'effectif total remplit la ferme visée (`farmTarget`), éclaireurs et nobles compris. Une difficulté
+ * inférieure à 1 ne remplit qu'une partie de la ferme.
+ */
 export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, difficulty: number): UnitCounts {
-  // Un village dont le rôle ne correspond pas au tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) y met moins d'efforts.
-  const fit = (role === 'offense') === (profile !== 'builder') ? 1 : 0.6;
-  const scale = (n: number) => Math.round(n * cap * difficulty * TROOP_FACTOR);
   const t = emptyUnits();
+  // Proportions de la masse de troupes (par « part »), les éclaireurs et les nobles étant à effectif fixe.
+  const shares: Partial<UnitCounts> =
+    role === 'offense' ? { swordsman: 7, cavalry: 2, spearman: 1, ram: profile === 'conqueror' ? 1 : 0 } : { spearman: 5, halberdier: 5, swordsman: 1 };
   if (role === 'offense') {
-    t.swordsman = scale(7 * fit);
-    t.cavalry = scale(2 * fit);
     t.scout = offenseScouts(cap, difficulty);
-    t.spearman = scale(1);
-    if (profile === 'conqueror') t.ram = scale(1);
     // Quatre nobles font tomber la loyauté d'un village dans trois cas sur quatre (20 à 35 points chacun).
     if (profile !== 'builder' && cap >= 10) t.noble = NOBLES_PER_CONQUEST;
   } else {
-    t.spearman = scale(5 * fit);
-    t.halberdier = scale(5 * fit);
-    t.swordsman = scale(1);
     t.scout = 2;
   }
+  const budget = populationCapacity(farmTarget(cap)) * Math.min(1, Math.max(0, difficulty)) - populationOf(t);
+  const perShare = (Object.entries(shares) as [keyof UnitCounts, number][]).reduce((sum, [k, n]) => sum + n * UNITS[k].population, 0);
+  const parts = Math.max(0, budget) / perShare;
+  for (const [k, n] of Object.entries(shares) as [keyof UnitCounts, number][]) t[k] = Math.floor(n * parts);
   return t;
 }

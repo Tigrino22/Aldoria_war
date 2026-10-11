@@ -241,14 +241,14 @@ Les batailles viennent des rapports de défense des PNJ (ils contiennent les per
 
 ## Recrutement des PNJ : villages offensifs et défensifs
 
-Rythme : le niveau visé par les PNJ gagne 1 par jour de monde (`NPC_LEVELS_PER_DAY`, 20 au bout de 18 jours à difficulté ×1). La ferme, qui loge l'armée, monte `FARM_LEAD` = 3 niveaux plus haut que le reste et pèse davantage (poids 1,6 à 1,7). Les effectifs visés sont triplés (`TROOP_FACTOR`), et un lot de recrutement peut aller jusqu'à 40 unités.
+Rythme : le niveau visé par les PNJ gagne 1 par jour de monde (`NPC_LEVELS_PER_DAY`, 20 au bout de 18 jours à difficulté ×1). La ferme, qui loge l'armée, monte `FARM_LEAD` = 3 niveaux plus haut que le reste et pèse davantage (poids 1,6 à 1,7). L'armée visée de chaque village remplit toute la ferme visée (niveau de ferme = plafond + 3, 20 au plus, soit jusqu'à 4 740 habitants), éclaireurs et nobles compris (`armyTarget` dans `npc-roles.ts`) ; les proportions ci-dessous se répartissent le reste. Une difficulté inférieure à 1 ne remplit qu'une part de la ferme. Un lot de recrutement peut aller jusqu'à 40 unités, réduit de moitié tant qu'il est trop cher ou trop lourd pour la ferme.
 
 Chaque village d'un PNJ a un rôle (code : `server/src/game/npc-roles.ts`), qui fixe les seules unités qu'on y recrute.
 
 | Rôle | Unités recrutées (par niveau visé) |
 |---|---|
-| Offensif | (effectifs × `TROOP_FACTOR` = 3) épéistes ×7, cavaliers ×2, jusqu'à 30 éclaireurs (min(30, (4 + niveau × 1,5) × max(1, difficulté)), voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
-| Défensif | (effectifs × 3) lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), 2 éclaireurs |
+| Offensif | (proportions) épéistes ×7, cavaliers ×2, jusqu'à 30 éclaireurs (min(30, (4 + niveau × 1,5) × max(1, difficulté)), voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
+| Défensif | (proportions) lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), 2 éclaireurs |
 
 Espionnage des PNJ : avant de piller, un PNJ envoie 2 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), la mission suivante en envoie 10, puis 30 (dans la limite de ceux du village). Après trois échecs de suite sur la même cible, il la laisse tranquille 12 heures de jeu après le dernier échec (`SCOUT_PAUSE_GAME_HOURS`), puis reprend directement avec 30 éclaireurs tant que le dernier échec date de moins de 36 heures de jeu (`SCOUT_MEMORY_GAME_HOURS`) ; au-delà, retour à 2. Un espionnage réussi efface les échecs. Constantes : `SCOUT_WAVES`, `scoutWave`, `scoutPaused`, `SCOUT_MAX_FAILURES` dans `npc-rules.ts`, `offenseScouts` dans `npc-roles.ts`.
 
