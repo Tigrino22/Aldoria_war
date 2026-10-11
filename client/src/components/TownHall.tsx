@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
 import {
   BUILDINGS,
   BUILDING_KEYS,
   BUILD_QUEUE_LIMIT,
   RESOURCES,
   type BuildingKey,
+  type Resources,
   type VillageState,
   buildingCost,
   buildingTime,
@@ -13,41 +13,45 @@ import {
 } from '@aldoria/shared';
 import { api } from '../api';
 import { buildingImg } from '../assets';
-import { duration, fmt } from '../format';
+import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow } from '../game';
+import { Panel } from '../ui';
 import { CancelButton, Cost, Countdown, ResIcon, liveResources } from '../ui';
 import { effect, effectiveLevels } from './buildingInfo';
 
-/** Fenêtre de l'hôtel de ville : tous les bâtiments du village d'un coup d'œil, avec coûts, durées et amélioration directe. */
-export default function TownHall({ v, onClose }: { v: VillageState; onClose: () => void }) {
+/** Moment où le village aura de quoi payer `cost` au rythme de production actuel ; null si c'est impossible (entrepôt trop petit ou production négative). */
+function affordableAt(v: VillageState, res: Resources, cost: Resources, now: number): number | null {
+  let wait = 0;
+  for (const r of RESOURCES) {
+    const missing = cost[r] - res[r];
+    if (missing <= 0) continue;
+    if (cost[r] > v.capacity || v.rates[r] <= 0) return null;
+    wait = Math.max(wait, missing / v.rates[r]);
+  }
+  return now + wait * 3_600_000;
+}
+
+/** Page de l'hôtel de ville : tous les bâtiments du village d'un coup d'œil, avec coûts, durées, heure de disponibilité des ressources et amélioration directe. */
+export default function TownHall({ v }: { v: VillageState }) {
   const { world, setVillage, run } = useGame();
   const now = useNow();
   const levels = effectiveLevels(v);
   const res = liveResources(v, now);
   const queueFull = v.buildQueue.length >= BUILD_QUEUE_LIMIT;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   const upgrade = (k: BuildingKey) => run(async () => setVillage(await api(`/api/villages/${v.id}/build`, { body: { building: k } })));
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="townhall" role="dialog" aria-modal="true" aria-label={`Hôtel de ville de ${v.name}`} onClick={(e) => e.stopPropagation()}>
+    <Panel title="Hôtel de ville" actions={<a className="btn small ghost" href="#/village">← Retour au village</a>}>
+      <div className="townhall">
         <header className="th-head">
           <img src={buildingImg('townhall', Math.max(v.buildings.townhall, 1))} alt="" width={84} height={84} />
           <div className="th-title">
-            <h2>Hôtel de ville</h2>
+            <h2>{v.name}</h2>
             <p className="muted">
               {v.name} · niveau {v.buildings.townhall} · {effect('townhall', v.buildings.townhall, world.speed)} · {fmt(v.points)} points
             </p>
           </div>
-          <button className="btn ghost" onClick={onClose} aria-label="Fermer">
-            ✕
-          </button>
         </header>
 
         <div className="th-stock">
@@ -99,6 +103,7 @@ export default function TownHall({ v, onClose }: { v: VillageState; onClose: () 
               const reqOk = meetsRequirements(levels, def.requires);
               const affordable = cost ? canAfford(res, cost) : false;
               const building = levels[k] > current;
+              const readyAt = cost && !affordable ? affordableAt(v, res, cost, now) : null;
               const missing = Object.entries(def.requires)
                 .filter(([rk, lvl]) => levels[rk as BuildingKey] < (lvl as number))
                 .map(([rk, lvl]) => `${BUILDINGS[rk as BuildingKey].name} niv. ${lvl}`)
@@ -127,7 +132,11 @@ export default function TownHall({ v, onClose }: { v: VillageState; onClose: () 
                         <button className="btn primary small" disabled={!reqOk || queueFull || !affordable} onClick={() => upgrade(k)}>
                           {levels[k] === 0 ? 'Construire' : `Améliorer au niveau ${next}`}
                         </button>
-                        {reqOk && !affordable && !queueFull && <span className="muted small"> Ressources insuffisantes</span>}
+                        {reqOk && !affordable && (
+                          <p className="muted small">
+                            {readyAt === null ? 'Ressources indisponibles : entrepôt trop petit ou production insuffisante.' : <>Ressources disponibles {clockTime(new Date(readyAt))}</>}
+                          </p>
+                        )}
                       </>
                     )}
                   </div>
@@ -138,6 +147,6 @@ export default function TownHall({ v, onClose }: { v: VillageState; onClose: () 
           {queueFull && <p className="muted small">La file de construction est pleine.</p>}
         </section>
       </div>
-    </div>
+    </Panel>
   );
 }
