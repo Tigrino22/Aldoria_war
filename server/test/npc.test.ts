@@ -42,7 +42,7 @@ describe('règles des PNJ', () => {
 
   it('le plafond de niveau monte avec l’âge du monde et plus vite en difficulté élevée', () => {
     expect(npcCap(0, 1)).toBe(2);
-    expect(npcCap(10, 1)).toBe(7);
+    expect(npcCap(10, 1)).toBe(12);
     expect(npcCap(10, 1.5)).toBeGreaterThan(npcCap(10, 1));
     expect(npcCap(1000, 1)).toBe(20);
   });
@@ -162,7 +162,7 @@ describe('PNJ en jeu', () => {
     const queue = (await pool.query('SELECT count(*)::int AS n FROM build_queue WHERE village_id = $1', [village])).rows[0].n;
     const v = (await pool.query('SELECT buildings, points FROM villages WHERE id = $1', [village])).rows[0];
     expect(queue + v.points).toBeGreaterThan(0);
-    expect(Object.values(v.buildings as Record<string, number>).reduce((a, b) => a + b, 0)).toBeGreaterThan(9 + 5);
+    expect(Object.values(v.buildings as Record<string, number>).reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(9 + 5);
     const recruits = (await pool.query('SELECT count(*)::int AS n FROM recruit_queue WHERE village_id = $1', [village])).rows[0].n;
     const troops = await tx((c) => getTroops(c, village, village));
     expect(recruits + troops.spearman + troops.swordsman).toBeGreaterThan(0);

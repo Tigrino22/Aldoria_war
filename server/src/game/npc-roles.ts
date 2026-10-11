@@ -31,6 +31,9 @@ export function villageRoles(profile: NpcProfile, count: number): VillageRole[] 
   return roles;
 }
 
+/** Multiplicateur des effectifs visés : les fermes (jusqu'à ~4 700 habitants au niveau 20) logent des armées bien plus grosses. */
+export const TROOP_FACTOR = 3;
+
 /** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté, pour passer les éclaireurs d'un défenseur. */
 export const offenseScouts = (cap: number, difficulty: number) => Math.min(30, Math.round((4 + cap * 1.5) * Math.max(1, difficulty)));
 
@@ -38,7 +41,7 @@ export const offenseScouts = (cap: number, difficulty: number) => Math.min(30, M
 export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, difficulty: number): UnitCounts {
   // Un village dont le rôle ne correspond pas au tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) y met moins d'efforts.
   const fit = (role === 'offense') === (profile !== 'builder') ? 1 : 0.6;
-  const scale = (n: number) => Math.round(n * cap * difficulty);
+  const scale = (n: number) => Math.round(n * cap * difficulty * TROOP_FACTOR);
   const t = emptyUnits();
   if (role === 'offense') {
     t.swordsman = scale(7 * fit);
