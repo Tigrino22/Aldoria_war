@@ -105,4 +105,18 @@ describe('classement de guerre et statistiques du monde', () => {
     expect(theirs.mine).toEqual(mine.theirs);
     expect((await tribeWarsView(pool, v, at)).warriors.map((w) => w.username)).toEqual(['Vert1']);
   });
+
+  it('les guerres du monde sont visibles de tous les joueurs, sans le détail des attaques en route', async () => {
+    expect((await app.inject({ method: 'GET', url: '/api/world/wars' })).statusCode).toBe(401);
+    const joueur = await register('Passant77');
+    const res = await app.inject({ method: 'GET', url: '/api/world/wars?hours=72', headers: joueur });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.inFlight).toEqual([]);
+    expect(Array.isArray(body.fronts)).toBe(true);
+    expect(body.hours).toBe(72);
+    // Un joueur ordinaire n'a toujours pas accès à la vue d'administration.
+    expect((await app.inject({ method: 'GET', url: '/api/admin/wars', headers: joueur })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: '/api/world/wars?hours=500', headers: joueur })).statusCode).toBe(400);
+  });
 });

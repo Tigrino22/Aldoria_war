@@ -229,6 +229,8 @@ Statistiques de guerre de tribu (migration 015) : `tribe_wars` garde, pour la tr
 
 ### Suivi des guerres (Administration > Guerres)
 
+La même vue est publique sous « Guerres du monde » (`#/guerres`, `WorldWars.tsx`, `GET /api/world/wars?hours=1..72`, réservé aux joueurs connectés) : `warOverview` est renvoyé tel quel sauf `inFlight`, vidé (cibles et heures d'arrivée des attaques en route restent réservées à l'administration). Limitée à 30 requêtes par minute, actualisation toutes les 15 s.
+
 Onglet en lecture seule, actualisé toutes les 5 s, avec une période au choix (1, 6, 24 ou 72 h). Code : `server/src/game/npc-war-report.ts` (route `GET /api/admin/wars`), `client/src/components/AdminWars.tsx`.
 
 | Bloc | Contenu |

@@ -20,6 +20,7 @@ import Overview from './Overview';
 import Profile from './Profile';
 import Wiki from './Wiki';
 import WorldStats from './WorldStats';
+import WorldWars from './WorldWars';
 import Admin from './Admin';
 import Raid from './Raid';
 import { api } from '../api';
@@ -62,6 +63,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'messages', label: 'Messages', img: NAV_IMG.messages },
       { path: 'tribu', label: 'Tribu', img: NAV_IMG.tribu },
       { path: 'classement', label: 'Classement', img: NAV_IMG.classement },
+      { path: 'guerres', label: 'Guerres du monde', img: NAV_IMG.classement },
       { path: 'monde', label: 'Statistiques du monde', img: MAP_IMG.village3 },
     ],
   },
@@ -214,6 +216,7 @@ export default function Layout() {
           {page === 'tribu' && <Tribe id={route[1] ? Number(route[1]) : undefined} />}
           {page === 'classement' && <Ranking />}
           {page === 'monde' && <WorldStats />}
+          {page === 'guerres' && <WorldWars />}
           {page === 'marche' && <Market focus={route[1]} />}
           {page === 'compte' && <Account />}
           {page === 'apercu' && <Overview />}
