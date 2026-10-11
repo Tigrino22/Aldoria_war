@@ -3,6 +3,8 @@ import { useGame, useRoute } from '../game';
 
 /** Identifiant de la nouveauté annoncée : une nouvelle annonce aura un nouvel identifiant et s'affichera à nouveau. */
 const ANNOUNCEMENT = 'assistant-pillage';
+/** L'annonce ne s'adresse qu'aux joueurs déjà inscrits à sa mise en ligne : les nouveaux inscrits découvrent l'assistant par eux-mêmes. */
+const ANNOUNCED_AT = Date.parse('2026-10-11T06:22:00Z');
 const key = (playerId: number) => `aldoria.annonce.${ANNOUNCEMENT}.${playerId}`;
 
 const seen = (playerId: number) => {
@@ -13,11 +15,11 @@ const seen = (playerId: number) => {
   }
 };
 
-/** Grande fenêtre affichée une fois à la prochaine connexion de chaque joueur pour présenter l'assistant de pillage. */
+/** Grande fenêtre affichée une fois à la prochaine connexion de chaque joueur déjà inscrit pour présenter l'assistant de pillage. */
 export default function Announcement() {
   const { me } = useGame();
   const [, go] = useRoute();
-  const [open, setOpen] = useState(() => !seen(me.player.id));
+  const [open, setOpen] = useState(() => Date.parse(me.player.createdAt) < ANNOUNCED_AT && !seen(me.player.id));
   if (!open) return null;
 
   const close = (to?: string) => {
