@@ -247,23 +247,23 @@ describe('PNJ agressifs', () => {
   });
 
   it('espionnage : plus d’éclaireurs après un échec, puis la cible est laissée tranquille après trois échecs', async () => {
-    expect([0, 1, 2, 3, 9].map((n) => scoutWave(n, 20))).toEqual([2, 4, 8, 8, 8]);
+    expect([0, 1, 2, 3, 9].map((n) => scoutWave(n, 100))).toEqual([2, 10, 30, 30, 30]);
     expect(scoutWave(2, 5)).toBe(5);
     expect(scoutWave(1, 0)).toBe(0);
     const ordered = [
-      { villageId: 1, ok: false },
-      { villageId: 2, ok: true },
-      { villageId: 1, ok: false },
-      { villageId: 2, ok: false },
-      { villageId: 1, ok: true },
-      { villageId: 1, ok: false },
+      { villageId: 1, ok: false, at: 60 },
+      { villageId: 2, ok: true, at: 50 },
+      { villageId: 1, ok: false, at: 40 },
+      { villageId: 2, ok: false, at: 30 },
+      { villageId: 1, ok: true, at: 20 },
+      { villageId: 1, ok: false, at: 10 },
     ];
     // Du plus récent au plus ancien : un renseignement obtenu remet le compte à zéro pour les échecs plus anciens.
-    expect([...consecutiveScoutFailures(ordered)]).toEqual([[1, 2]]);
+    expect([...consecutiveScoutFailures(ordered)]).toEqual([[1, { count: 2, lastAt: 60 }]]);
 
     const npc = await tx((c) => createNpc(c, NOON, 'raider'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
-    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 30 })));
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 100 })));
     const other = await makePlayer('Defenseur');
     const v = await villageOf(other, home.x + 2, home.y + 2);
     // Les autres joueurs restent sous protection : cette cible est la seule possible.
@@ -284,24 +284,28 @@ describe('PNJ agressifs', () => {
     await pool.query('DELETE FROM commands');
     await failed(new Date(t.getTime() - HOUR));
     await tx((c) => npcThink(c, new Outbox(), npc, t));
-    expect(await scoutsSent()).toEqual([4]);
+    expect(await scoutsSent()).toEqual([10]);
 
     await pool.query('DELETE FROM commands');
     await failed(new Date(t.getTime() - 2 * HOUR));
     await tx((c) => npcThink(c, new Outbox(), npc, t));
-    expect(await scoutsSent()).toEqual([8]);
+    expect(await scoutsSent()).toEqual([30]);
 
     // Troisième échec : la cible est laissée tranquille.
     await pool.query('DELETE FROM commands');
     await failed(new Date(t.getTime() - 3 * HOUR));
     await tx((c) => npcThink(c, new Outbox(), npc, t));
     expect(await scoutsSent()).toEqual([]);
-    // Au bout de 12 heures, plus personne ne s'en souvient (ici en journée : jamais d'espionnage chez un joueur la nuit).
+    // La pause dure 12 heures après le dernier échec ; ensuite il y retourne avec la plus forte vague, pas de zéro (ici en journée : jamais d'espionnage chez un joueur la nuit).
     // (Le PNJ a grandi entre-temps : on remet les deux villages à la même taille pour qu'il vise toujours ce joueur.)
     const later = new Date(t.getTime() + 21 * HOUR);
     await tx((c) => syncVillage(c, home.id, later));
     await pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $1) WHERE id = $2', [home.id, v]);
     await tx((c) => npcThink(c, new Outbox(), npc, later));
+    expect(await scoutsSent()).toEqual([30]);
+    // Les échecs sont retenus 36 heures : passé ce délai, il repart avec 2 éclaireurs.
+    await pool.query('DELETE FROM commands');
+    await tx((c) => npcThink(c, new Outbox(), npc, new Date(t.getTime() + 45 * HOUR)));
     expect(await scoutsSent()).toEqual([2]);
   });
 

@@ -245,10 +245,10 @@ Chaque village d'un PNJ a un rôle (code : `server/src/game/npc-roles.ts`), qui 
 
 | Rôle | Unités recrutées (par niveau visé) |
 |---|---|
-| Offensif | épéistes ×7, cavaliers ×2, (3 + niveau ÷ 2) × difficulté éclaireurs (12 au plus, voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
+| Offensif | épéistes ×7, cavaliers ×2, jusqu'à 30 éclaireurs (min(30, (4 + niveau × 1,5) × max(1, difficulté)), voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
 | Défensif | lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), 2 éclaireurs |
 
-Espionnage des PNJ : avant de piller, un PNJ envoie 2 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), la mission suivante en envoie 4, puis 8 (dans la limite de ceux du village). Après trois échecs de suite sur la même cible, il la laisse tranquille et en choisit une autre ; les échecs sont oubliés au bout de 12 heures de jeu, ou dès qu'un espionnage réussit. Constantes : `scoutWave`, `SCOUT_MAX_FAILURES`, `SCOUT_MEMORY_GAME_HOURS` dans `npc-rules.ts`, `offenseScouts` dans `npc-roles.ts`.
+Espionnage des PNJ : avant de piller, un PNJ envoie 2 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), la mission suivante en envoie 10, puis 30 (dans la limite de ceux du village). Après trois échecs de suite sur la même cible, il la laisse tranquille 12 heures de jeu après le dernier échec (`SCOUT_PAUSE_GAME_HOURS`), puis reprend directement avec 30 éclaireurs tant que le dernier échec date de moins de 36 heures de jeu (`SCOUT_MEMORY_GAME_HOURS`) ; au-delà, retour à 2. Un espionnage réussi efface les échecs. Constantes : `SCOUT_WAVES`, `scoutWave`, `scoutPaused`, `SCOUT_MAX_FAILURES` dans `npc-rules.ts`, `offenseScouts` dans `npc-roles.ts`.
 
 Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) recrute ses unités principales à 60 %.
 

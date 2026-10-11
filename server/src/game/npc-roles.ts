@@ -32,7 +32,7 @@ export function villageRoles(profile: NpcProfile, count: number): VillageRole[] 
 }
 
 /** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté, pour passer les éclaireurs d'un défenseur. */
-export const offenseScouts = (cap: number, difficulty: number) => Math.min(12, Math.round((3 + cap / 2) * Math.max(1, difficulty)));
+export const offenseScouts = (cap: number, difficulty: number) => Math.min(30, Math.round((4 + cap * 1.5) * Math.max(1, difficulty)));
 
 /** Armée visée par un village de rôle `role` au niveau `cap` : les unités dont les bâtiments manquent encore sont ignorées au recrutement. */
 export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, difficulty: number): UnitCounts {
