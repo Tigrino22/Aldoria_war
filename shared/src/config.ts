@@ -245,7 +245,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
   },
   ram: {
     name: 'Bélier',
-    description: 'Abaisse la muraille pendant le combat et la détruit en partie après une victoire.',
+    description: 'Abaisse la muraille niveau après niveau (le niveau N demande N béliers), pendant le combat puis après une victoire.',
     kind: 'infantry',
     cost: { wood: 300, clay: 200, iron: 200, wheat: 40 },
     population: 5,
