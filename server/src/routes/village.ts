@@ -6,6 +6,7 @@ import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
 import { GameError, forbidden } from '../errors';
 import { pickIntel } from '../game/intel';
+import { cancelOrder, placeOrder, plannedOrders } from '../game/orders';
 import { cancelCommand, disbandTroops, recallTroops, sendCommand, sendTrade } from '../game/commands';
 import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
@@ -152,6 +153,39 @@ export default async function villageRoutes(app: FastifyInstance) {
     return act(async (c, outbox, now) => {
       await sendCommand(c, outbox, playerId, id, body, now);
       return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  // Point de ralliement : ordre à heure d'arrivée précise et/ou train de nobles.
+  app.post('/api/villages/:id/orders', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const body = z
+      .object({
+        type: z.enum(['attack', 'support']),
+        targetId: z.number().int().positive(),
+        units: unitsSchema,
+        arriveAt: z.string().datetime().nullish(),
+        train: z.object({ nobles: z.number().int().min(1).max(200), escort: unitsSchema.optional(), gapSeconds: z.number().int().min(1).max(10).optional() }).nullish(),
+      })
+      .parse(req.body);
+    return act(async (c, outbox, now) => {
+      await placeOrder(c, outbox, playerId, id, { ...body, arriveAt: body.arriveAt ? new Date(body.arriveAt) : null }, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  app.get('/api/orders', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act((c) => plannedOrders(c, playerId));
+  });
+
+  app.delete('/api/orders/:groupId', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { groupId } = z.object({ groupId: z.string().uuid() }).parse(req.params);
+    return act(async (c, outbox) => {
+      await cancelOrder(c, outbox, playerId, groupId);
+      return { ok: true };
     });
   });
 

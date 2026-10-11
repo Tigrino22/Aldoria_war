@@ -24,6 +24,7 @@ export async function loadQuestContext(c: Db, playerId: number): Promise<QuestCo
     // Troupes chez elles, en route (le propriétaire est le village d'origine) ou en cours de recrutement.
     for (const r of (await c.query('SELECT units FROM troops WHERE home_village_id = ANY($1)', [ids])).rows) units = addUnits(units, normalizeUnits(r.units));
     for (const r of (await c.query('SELECT units FROM commands WHERE home_village_id = ANY($1) AND NOT processed', [ids])).rows) units = addUnits(units, normalizeUnits(r.units));
+    for (const r of (await c.query('SELECT units FROM planned_commands WHERE origin_village_id = ANY($1)', [ids])).rows) units = addUnits(units, normalizeUnits(r.units));
     for (const r of (await c.query('SELECT unit, count - delivered AS left FROM recruit_queue WHERE village_id = ANY($1)', [ids])).rows) {
       units = addUnits(units, { ...emptyUnits(), [r.unit as UnitKey]: Number(r.left) });
     }

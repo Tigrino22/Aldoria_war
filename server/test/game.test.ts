@@ -115,17 +115,28 @@ describe('jeu', () => {
     const back = await tx((c) => getTroops(c, home, home));
     expect(back.swordsman).toBe(200 - report.attacker.losses.swordsman);
 
-    // Conquête : 3 nobles × 35 de loyauté.
+    // Trois nobles dans une même attaque ne font baisser la loyauté qu'une fois (35 au plus fort tirage) : le village n'est pas conquis.
     const t1 = new Date(arriveAt.getTime() + 3 * HOUR);
     const second = await tx((c) =>
       sendCommand(c, new Outbox(), attacker, home, { type: 'attack', targetId: target, units: { swordsman: 50, noble: 3 } }, t1),
     );
     await processDueEvents(new Date(second.arriveAt.getTime() + 1));
+    const hit = (await pool.query('SELECT owner_id, loyalty FROM villages WHERE id = $1', [target])).rows[0];
+    expect(hit.owner_id).toBe(defender);
+    expect(Math.floor(hit.loyalty)).toBeGreaterThanOrEqual(65);
+    expect(Math.floor(hit.loyalty)).toBeLessThanOrEqual(66);
+
+    // Train de nobles : une attaque par noble, chacune fait baisser la loyauté. Les nobles revenus repartent séparément.
+    const t2 = new Date(second.arriveAt.getTime() + 2 * HOUR);
+    await processDueEvents(t2);
+    const train = [];
+    for (let i = 0; i < 2; i++) {
+      train.push(await tx((c) => sendCommand(c, new Outbox(), attacker, home, { type: 'attack', targetId: target, units: { swordsman: 20, noble: 1 } }, t2)));
+    }
+    await processDueEvents(new Date(Math.max(...train.map((x) => x.arriveAt.getTime())) + 1));
     const owner = (await pool.query('SELECT owner_id, loyalty FROM villages WHERE id = $1', [target])).rows[0];
     expect(owner.owner_id).toBe(attacker);
     expect(owner.loyalty).toBe(25);
-    const garrison = await tx((c) => getTroops(c, target, target));
-    expect(garrison.noble).toBe(2);
     const defenderReport = (await pool.query("SELECT title FROM reports WHERE player_id = $1 ORDER BY id DESC LIMIT 1", [defender])).rows[0];
     expect(defenderReport.title).toMatch(/conquis/);
   });

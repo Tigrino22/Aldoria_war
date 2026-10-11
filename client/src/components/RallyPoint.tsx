@@ -146,7 +146,6 @@ export default function RallyPoint() {
         ) : (
           <p className="muted">Aucune troupe au village. Recrutez à la caserne.</p>
         )}
-        <p className="muted small">Pour attaquer ou envoyer des renforts, choisissez un village sur la carte.</p>
       </Panel>
 
       <Panel title="Mouvements entrants">
