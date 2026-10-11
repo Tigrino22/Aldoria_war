@@ -242,6 +242,28 @@ function spearmanFig() {
   return g;
 }
 
+function halberdierFig() {
+  // Hallebardier : gambison, cuirasse d'acier, chapel de fer, hallebarde à deux mains.
+  const s = skeleton({ hands: { r: [0.33, 1.1, 0.24], l: [0.3, 1.34, 0.24] }, elbows: { r: [0.34, 1.06, 0.0], l: [0.14, 1.26, 0.1] } });
+  const { out } = dressedBase(s, { tunic: { material: M.quilt(), tex: 'quilt', quilted: true }, hose: 0x4a3a30, skirtBottom: 0.52 });
+  const cuirass = intersect(inflate(torsoShape(s), 0.034), (p) => Math.max(p[1] - 1.5, 1.04 - p[1]));
+  out.push({ shape: wrinkle(cuirass, 0.004, 5), material: M.steel(0xa4a8b0), tex: 'steel', box: { center: [0, 1.28, 0.04], size: 0.7, res: 190 } });
+  // Ceinture et jupe de cuir.
+  out.push({ shape: intersect(inflate(torsoShape(s), 0.036), (p) => Math.abs(p[1] - 1.0) - 0.03), material: M.leather(0x5a3a22), tex: 'leather' });
+  out.push({ shape: intersect(inflate(skirt(s, 0.62, 0.18, 0.26, 0.012), 0.03), (p) => Math.max(p[1] - 1.0, 0.62 - p[1])), material: M.cloth(BLUE), tex: 'cloth', box: { center: [0, 0.82, 0.04], size: 0.5, res: 150 } });
+  const h = s.head;
+  out.push({ shape: beard(s, 0.012), material: M.hair(0x7a5a3a), tex: 'hair', box: { center: [h[0], h[1], h[2] + 0.02], size: 0.42, res: 120 } });
+  // Camail de mailles et chapel de fer à bord large.
+  out.push({ shape: intersect(inflate(limb(s.neck, [0, 1.6, 0], 0.07, 0.07), 0.02), halfSpace([0, 1.6, 0], [0, 1, 0])), material: M.mail(), tex: 'mail' });
+  const hat = union(
+    intersect(shell(sphere([h[0], h[1] + 0.03, h[2]], 0.118), 0.007), halfSpace([0, h[1] + 0.04, 0], [0, -1, 0])),
+    cylY([h[0], 0, h[2]], h[1] + 0.035, h[1] + 0.047, 0.2, 0.18),
+  );
+  const g = layers([...out, { shape: hat, material: M.steel(0x9ea2aa), tex: 'steel', box: { center: [h[0], h[1] + 0.06, h[2]], size: 0.46, res: 120 } }], bbox);
+  g.add(halberd([0.32, 1.12, 0.25], 2.35));
+  return g;
+}
+
 function swordsmanFig() {
   const s = skeleton({ hands: { r: [0.24, 1.12, 0.26], l: [-0.2, 1.1, 0.22] }, elbows: { r: [0.3, 1.14, 0.0], l: [-0.28, 1.14, -0.0] } });
   const { out } = dressedBase(s, { tunic: { material: M.quilt(), tex: 'quilt', quilted: true }, hose: 0x3e3a36, skirtBottom: 0.5 });
@@ -440,6 +462,39 @@ function spear(handPos, length) {
   return g;
 }
 
+/** Hallebarde : hampe, pointe, lame de hache d'un côté et crochet de l'autre. */
+function halberd(handPos, length) {
+  const g = new THREE.Group();
+  const top = length - 1.0;
+  const shaft = mesh(new THREE.CylinderGeometry(0.017, 0.02, length, 8), M.wood());
+  shaft.position.y = length / 2 - 1.0;
+  const spike = mesh(new THREE.ConeGeometry(0.03, 0.3, 4), M.steel(0xd0d2d6));
+  spike.scale.set(1, 1, 0.4);
+  spike.position.y = top + 0.15;
+  const bladeShape = new THREE.Shape();
+  bladeShape.moveTo(0, 0);
+  bladeShape.lineTo(0.2, 0.02);
+  bladeShape.quadraticCurveTo(0.27, 0.12, 0.2, 0.3);
+  bladeShape.lineTo(0, 0.24);
+  bladeShape.closePath();
+  const blade = mesh(new THREE.ExtrudeGeometry(bladeShape, { depth: 0.012, bevelEnabled: true, bevelSize: 0.006, bevelThickness: 0.004, bevelSegments: 1 }), M.steel(0xc4c6ca));
+  blade.position.set(0.014, top - 0.28, -0.006);
+  const hookShape = new THREE.Shape();
+  hookShape.moveTo(0, 0);
+  hookShape.lineTo(-0.16, 0.0);
+  hookShape.lineTo(-0.2, -0.07);
+  hookShape.lineTo(-0.1, -0.02);
+  hookShape.lineTo(0, 0.05);
+  hookShape.closePath();
+  const hook = mesh(new THREE.ExtrudeGeometry(hookShape, { depth: 0.01, bevelEnabled: false }), M.steel(0xb0b2b6));
+  hook.position.set(-0.014, top - 0.16, -0.005);
+  const socket = mesh(new THREE.CylinderGeometry(0.026, 0.02, 0.14, 8), M.steel(0x8e9096));
+  socket.position.y = top - 0.12;
+  g.add(shaft, spike, blade, hook, socket);
+  g.position.set(handPos[0], handPos[1], handPos[2]);
+  return g;
+}
+
 function sword(handPos, dir) {
   const g = new THREE.Group();
   const shape = new THREE.Shape();
@@ -560,4 +615,4 @@ function banner(handPos, color) {
   return g;
 }
 
-export const FIGURES = { spearman: spearmanFig, swordsman: swordsmanFig, noble: nobleFig, cavalry: cavalryFig, scout: scoutFig };
+export const FIGURES = { spearman: spearmanFig, halberdier: halberdierFig, swordsman: swordsmanFig, noble: nobleFig, cavalry: cavalryFig, scout: scoutFig };

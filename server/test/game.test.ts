@@ -73,13 +73,13 @@ describe('jeu', () => {
     expect(done.buildings.woodcutter).toBe(2);
   });
 
-  it('le recrutement livre les unités au fil du temps et respecte la ferme', async () => {
+  it('le recrutement livre les unités au fil du temps et respecte la population de la ferme', async () => {
     const owner = await makePlayer('Recruteur');
     const t0 = new Date('2030-01-01T00:00:00Z');
     const id = await tx((c) =>
       createVillage(c, { ownerId: owner, name: 'Caserne', x: 2, y: 2, buildings: { ...STARTING_BUILDINGS, barracks: 1 }, resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, at: t0 }),
     );
-    await expect(tx((c) => enqueueRecruit(c, id, 'spearman', 50, t0))).rejects.toThrow(/blé/);
+    await expect(tx((c) => enqueueRecruit(c, id, 'spearman', 241, t0))).rejects.toThrow(/ferme/);
     await tx((c) => enqueueRecruit(c, id, 'spearman', 10, t0));
     await tx((c) => syncVillage(c, id, new Date(t0.getTime() + 180_000 * 3 + 1000)));
     expect((await tx((c) => getTroops(c, id, id))).spearman).toBe(3);

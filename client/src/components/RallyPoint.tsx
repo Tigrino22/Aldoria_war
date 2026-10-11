@@ -65,8 +65,8 @@ function DisbandDialog({ v, unit, onClose }: { v: VillageState; unit: UnitKey; o
             <b>{fmt(have - n)}</b>
           </div>
           <div>
-            <span className="muted small">Blé économisé</span>
-            <b className="ok">+{fmt(n * def.upkeep)}/h</b>
+            <span className="muted small">Population libérée</span>
+            <b className="ok">+{fmt(n * def.population)}</b>
           </div>
           <div>
             <span className="muted small">Ressources perdues</span>
@@ -115,7 +115,7 @@ export default function RallyPoint() {
                   <tr>
                     <th>Unité</th>
                     <th>Effectif</th>
-                    <th>Entretien blé/h</th>
+                    <th>Population</th>
                     <th />
                   </tr>
                 </thead>
@@ -130,7 +130,7 @@ export default function RallyPoint() {
                       <td>
                         <b>{fmt(v.troopsHome[k])}</b>
                       </td>
-                      <td>−{fmt(v.troopsHome[k] * UNITS[k].upkeep)}</td>
+                      <td>{fmt(v.troopsHome[k] * UNITS[k].population)}</td>
                       <td>
                         <button className="btn small danger-outline" onClick={() => setDisband(k)}>
                           Dissoudre…
@@ -141,7 +141,7 @@ export default function RallyPoint() {
                 </tbody>
               </table>
             </div>
-            <p className="muted small">Dissoudre des unités libère leur entretien en blé. Aucune ressource n'est remboursée.</p>
+            <p className="muted small">Dissoudre des unités libère leurs places de population. Aucune ressource n'est remboursée.</p>
           </>
         ) : (
           <p className="muted">Aucune troupe au village. Recrutez à la caserne.</p>

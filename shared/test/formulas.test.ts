@@ -5,9 +5,13 @@ import {
   carryCapacity,
   emptyUnits,
   plunder,
+  populationCapacity,
   productionRates,
   resolveCombat,
   STARTING_BUILDINGS,
+  UNITS,
+  wallAfterRams,
+  ramsToBreakWall,
   travelTime,
 } from '../src';
 
@@ -23,9 +27,27 @@ describe('formules', () => {
     expect(buildingTime('farm', 1, 1, 10)).toBe(30);
   });
 
-  it("le blé net tient compte de l'entretien des troupes", () => {
-    const rates = productionRates(STARTING_BUILDINGS, 10, 1);
-    expect(rates.wheat).toBe(30 - 10);
+  it("la troupe n'entame pas la production de blé : la ferme limite la population", () => {
+    expect(productionRates(STARTING_BUILDINGS, 1).wheat).toBe(30);
+    expect(populationCapacity(1)).toBe(240);
+    expect(populationCapacity(20)).toBeGreaterThan(4500);
+    expect(populationCapacity(0)).toBe(0);
+  });
+
+  it('les béliers abaissent la muraille de façon progressive : le niveau N coûte N béliers', () => {
+    expect(wallAfterRams(3, 0)).toBe(3);
+    expect(wallAfterRams(3, 2)).toBe(3);
+    expect(wallAfterRams(3, 3)).toBe(2);
+    expect(wallAfterRams(3, 5)).toBe(1);
+    expect(wallAfterRams(3, 6)).toBe(0);
+    expect(wallAfterRams(20, 209)).toBe(1);
+    expect(wallAfterRams(20, 210)).toBe(0);
+    expect(ramsToBreakWall(20)).toBe(210);
+    expect(wallAfterRams(0, 50)).toBe(0);
+  });
+
+  it('le hallebardier défend mieux contre l’infanterie que le lancier', () => {
+    expect(UNITS.halberdier.defenseInfantry).toBeGreaterThan(UNITS.spearman.defenseInfantry);
   });
 
   it('le trajet dépend de la distance et de l’unité la plus lente', () => {

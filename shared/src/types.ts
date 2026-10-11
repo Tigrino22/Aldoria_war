@@ -91,7 +91,10 @@ export interface VillageState {
   buildings: Buildings;
   buildQueue: BuildQueueItem[];
   recruitQueue: RecruitQueueItem[];
-  upkeep: number;
+  /** Places de population occupées (troupes du village où qu'elles soient, recrues comprises). */
+  population: number;
+  /** Population maximale selon la ferme. */
+  populationMax: number;
   /** Troupes du village présentes chez lui. */
   troopsHome: UnitCounts;
   /** Renforts d'autres villages stationnés ici. */

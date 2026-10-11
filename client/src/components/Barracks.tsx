@@ -10,7 +10,6 @@ import {
   emptyUnits,
   meetsRequirements,
   recruitTime,
-  resourceProduction,
   scaleResources,
 } from '@aldoria/shared';
 import { api } from '../api';
@@ -37,11 +36,11 @@ export default function Barracks() {
   }
 
   const res = liveResources(v, now);
-  const freeWheat = resourceProduction(v.buildings.farm) - v.upkeep;
+  const freePopulation = Math.max(0, v.populationMax - v.population);
 
   const maxFor = (k: UnitKey) => {
     const def = UNITS[k];
-    let max = Math.floor(freeWheat / def.upkeep);
+    let max = Math.floor(freePopulation / def.population);
     for (const r of RESOURCES) if (def.cost[r] > 0) max = Math.min(max, Math.floor(res[r] / def.cost[r]));
     return Math.max(0, max);
   };
@@ -70,7 +69,7 @@ export default function Barracks() {
     <div className="stack">
       <Panel title={`Caserne (niveau ${v.buildings.barracks})`}>
         <p className="muted small">
-          Blé disponible pour de nouvelles troupes : <b>{fmt(freeWheat)}</b> par heure (à vitesse x1). Améliorez la ferme pour nourrir une plus grande armée.
+          Population : <b>{fmt(v.population)}</b> / {fmt(v.populationMax)} ({fmt(freePopulation)} places libres). Les recrues en formation et les troupes parties au combat comptent. Améliorez la ferme pour loger une plus grande armée.
         </p>
         <h3>Troupes du village</h3>
         {owned.length ? (
@@ -139,7 +138,7 @@ export default function Barracks() {
                   <div><dt>Déf. cavalerie</dt><dd>{def.defenseCavalry}</dd></div>
                   <div><dt>Butin</dt><dd>{def.carry}</dd></div>
                   <div><dt>Vitesse</dt><dd>{duration((def.speed * 60) / world.speed)}/case</dd></div>
-                  <div><dt>Entretien</dt><dd>{def.upkeep} blé/h</dd></div>
+                  <div><dt>Population</dt><dd>{def.population}</dd></div>
                 </dl>
                 <div className="row wrap">
                   <Cost cost={def.cost} have={res} />

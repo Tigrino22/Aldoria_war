@@ -19,7 +19,7 @@ export interface QuestDef {
 }
 
 const level = (key: BuildingKey, n: number) => (ctx: QuestContext) => ctx.buildings[key] >= n;
-const soldiers = (u: UnitCounts) => u.spearman + u.swordsman + u.cavalry + u.ram + u.noble;
+const soldiers = (u: UnitCounts) => u.spearman + u.halberdier + u.swordsman + u.cavalry + u.ram + u.noble;
 const gift = (n: number): Resources => ({ wood: n, clay: n, iron: n, wheat: n });
 
 /** Quêtes de départ, dans l'ordre conseillé : elles guident un nouveau joueur et donnent un petit coup de pouce. */

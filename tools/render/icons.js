@@ -303,6 +303,7 @@ export const ICONS = {
   wheat: () => ({ object: wheat(), view: { frame: 3, centerY: 0.6 } }),
   // Figurines sculptées (figures.js), tournées de trois quarts vers la caméra.
   spearman: () => ({ object: place(FIGURES.spearman(), 0, 0, 0, YAW - 0.45), view: { frame: 3.4, centerY: 1.2, env: true, pitch: PORTRAIT } }),
+  halberdier: () => ({ object: place(FIGURES.halberdier(), 0, 0, 0, YAW - 0.45), view: { frame: 3.4, centerY: 1.2, env: true, pitch: PORTRAIT } }),
   swordsman: () => ({ object: place(FIGURES.swordsman(), 0, 0, 0, YAW - 0.45), view: { frame: 3.0, centerY: 1.0, env: true, pitch: PORTRAIT } }),
   noble: () => ({ object: place(FIGURES.noble(), 0, 0, 0, YAW - 0.45), view: { frame: 3.4, centerY: 1.2, env: true, pitch: PORTRAIT } }),
   cavalry: () => ({ object: place(FIGURES.cavalry(), 0, 0, 0, YAW - 1.15), view: { frame: 4.6, centerY: 1.5, env: true, pitch: PORTRAIT } }),

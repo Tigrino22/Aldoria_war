@@ -375,7 +375,7 @@ export default function Admin() {
                   </tbody>
                 </table>
               )}
-              <p className="muted small">Stocks au dernier calcul de chaque village ; production brute (avant consommation de blé).</p>
+              <p className="muted small">Stocks au dernier calcul de chaque village ; production par heure.</p>
             </Panel>
             <Panel title="Bâtiments (niveau moyen)">
               {!stats ? (
