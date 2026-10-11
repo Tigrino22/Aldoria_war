@@ -14,6 +14,8 @@ export interface WarSide {
   id: number;
   tag: string;
   name: string;
+  /** Tribu de PNJ (sinon de joueurs). */
+  isNpc: boolean;
   members: number;
   villages: number;
   points: number;
@@ -86,20 +88,26 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
   const since = new Date(now.getTime() - hours * 3_600_000);
   const tribeRows = (
     await pool.query(
-      `SELECT t.id, t.tag, t.name, t.npc_state,
+      `SELECT t.id, t.tag, t.name, t.is_npc, t.npc_state,
               (SELECT count(*)::int FROM players p WHERE p.tribe_id = t.id) AS members,
               (SELECT count(*)::int FROM villages v JOIN players p ON p.id = v.owner_id WHERE p.tribe_id = t.id) AS villages,
               (SELECT coalesce(sum(v.points), 0)::int FROM villages v JOIN players p ON p.id = v.owner_id WHERE p.tribe_id = t.id) AS points
-       FROM tribes t WHERE t.is_npc ORDER BY t.id`,
+       FROM tribes t ORDER BY t.id`,
     )
   ).rows;
-  const side = new Map<number, WarSide>(tribeRows.map((r) => [r.id, { id: r.id, tag: r.tag, name: r.name, members: r.members, villages: r.villages, points: r.points }]));
+  const side = new Map<number, WarSide>(tribeRows.map((r) => [r.id, { id: r.id, tag: r.tag, name: r.name, isNpc: r.is_npc, members: r.members, villages: r.villages, points: r.points }]));
+  const npcRows = tribeRows.filter((r) => r.is_npc);
   const state = new Map<number, { war: { enemyId: number; until: string } | null; nextWarAt: string | null }>(
-    tribeRows.map((r) => [r.id, { war: r.npc_state?.war ?? null, nextWarAt: r.npc_state?.nextWarAt ?? null }]),
+    npcRows.map((r) => [r.id, { war: r.npc_state?.war ?? null, nextWarAt: r.npc_state?.nextWarAt ?? null }]),
   );
+  // Guerres qui concernent une tribu de joueurs (déclarées par un chef ou par une tribu de PNJ), en cours ou finies depuis le début de la période.
+  const playerWars = (
+    await pool.query('SELECT declarer_id, target_id, until, ended_at FROM tribe_wars WHERE ended_at IS NULL OR ended_at >= $1', [since])
+  ).rows.map((r) => ({ a: r.declarer_id as number, b: r.target_id as number, until: new Date(r.until), live: !r.ended_at && new Date(r.until).getTime() > now.getTime() }));
+  const playerPairs = new Set(playerWars.map((w) => pairKey(w.a, w.b)));
   const atWar = (a: number, b: number) => {
     const w = state.get(a)?.war;
-    return !!w && w.enemyId === b && Date.parse(w.until) > now.getTime() && !!env.npcWars;
+    return (!!w && w.enemyId === b && Date.parse(w.until) > now.getTime() && !!env.npcWars) || playerPairs.has(pairKey(a, b));
   };
 
   // Batailles entre PNJ de tribus différentes : le rapport de défense du PNJ attaqué contient les pertes des deux camps.
@@ -114,7 +122,25 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
       [since],
     )
   ).rows;
-  const battles: WarBattle[] = battleRows.map((r) => ({
+  // Batailles qui opposent un PNJ et un joueur dans une guerre de tribu : le rapport de l'attaquant PNJ (ou celui du PNJ attaqué par un joueur).
+  const mixedRows = (
+    await pool.query(
+      `SELECT r.created_at, r.data, a.username AS attacker, a.tribe_id AS at_, d.username AS defender, d.tribe_id AS dt
+       FROM reports r
+       JOIN players a ON a.id = r.player_id AND a.is_npc
+       JOIN players d ON d.username = r.data->'defender'->>'playerName' AND NOT d.is_npc
+       WHERE r.type = 'attack' AND r.created_at >= $1 AND a.tribe_id IS NOT NULL AND d.tribe_id IS NOT NULL AND a.tribe_id <> d.tribe_id
+       UNION ALL
+       SELECT r.created_at, r.data, a.username, a.tribe_id, d.username, d.tribe_id
+       FROM reports r
+       JOIN players d ON d.id = r.player_id AND d.is_npc
+       JOIN players a ON a.username = r.data->'attacker'->>'playerName' AND NOT a.is_npc
+       WHERE r.type = 'defense' AND r.created_at >= $1 AND a.tribe_id IS NOT NULL AND d.tribe_id IS NOT NULL AND a.tribe_id <> d.tribe_id
+       ORDER BY created_at DESC LIMIT 500`,
+      [since],
+    )
+  ).rows.filter((r) => playerPairs.has(pairKey(r.at_, r.dt)));
+  const battles: WarBattle[] = [...battleRows, ...mixedRows].sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime()).map((r) => ({
     at: new Date(r.created_at).toISOString(),
     attacker: { player: r.attacker, tribeId: r.at_, tag: side.get(r.at_)?.tag ?? '?', village: r.data.attacker.village.name },
     defender: { player: r.defender, tribeId: r.dt, tag: side.get(r.dt)?.tag ?? '?', village: r.data.defender.village.name },
@@ -129,16 +155,16 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
   const flightRows = (
     await pool.query(
       `SELECT cm.sent_at, cm.arrive_at, cm.units, a.username AS attacker, a.tribe_id AS at_, ov.name AS origin,
-              d.username AS defender, d.tribe_id AS dt, tv.name AS target, tv.x, tv.y
+              d.username AS defender, d.tribe_id AS dt, d.is_npc AS d_npc, tv.name AS target, tv.x, tv.y
        FROM commands cm
        JOIN players a ON a.id = cm.player_id AND a.is_npc
        JOIN villages ov ON ov.id = cm.origin_village_id
        JOIN villages tv ON tv.id = cm.target_village_id
-       JOIN players d ON d.id = tv.owner_id AND d.is_npc
+       JOIN players d ON d.id = tv.owner_id
        WHERE cm.type = 'attack' AND NOT cm.processed AND ${REAL_ATTACK} AND a.tribe_id IS NOT NULL AND d.tribe_id IS NOT NULL AND a.tribe_id <> d.tribe_id
-       ORDER BY cm.arrive_at LIMIT 100`,
+       ORDER BY cm.arrive_at LIMIT 200`,
     )
-  ).rows;
+  ).rows.filter((r) => r.d_npc || playerPairs.has(pairKey(r.at_, r.dt)));
   const inFlight: WarInFlight[] = flightRows.map((r) => ({
     arriveAt: new Date(r.arrive_at).toISOString(),
     sentAt: new Date(r.sent_at).toISOString(),
@@ -171,6 +197,13 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
       }
     }
   }
+  for (const w of playerWars) {
+    const f = front(w.a, w.b);
+    if (f && w.live) {
+      f.until = w.until.toISOString();
+      f.startedAt = new Date(w.until.getTime() - WAR_DAYS * 86_400_000).toISOString();
+    }
+  }
   for (const b of battles) {
     const f = front(b.attacker.tribeId, b.defender.tribeId);
     if (!f) continue;
@@ -188,7 +221,7 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
     if (f) f.inFlight++;
   }
 
-  const truce = tribeRows
+  const truce = npcRows
     .filter((r) => !state.get(r.id)!.war || Date.parse(state.get(r.id)!.war!.until) <= now.getTime() || !env.npcWars)
     .map((r) => ({ tribe: side.get(r.id)!, nextWarAt: state.get(r.id)!.nextWarAt }));
 

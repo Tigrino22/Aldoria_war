@@ -5,6 +5,7 @@ import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
 import { GameError, forbidden, notFound } from '../errors';
+import { declareWar, endWar, tribeWarsView } from '../game/tribe-wars';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
@@ -176,6 +177,33 @@ export default async function socialRoutes(app: FastifyInstance) {
         outbox.push(m.id, { type: 'message', from: me.username });
       }
       return { sent: members.length };
+    });
+  });
+
+  // ---------- Guerres de tribu ----------
+  /** Onglet « Guerres » de la tribu : guerres en cours (déclarées ou subies), récentes, et tribus à qui déclarer la guerre. */
+  app.get('/api/tribes/mine/wars', async (req) => {
+    const playerId = await requirePlayer(req);
+    return tribeWarsView(pool, playerId, new Date());
+  });
+
+  /** Le chef de tribu déclare la guerre à une autre tribu (de joueurs ou de PNJ). */
+  app.post('/api/tribes/mine/wars', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const playerId = await requirePlayer(req);
+    const { targetId } = z.object({ targetId: z.number().int().positive() }).parse(req.body);
+    return act(async (c, outbox) => {
+      await declareWar(c, outbox, playerId, targetId, new Date());
+      return tribeWarsView(c, playerId, new Date());
+    });
+  });
+
+  /** La tribu qui a déclaré une guerre y met fin. */
+  app.delete('/api/tribes/mine/wars/:id', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    return act(async (c, outbox) => {
+      await endWar(c, outbox, playerId, id, new Date());
+      return tribeWarsView(c, playerId, new Date());
     });
   });
 

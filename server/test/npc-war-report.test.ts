@@ -94,8 +94,40 @@ describe('suivi des guerres dans l’administration', () => {
     expect(o.hourly.reduce((n, h) => n + h.conquests, 0)).toBe(1);
   });
 
+  it('suit aussi les guerres entre une tribu de PNJ et une tribu de joueurs', async () => {
+    const tN = await tribeRow('NPT');
+    const attacker = await npc('Agresseur', tN);
+    const vn = await village(attacker, 80, 80);
+    const tP = (await pool.query("INSERT INTO tribes (name, tag, is_npc) VALUES ('Tribu joueurs', 'JOU', false) RETURNING id")).rows[0].id as number;
+    const human = (await pool.query("INSERT INTO players (username, password_hash, tribe_id) VALUES ('Joueur Z', 'x', $1) RETURNING id", [tP])).rows[0].id as number;
+    const vh = await village(human, 84, 80);
+    const free = (await pool.query("INSERT INTO tribes (name, tag, is_npc) VALUES ('Autre', 'AUT', false) RETURNING id")).rows[0].id as number;
+    await pool.query("UPDATE players SET tribe_id = $1 WHERE username = 'Joueur Z'", [tP]);
+    await pool.query("INSERT INTO tribe_wars (declarer_id, target_id, started_at, until) VALUES ($1, $2, $3, $4)", [tN, tP, new Date(NOW.getTime() - 3_600_000), new Date(NOW.getTime() + 86_400_000)]);
+    // Le rapport de l'attaquant PNJ ; une attaque sur un joueur d'une tribu sans guerre ne compte pas.
+    await pool.query(
+      "INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'attack', 't', $2, $3)",
+      [attacker, JSON.stringify(data('Agresseur', 'V80-80', 'Joueur Z', 'V84-80', 7, 12, { conquered: true })), new Date(NOW.getTime() - 600_000)],
+    );
+    await pool.query(
+      `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, sent_at, arrive_at)
+       VALUES ('attack', $1, $2, $1, $3, '{"cavalry":25}', $4, $5)`,
+      [vn, vh, attacker, new Date(NOW.getTime() - 60_000), new Date(NOW.getTime() + 300_000)],
+    );
+    const o = await warOverview(24, NOW);
+    const f = o.fronts.find((x) => [x.a.id, x.b.id].includes(tP))!;
+    expect(f.until).not.toBeNull();
+    expect([f.a.isNpc, f.b.isNpc].sort()).toEqual([false, true]);
+    expect(f.battles).toBe(1);
+    expect(f.conquests.a + f.conquests.b).toBe(1);
+    expect(f.inFlight).toBe(1);
+    expect(o.battles.find((b) => b.defender.player === 'Joueur Z')).toMatchObject({ conquered: true, atWar: true, attackerLosses: 7, defenderLosses: 12 });
+    expect(o.inFlight.find((x) => x.target.player === 'Joueur Z')!.units).toBe(25);
+    expect(free).toBeGreaterThan(0);
+  });
+
   it('refreshWars écrit les déclarations dans le journal', async () => {
-    await pool.query("DELETE FROM tribes WHERE tag IN ('AAA','BBB','CCC')");
+    await pool.query("DELETE FROM tribes WHERE tag IN ('AAA','BBB','CCC','NPT','JOU','AUT')");
     const x = await tribeRow('XXX', { nextWarAt: new Date(NOW.getTime() - 1000).toISOString() });
     const y = await tribeRow('YYY', { nextWarAt: new Date(NOW.getTime() + 1e10).toISOString() });
     await village(await npc('Xavier', x), 40, 40);

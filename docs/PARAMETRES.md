@@ -211,6 +211,19 @@ Onglet « Monde » : interrupteurs de la riposte des PNJ et des guerres entre tr
 
 Code : `server/src/game/npc-wars.ts` (règles pures `planWars`, déclaration en base, rancunes entre PNJ), consommé par `attackStep` dans `npc.ts`.
 
+### Guerres entre PNJ et tribus de joueurs
+
+Table `tribe_wars` (migration 013), code dans `server/src/game/tribe-wars.ts`, page « Tribu » > onglet « Guerres » (`client/src/components/TribeWars.tsx`). Elles sont indépendantes de la riposte (interrupteur « Riposte des PNJ ») : une guerre n'a pas besoin d'une attaque préalable du joueur.
+
+| Règle | Valeur |
+|---|---|
+| Déclaration par un PNJ | Une tribu de PNJ déclare la guerre à une tribu de joueurs libre (aucune guerre en cours contre un PNJ, au moins un village hors protection des débutants), sans provocation ; une tribu de joueurs n'a qu'un agresseur PNJ à la fois |
+| Rythme | Une tribu de PNJ neuve attend 0 à 24 h, puis une guerre dure 4 jours, suivie d'au moins 3 jours de trêve avant la suivante contre des joueurs ; sans cible libre elle réessaie 1 h plus tard |
+| Déclaration par un chef | Seul le chef de tribu, vers une tribu de joueurs ou de PNJ ayant au moins un village ; 4 jours ; 3 guerres déclarées à la fois au plus ; une seule guerre à la fois entre deux mêmes tribus ; le chef y met fin quand il veut |
+| Effet | Contre ou depuis une tribu de PNJ, tous les membres PNJ frappent les villages ennemis (jusqu'à 40 cases, 70 % de l'armée offensive, sans condition de taille), jamais pendant les heures calmes ni sur un joueur sous protection ; entre deux tribus de joueurs, c'est un état déclaré sans effet mécanique |
+| Messages | Les membres de la tribu visée reçoivent un message à la déclaration, à la fin anticipée et à l'expiration |
+| Interrupteurs | « Guerres contre les tribus de joueurs » (variable `NPC_PLAYER_WARS`, 1 par défaut) : coupé, aucune nouvelle guerre contre des joueurs, les guerres en cours cessent d'avoir un effet et on ne peut plus déclarer la guerre à un PNJ. Nécessite aussi « Guerres entre tribus de PNJ » |
+
 ### Suivi des guerres (Administration > Guerres)
 
 Onglet en lecture seule, actualisé toutes les 5 s, avec une période au choix (1, 6, 24 ou 72 h). Code : `server/src/game/npc-war-report.ts` (route `GET /api/admin/wars`), `client/src/components/AdminWars.tsx`.
@@ -223,7 +236,7 @@ Onglet en lecture seule, actualisé toutes les 5 s, avec une période au choix (
 | Journal | Batailles (attaquant, cible, résultat, pertes, « riposte » hors guerre déclarée, « conquête ») et déclarations / fins de guerre |
 | Tribus en trêve | Date de la prochaine guerre possible |
 
-Les batailles viennent des rapports de défense des PNJ (ils contiennent les pertes des deux camps) : un combat entre deux PNJ de tribus différentes. Les déclarations et fins de guerre sont écrites dans la table `npc_war_log` (migration 012) par `refreshWars`. Les rapports des PNJ sont conservés 3 jours : c'est la limite de l'historique.
+Les batailles viennent des rapports de défense des PNJ (ils contiennent les pertes des deux camps) : un combat entre deux PNJ de tribus différentes ; pour une guerre contre une tribu de joueurs, du rapport de l'attaquant PNJ (les pertes du défenseur y manquent quand l'attaque est anéantie). Les guerres de joueurs apparaissent aussi dans les fronts, avec la mention « joueurs ». Les déclarations et fins de guerre sont écrites dans la table `npc_war_log` (migration 012) par `refreshWars`. Les rapports des PNJ sont conservés 3 jours : c'est la limite de l'historique.
 
 ## Recrutement des PNJ : villages offensifs et défensifs
 

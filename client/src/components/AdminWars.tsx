@@ -8,6 +8,7 @@ interface Side {
   id: number;
   tag: string;
   name: string;
+  isNpc: boolean;
   members: number;
   villages: number;
   points: number;
@@ -146,9 +147,11 @@ export default function AdminWars({ hours }: { hours: number }) {
                 {data.fronts.map((f) => (
                   <tr key={`${f.a.id}-${f.b.id}`}>
                     <td>
-                      <b>[{f.a.tag}]</b> contre <b>[{f.b.tag}]</b>
+                      <b>[{f.a.tag}]</b>
+                      {!f.a.isNpc && <span className="chip">joueurs</span>} contre <b>[{f.b.tag}]</b>
+                      {!f.b.isNpc && <span className="chip">joueurs</span>}
                     </td>
-                    <td>{f.until ? <>fin dans <Countdown to={f.until} /></> : <span className="muted">ripostes seulement</span>}</td>
+                    <td>{f.until ? <>fin dans <Countdown to={f.until} /></> : <span className="muted" title="Rivalités et ripostes : aucune guerre déclarée entre ces tribus en ce moment">hors guerre</span>}</td>
                     <td className="num">{f.a.villages} – {f.b.villages}</td>
                     <td className="num"><Score f={f} /></td>
                     <td className="num hide-m">{f.conquests.a} – {f.conquests.b}</td>

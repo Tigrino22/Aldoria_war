@@ -114,11 +114,13 @@ export function warLogEntries(before: WarTribe[], updates: WarUpdate[]): WarLogE
   return [...entries.values()];
 }
 
-/** Tribus ennemies de la tribu d'un PNJ en ce moment (vide si les guerres sont désactivées ou si la guerre est finie). */
+/** Tribus ennemies de la tribu d'un PNJ en ce moment, de PNJ ou de joueurs (vide si les guerres sont désactivées ou si la guerre est finie). */
 export function warEnemiesOf(tribe: TribeInfo | null, now: Date): number[] {
-  const war = tribe?.state.war;
-  if (!env.npcWars || !war || Date.parse(war.until) <= now.getTime()) return [];
-  return [war.enemyId];
+  if (!env.npcWars || !tribe) return [];
+  const war = tribe.state.war;
+  const enemies = war && Date.parse(war.until) > now.getTime() ? [war.enemyId] : [];
+  // Les guerres contre des tribus de joueurs ont leur propre interrupteur, sans lien avec la riposte.
+  return env.npcPlayerWars ? [...enemies, ...(tribe.playerEnemies ?? [])] : enemies;
 }
 
 /**

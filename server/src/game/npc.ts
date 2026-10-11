@@ -37,6 +37,7 @@ import {
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
 import { villageRoles, type VillageRole } from './npc-roles';
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
+import { refreshTribeWars } from './tribe-wars';
 import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
 
 /** Nombre maximal d'échanges (acceptations ou publications) d'un PNJ par village et par réflexion. */
@@ -302,7 +303,8 @@ async function candidates(c: Db, npcId: number, from: { id: number; x: number; y
     y: r.y,
     ownerId: r.owner_id,
     rival: r.rival,
-    enemy: r.rival && (hostiles.warTribes.includes(r.owner_tribe) || hostiles.grudges.includes(r.owner_id)),
+    // Un village de la tribu ennemie en guerre est un ennemi, de PNJ comme de joueur ; la rancune ne vaut qu'entre PNJ.
+    enemy: hostiles.warTribes.includes(r.owner_tribe) || (r.rival && hostiles.grudges.includes(r.owner_id)),
     ownerPoints: r.owner_points,
     dist: Math.hypot(r.x - from.x, r.y - from.y),
   }));
@@ -364,14 +366,17 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const opCooldownOk = !tribe || !tribe.state.lastOpAt || now.getTime() - Date.parse(tribe.state.lastOpAt) >= (12 * 3_600_000) / env.worldSpeed;
   const humans = all.filter((t) => t.ownerId !== null && !t.rival);
   const revenge = quiet ? [] : humans.filter((t) => grudges.includes(t.ownerId!));
+  // En guerre contre une tribu de joueurs, tous les membres frappent ses villages (pas seulement le chef), sans condition de taille : jamais pendant les heures calmes.
+  const warPlayers = quiet ? [] : humans.filter((t) => t.enemy);
   // Sans provocation, un PNJ ne s'attaque qu'à un joueur de sa taille : entre 70 % et 150 % de ses points.
   const myPoints = (await c.query('SELECT coalesce(sum(points), 0)::int AS p FROM villages WHERE owner_id = $1', [npcId])).rows[0].p as number;
   const sameSize = humans.filter((t) => pointRatioOk(myPoints, t.ownerPoints));
   const aggressive = !quiet && isLeader && opCooldownOk ? sameSize : [];
-  const players = [...new Set([...revenge, ...aggressive])];
+  const players = [...new Set([...revenge, ...aggressive, ...warPlayers])];
   // Un Bâtisseur se développe surtout en pillant les barbares et ne s'en prend que de temps en temps à un joueur.
   // Les ennemis déclarés (guerre de tribu, PNJ qui nous a attaqués) passent avant tout ; viennent ensuite les rivaux, puis les barbares.
-  const enemyVillages = all.filter((t) => t.enemy);
+  // Un village de joueur ne se vise jamais pendant les heures calmes, même en guerre.
+  const enemyVillages = all.filter((t) => t.enemy && (t.rival || !quiet));
   const prey = enemyVillages.length && rng() < 0.9 ? enemyVillages : rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
   const revengePool = players.filter((t) => revenge.includes(t));
   // Quand une guerre ou une vengeance contre un autre PNJ occupe la tribu, les joueurs passent au second plan.
@@ -535,7 +540,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   }
 
   const cap = npcCap(await worldDays(c, now), env.npcDifficulty);
-  const tribe = await npcTribeOf(c, npcId);
+  const tribe = await npcTribeOf(c, npcId, now);
   let angry = false;
   // Les villages se partagent entre offensifs et défensifs selon le profil du PNJ (voir npc-roles.ts).
   const roles = villageRoles(profile, villages.length);
@@ -563,6 +568,7 @@ export async function processNpcs(now: Date, limit = 25): Promise<number> {
   await alertTribes(now);
   await alertAttackedNpcs(now);
   await refreshWars(now);
+  await refreshTribeWars(now);
   await tx((c) => ensureDailyNpc(c, now));
   {
     const outbox = new Outbox();
