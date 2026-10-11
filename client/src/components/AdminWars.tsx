@@ -73,16 +73,16 @@ function Score({ f }: { f: Front }) {
 }
 
 /** Onglet « Guerres » de l'administration : suivi en direct des guerres entre tribus de PNJ, et ce qui s'est passé sur la période. */
-export default function AdminWars({ hours }: { hours: number }) {
+export default function AdminWars({ hours, publicView = false }: { hours: number; publicView?: boolean }) {
   const { run } = useGame();
   const [data, setData] = useState<Overview | null>(null);
   const [all, setAll] = useState(false);
-  const load = useCallback(() => run(async () => setData(await api<Overview>(`/api/admin/wars?hours=${hours}`))), [run, hours]);
+  const load = useCallback(() => run(async () => setData(await api<Overview>(`/api/${publicView ? 'world' : 'admin'}/wars?hours=${hours}`))), [run, hours, publicView]);
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
+    const t = setInterval(load, publicView ? 15_000 : 5000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, publicView]);
 
   if (!data) return <p className="muted">Chargement…</p>;
 
@@ -121,12 +121,12 @@ export default function AdminWars({ hours }: { hours: number }) {
       )}
       <div className="admin-kpis">
         <div className="admin-kpi"><i>Guerres en cours</i><b>{active.length}</b></div>
-        <div className="admin-kpi"><i>Attaques en route</i><b>{data.inFlight.length}</b></div>
+        <div className="admin-kpi"><i>Attaques en route</i><b>{publicView ? data.fronts.reduce((n, f) => n + f.inFlight, 0) : data.inFlight.length}</b></div>
         <div className="admin-kpi"><i>Batailles ({hours} h)</i><b>{data.battles.length}</b></div>
         <div className="admin-kpi"><i>Conquêtes ({hours} h)</i><b>{conquests}</b></div>
       </div>
 
-      <Panel title="Fronts" actions={<span className="muted small">actualisé toutes les 5 s</span>}>
+      <Panel title="Fronts" actions={<span className="muted small">actualisé toutes les {publicView ? 15 : 5} s</span>}>
         {data.fronts.length === 0 ? (
           <p className="muted">Aucune guerre en cours ni bataille sur la période.</p>
         ) : (
@@ -166,6 +166,7 @@ export default function AdminWars({ hours }: { hours: number }) {
         <p className="muted small">Les colonnes comparent la première tribu à la seconde. Pertes : unités perdues par chaque camp sur la période.</p>
       </Panel>
 
+      {!publicView && (
       <Panel title="Attaques en route" actions={<span className="muted small">en direct</span>}>
         {data.inFlight.length === 0 ? (
           <p className="muted">Aucune attaque entre tribus de PNJ en ce moment.</p>
@@ -201,6 +202,7 @@ export default function AdminWars({ hours }: { hours: number }) {
           </div>
         )}
       </Panel>
+      )}
 
       <Panel title={`Rythme des batailles (${hours} h)`}>
         <div className="war-chart" role="img" aria-label="Batailles par heure">

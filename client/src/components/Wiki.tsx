@@ -469,6 +469,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
             (3 guerres déclarées à la fois au plus) et y mettre fin quand il veut. Une tribu de PNJ peut aussi vous déclarer la guerre sans provocation, ou en riposte quand l'un des vôtres attaque un de ses membres (si la riposte est activée) : ses membres frappent alors les villages de votre tribu, jamais pendant les
             heures calmes, et vous êtes prévenus par message. Entre deux tribus de joueurs, la guerre est un état déclaré, visible des deux camps.
             Chaque guerre affiche son bilan depuis la déclaration, pour votre tribu et pour l'adversaire : batailles gagnées (en attaque et en défense), villages conquis et adversaires battus. Un panneau « Statistiques de guerre » totalise les guerres en cours et celles de la semaine, et classe les cinq meilleurs guerriers de votre tribu.
+            La page « Guerres du monde » (menu Social) est ouverte à tous : fronts en cours entre toutes les tribus, batailles et conquêtes des dernières heures (jusqu'à 72 h), rythme par heure, journal des déclarations et tribus de PNJ en trêve. Les attaques en route n'y sont pas détaillées.
           </li>
         </ul>
         <h3>Vue d'ensemble et aides à l'attaque</h3>

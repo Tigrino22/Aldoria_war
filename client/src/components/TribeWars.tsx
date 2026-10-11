@@ -198,7 +198,7 @@ export default function TribeWars({ onCount }: { onCount?: (n: number) => void }
                   <span className="muted small">
                     {' '}· {fmt(m.conquests)} conquête{m.conquests > 1 ? 's' : ''} · {fmt(m.wins)} victoire{m.wins > 1 ? 's' : ''}
                   </span>
-                  <span className="war-score">{fmt(m.score)} pts</span>
+                  <span className="war-warrior-score">{fmt(m.score)} pts</span>
                 </li>
               ))}
             </ol>

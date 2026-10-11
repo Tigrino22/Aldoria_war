@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { env } from '../env';
 import { warScore, WAR_POINTS, WAR_SCORE_SQL } from '../game/war-stats';
+import { warOverview } from '../game/npc-war-report';
 import { worldStats } from '../game/world-stats';
 
 const toStats = (r: any) => ({
@@ -62,6 +64,16 @@ export default async function statsRoutes(app: FastifyInstance) {
       )
     ).rows;
     return { conquests, wars };
+  });
+
+  /**
+   * Guerres du monde pour tous les joueurs : fronts, batailles passées, journal et trêves. Les attaques en route (cibles et heures d'arrivée)
+   * restent réservées à l'administration. Les rapports des PNJ ne sont gardés que 72 h : c'est la limite de l'historique.
+   */
+  app.get('/api/world/wars', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    await requirePlayer(req);
+    const { hours } = z.object({ hours: z.coerce.number().int().min(1).max(72).default(24) }).parse(req.query);
+    return { ...(await warOverview(hours)), inFlight: [] };
   });
 
   /** Statistiques publiques du monde : uniquement des totaux et des moyennes, jamais de joueur ni de village précis. */
