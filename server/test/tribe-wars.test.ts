@@ -216,5 +216,55 @@ describe('guerres de tribu : base de données', () => {
       env.npcPlayerWars = 1;
       expect((await pool.query('SELECT count(*)::int AS n FROM tribe_wars')).rows[0].n).toBe(0);
     });
+
+    it('attaquer un PNJ d’une tribu de PNJ fait déclarer la guerre à la tribu de l’attaquant, si la riposte est activée', async () => {
+      const attack = async (player: number, from: number) => {
+        await pool.query('DELETE FROM commands');
+        await pool.query(
+          `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, sent_at, arrive_at)
+           VALUES ('attack', $1, $2, $1, $3, $4::jsonb, $5, $6)`,
+          [from, npcVillage, player, JSON.stringify({ ...emptyUnits(), cavalry: 50 }), NOON, new Date(NOON.getTime() + 3_600_000)],
+        );
+      };
+      const wars = async () => (await pool.query('SELECT declarer_id, target_id, declared_by FROM tribe_wars')).rows;
+      await pool.query('DELETE FROM tribe_wars');
+      await pool.query('DELETE FROM messages');
+      // Les déclarations spontanées sont repoussées : seule la provocation compte ici.
+      await pool.query("UPDATE tribes SET npc_state = npc_state || jsonb_build_object('nextPlayerWarAt', $1::text) WHERE is_npc", [new Date(NOON.getTime() + 30 * DAY).toISOString()]);
+      await attack(boss, humanVillage);
+
+      // Riposte désactivée : aucune guerre.
+      env.npcRevenge = 0;
+      await refreshTribeWars(NOON, () => 0.5);
+      expect(await wars()).toEqual([]);
+      env.npcRevenge = 1;
+
+      // Un joueur sans tribu n'en déclenche pas.
+      const loner = await human('Solitaire');
+      const lonerVillage = await village(loner, 5, 5);
+      await attack(loner, lonerVillage);
+      await refreshTribeWars(NOON, () => 0.5);
+      expect(await wars()).toEqual([]);
+
+      // Riposte activée : la tribu du PNJ déclare la guerre à la tribu de l'attaquant, une seule fois.
+      await attack(boss, humanVillage);
+      await refreshTribeWars(NOON, () => 0.5);
+      expect(await wars()).toEqual([{ declarer_id: npcTribe, target_id: playerTribe, declared_by: null }]);
+      expect((await pool.query("SELECT count(*)::int AS n FROM messages WHERE to_id = $1 AND body LIKE '%a attaqué un membre%'", [boss])).rows[0].n).toBe(1);
+      await refreshTribeWars(NOON, () => 0.5);
+      expect(await wars()).toHaveLength(1);
+
+      // Terminée à la main, la même attaque ne la relance pas.
+      await pool.query('UPDATE tribe_wars SET ended_at = $1', [new Date(NOON.getTime() + 60_000)]);
+      await refreshTribeWars(new Date(NOON.getTime() + 120_000), () => 0.5);
+      expect(await wars()).toHaveLength(1);
+
+      // Sans les guerres contre les joueurs, pas de déclaration non plus.
+      await pool.query('DELETE FROM tribe_wars');
+      env.npcPlayerWars = 0;
+      await refreshTribeWars(NOON, () => 0.5);
+      env.npcPlayerWars = 1;
+      expect(await wars()).toEqual([]);
+    });
   });
 });

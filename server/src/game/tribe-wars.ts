@@ -3,11 +3,13 @@ import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { WAR_DAYS } from './npc-wars';
+import { GRUDGE_DAYS, REAL_ATTACK } from './npc-tribes';
 
 /**
  * Guerres qui concernent une tribu de joueurs (table `tribe_wars`) :
  * - un chef de tribu déclare la guerre à une autre tribu, de joueurs ou de PNJ ;
- * - une tribu de PNJ déclare la guerre à une tribu de joueurs, sans provocation (réglage `npcPlayerWars`, indépendant de la riposte).
+ * - une tribu de PNJ déclare la guerre à une tribu de joueurs, sans provocation (réglage `npcPlayerWars`, indépendant de la riposte) ;
+ * - une tribu de PNJ déclare la guerre à la tribu d'un joueur qui a attaqué l'un de ses membres, si la riposte est activée.
  * Contre une tribu de PNJ, ou depuis une tribu de PNJ, les membres du camp PNJ frappent les villages ennemis (voir `warEnemiesOf`).
  * Entre deux tribus de joueurs, la guerre est un état déclaré, visible des deux camps, sans effet mécanique.
  * Les règles de choix des PNJ (`planPlayerWars`) sont pures ; le reste lit et écrit la base.
@@ -217,6 +219,44 @@ export async function endWar(c: Db, outbox: Outbox, playerId: number, warId: num
 }
 
 /**
+ * Riposte de tribu : quand un joueur membre d'une tribu attaque (pour de bon) un PNJ d'une tribu de PNJ, cette tribu déclare la guerre
+ * à la tribu de l'attaquant, sauf si une guerre est déjà en cours entre elles ou a été déclarée depuis cette attaque.
+ * Demande la riposte, les guerres et les guerres contre les joueurs. Un joueur sans tribu ne subit que la riposte individuelle.
+ */
+export async function declareProvokedWars(now: Date) {
+  if (!env.npcRevenge || !env.npcWars || !env.npcPlayerWars) return;
+  const { rows } = await pool.query(
+    `SELECT DISTINCT ON (o.tribe_id, a.tribe_id) o.tribe_id AS npc_tribe, a.tribe_id AS player_tribe, a.username
+     FROM commands cm
+     JOIN villages t ON t.id = cm.target_village_id
+     JOIN players o ON o.id = t.owner_id AND o.is_npc AND o.tribe_id IS NOT NULL
+     JOIN players a ON a.id = cm.player_id AND NOT a.is_npc AND a.tribe_id IS NOT NULL
+     WHERE cm.type = 'attack' AND cm.sent_at > $1 AND ${REAL_ATTACK}
+       AND NOT EXISTS (
+         SELECT 1 FROM tribe_wars w
+         WHERE ((w.declarer_id = o.tribe_id AND w.target_id = a.tribe_id) OR (w.declarer_id = a.tribe_id AND w.target_id = o.tribe_id))
+           AND ((w.ended_at IS NULL AND w.until > $2) OR w.started_at >= cm.sent_at))
+     ORDER BY o.tribe_id, a.tribe_id, cm.sent_at`,
+    [new Date(now.getTime() - GRUDGE_DAYS * DAY_MS), now],
+  );
+  for (const r of rows) {
+    const until = new Date(now.getTime() + PLAYER_WAR_DAYS * DAY_MS);
+    await pool.query('INSERT INTO tribe_wars (declarer_id, target_id, declared_by, started_at, until) VALUES ($1, $2, NULL, $3, $4)', [r.npc_tribe, r.player_tribe, now, until]);
+    const [npc, target] = await Promise.all([r.npc_tribe, r.player_tribe].map(async (id) => (await pool.query('SELECT tag, name, leader_id FROM tribes WHERE id = $1', [id])).rows[0]));
+    const out = new Outbox();
+    await notifyMembers(
+      pool,
+      out,
+      r.player_tribe,
+      npc.leader_id,
+      `[Guerre] ${tribeLabel(npc)} vous déclare la guerre`,
+      `${r.username} a attaqué un membre de la tribu de PNJ ${tribeLabel(npc)}, qui riposte en déclarant la guerre à ${tribeLabel(target)} pour ${PLAYER_WAR_DAYS} jours : ses membres vont frapper vos villages (jamais pendant les heures calmes). Surveillez l'onglet « Guerres » de la page Tribu.`,
+    );
+    out.flush();
+  }
+}
+
+/**
  * Termine les guerres échues (avec un message aux tribus de joueurs concernées) et, quand les guerres contre les joueurs
  * sont activées, laisse les tribus de PNJ en déclarer de nouvelles. À appeler à chaque passage des PNJ.
  */
@@ -239,6 +279,7 @@ export async function refreshTribeWars(now: Date, rnd: () => number = Math.rando
     }
   }
   outbox.flush();
+  await declareProvokedWars(now);
   if (!env.npcWars || !env.npcPlayerWars) return;
 
   const npcRows = (
