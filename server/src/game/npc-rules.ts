@@ -90,6 +90,29 @@ export function nextRecruit(
     .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(15, Math.ceil(deficit / 3))) }));
 }
 
+/**
+ * Éclaireurs envoyés en mission : 2 d'abord, puis 4 et 8 après chaque échec (tous les éclaireurs tués), dans la limite de ceux dont le village dispose.
+ * Une défense qui compte autant d'éclaireurs que l'attaque les tue tous : il en faut davantage pour passer.
+ */
+export const scoutWave = (failures: number, available: number) => Math.max(0, Math.min(available, 2 << Math.min(2, Math.max(0, failures))));
+
+/** Échecs d'espionnage consécutifs après lesquels un PNJ laisse une cible tranquille un temps. */
+export const SCOUT_MAX_FAILURES = 3;
+/** Durée (en heures de jeu) pendant laquelle les échecs d'espionnage comptent, et pendant laquelle une cible abandonnée est laissée. */
+export const SCOUT_MEMORY_GAME_HOURS = 12;
+
+/** Échecs consécutifs par village, du plus récent au plus ancien : un renseignement obtenu remet le compte à zéro. `reports` est trié du plus récent au plus ancien. */
+export function consecutiveScoutFailures(reports: { villageId: number; ok: boolean }[]): Map<number, number> {
+  const failures = new Map<number, number>();
+  const done = new Set<number>();
+  for (const r of reports) {
+    if (done.has(r.villageId)) continue;
+    if (r.ok) done.add(r.villageId);
+    else failures.set(r.villageId, (failures.get(r.villageId) ?? 0) + 1);
+  }
+  return failures;
+}
+
 /** Marge de sécurité demandée avant d'attaquer : la force d'attaque doit dépasser 1,3 fois la défense estimée. */
 export const ATTACK_MARGIN = 1.3;
 

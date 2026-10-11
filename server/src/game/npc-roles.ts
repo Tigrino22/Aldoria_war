@@ -31,6 +31,9 @@ export function villageRoles(profile: NpcProfile, count: number): VillageRole[] 
   return roles;
 }
 
+/** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté, pour passer les éclaireurs d'un défenseur. */
+export const offenseScouts = (cap: number, difficulty: number) => Math.min(12, Math.round((3 + cap / 2) * Math.max(1, difficulty)));
+
 /** Armée visée par un village de rôle `role` au niveau `cap` : les unités dont les bâtiments manquent encore sont ignorées au recrutement. */
 export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, difficulty: number): UnitCounts {
   // Un village dont le rôle ne correspond pas au tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) y met moins d'efforts.
@@ -40,7 +43,7 @@ export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, 
   if (role === 'offense') {
     t.swordsman = scale(7 * fit);
     t.cavalry = scale(2 * fit);
-    t.scout = 3;
+    t.scout = offenseScouts(cap, difficulty);
     t.spearman = scale(1);
     if (profile === 'conqueror') t.ram = scale(1);
     // Quatre nobles font tomber la loyauté d'un village dans trois cas sur quatre (20 à 35 points chacun).
@@ -49,7 +52,7 @@ export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, 
     t.spearman = scale(5 * fit);
     t.halberdier = scale(5 * fit);
     t.swordsman = scale(1);
-    t.scout = 1;
+    t.scout = 2;
   }
   return t;
 }

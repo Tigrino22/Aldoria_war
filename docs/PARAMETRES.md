@@ -245,8 +245,10 @@ Chaque village d'un PNJ a un rôle (code : `server/src/game/npc-roles.ts`), qui 
 
 | Rôle | Unités recrutées (par niveau visé) |
 |---|---|
-| Offensif | épéistes ×7, cavaliers ×2, 3 éclaireurs, garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
-| Défensif | lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), 1 éclaireur |
+| Offensif | épéistes ×7, cavaliers ×2, (3 + niveau ÷ 2) × difficulté éclaireurs (12 au plus, voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
+| Défensif | lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), 2 éclaireurs |
+
+Espionnage des PNJ : avant de piller, un PNJ envoie 2 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), la mission suivante en envoie 4, puis 8 (dans la limite de ceux du village). Après trois échecs de suite sur la même cible, il la laisse tranquille et en choisit une autre ; les échecs sont oubliés au bout de 12 heures de jeu, ou dès qu'un espionnage réussit. Constantes : `scoutWave`, `SCOUT_MAX_FAILURES`, `SCOUT_MEMORY_GAME_HOURS` dans `npc-rules.ts`, `offenseScouts` dans `npc-roles.ts`.
 
 Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) recrute ses unités principales à 60 %.
 
