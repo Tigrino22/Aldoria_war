@@ -459,7 +459,7 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
     });
   }
   await saveVillage(c, target);
-  await recordBattle(c, { attackerId, defenderId: previousOwner, attackerWins: result.attackerWins, conquered, village: target, at });
+  await recordBattle(c, { attackerId, defenderId: previousOwner, attackerWins: result.attackerWins, conquered, village: target, at, attackerKills: populationOf(defenderLossesTotal), defenderKills: killedByDefense });
 
   const attackerName = await playerName(c, attackerId);
   const defenderName = await playerName(c, previousOwner);

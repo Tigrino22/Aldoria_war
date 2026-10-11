@@ -3,6 +3,7 @@ import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
 import { Countdown, Panel } from '../ui';
+import './ranking.css';
 
 interface Other {
   id: number;
@@ -13,8 +14,15 @@ interface Other {
   villages: number;
   points: number;
 }
+interface Side {
+  attackWins: number;
+  defenseWins: number;
+  conquests: number;
+  kills: number;
+}
 interface WarLine {
   id: number;
+  stats: { mine: Side; theirs: Side };
   other: Other;
   direction: 'declared' | 'received';
   declaredBy: string | null;
@@ -40,6 +48,45 @@ export interface TribeWarsView {
   declaredCount: number;
   maxDeclared: number;
   durationDays: number;
+  warriors: { username: string; score: number; conquests: number; wins: number }[];
+}
+
+const wins = (s: Side) => s.attackWins + s.defenseWins;
+const sum = (lines: WarLine[], who: 'mine' | 'theirs'): Side =>
+  lines.reduce(
+    (t, w) => ({ attackWins: t.attackWins + w.stats[who].attackWins, defenseWins: t.defenseWins + w.stats[who].defenseWins, conquests: t.conquests + w.stats[who].conquests, kills: t.kills + w.stats[who].kills }),
+    { attackWins: 0, defenseWins: 0, conquests: 0, kills: 0 },
+  );
+
+/** Tableau « nous / eux » : batailles gagnées, villages conquis et adversaires battus. */
+function Versus({ mine, theirs, theirLabel }: { mine: Side; theirs: Side; theirLabel: string }) {
+  const rows: [string, number, number][] = [
+    ['Batailles gagnées', wins(mine), wins(theirs)],
+    ['dont en attaque', mine.attackWins, theirs.attackWins],
+    ['dont en défense', mine.defenseWins, theirs.defenseWins],
+    ['Villages conquis', mine.conquests, theirs.conquests],
+    ['Adversaires battus', mine.kills, theirs.kills],
+  ];
+  return (
+    <table className="war-versus">
+      <thead>
+        <tr>
+          <th />
+          <th>Nous</th>
+          <th>{theirLabel}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(([label, a, b]) => (
+          <tr key={label} className={label.startsWith('dont') ? 'sub' : ''}>
+            <td>{label}</td>
+            <td className={a > b ? 'lead' : ''}>{fmt(a)}</td>
+            <td className={b > a ? 'lead lost' : ''}>{fmt(b)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
@@ -92,6 +139,10 @@ export default function TribeWars({ onCount }: { onCount?: (n: number) => void }
           {' '}· {w.other.members} membre{w.other.members > 1 ? 's' : ''} · {w.other.villages} village{w.other.villages > 1 ? 's' : ''} · {fmt(w.other.points)} pts
         </span>
         <br />
+        <span className="war-mini">
+          <b>{fmt(wins(w.stats.mine))}</b> – {fmt(wins(w.stats.theirs))} batailles · <b>{fmt(w.stats.mine.conquests)}</b> – {fmt(w.stats.theirs.conquests)} villages conquis
+        </span>
+        <br />
         <span className="muted small">
           {w.direction === 'declared' ? 'Déclarée' : 'Déclarée contre vous'} le {day(w.startedAt)}
           {w.declaredBy ? ` par ${w.declaredBy}` : w.direction === 'received' ? ' sans provocation' : ''}
@@ -126,6 +177,34 @@ export default function TribeWars({ onCount }: { onCount?: (n: number) => void }
         <p className="muted small">
           Une tribu de PNJ en guerre contre vous frappe les villages de ses membres (jamais pendant les heures calmes). Contre une tribu de joueurs, la guerre est un état déclaré, visible par les deux camps.
         </p>
+      </Panel>
+
+      <Panel title="Statistiques de guerre">
+        {view.active.length + view.recent.length === 0 ? (
+          <p className="muted">Les statistiques apparaissent dès qu’une guerre est déclarée.</p>
+        ) : (
+          <>
+            <p className="muted small">Bilan de toutes les guerres en cours et terminées depuis 7 jours, comptées depuis leur déclaration.</p>
+            <Versus mine={sum([...view.active, ...view.recent], 'mine')} theirs={sum([...view.active, ...view.recent], 'theirs')} theirLabel="Adversaires" />
+          </>
+        )}
+        {view.warriors.length > 0 && (
+          <>
+            <h4 className="war-sub">Meilleurs guerriers de la tribu</h4>
+            <ol className="war-warriors">
+              {view.warriors.map((m) => (
+                <li key={m.username}>
+                  <b>{m.username}</b>
+                  <span className="muted small">
+                    {' '}· {fmt(m.conquests)} conquête{m.conquests > 1 ? 's' : ''} · {fmt(m.wins)} victoire{m.wins > 1 ? 's' : ''}
+                  </span>
+                  <span className="war-score">{fmt(m.score)} pts</span>
+                </li>
+              ))}
+            </ol>
+            <p className="muted small">Classement de guerre du monde, toutes batailles confondues.</p>
+          </>
+        )}
       </Panel>
 
       <Panel title="Déclarer la guerre">
