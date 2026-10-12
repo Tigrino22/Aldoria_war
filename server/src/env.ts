@@ -40,6 +40,10 @@ export const env = {
   npcRaids: count('NPC_RAIDS', 1) > 0 ? 1 : 0,
   npcRaidsPerThink: count('NPC_RAIDS_PER_THINK', 6),
   npcRaidRadius: count('NPC_RAID_RADIUS', 25),
+  /** Recrutement des PNJ : lot maximal par unité, nombre de lots par réflexion, et recrutement avant construction (1 = oui) ; modifiables à chaud. */
+  npcRecruitBatch: count('NPC_RECRUIT_BATCH', 150),
+  npcRecruitBatches: count('NPC_RECRUIT_BATCHES', 3),
+  npcArmyFirst: count('NPC_ARMY_FIRST', 1) > 0 ? 1 : 0,
   /** Délai moyen (minutes réelles à vitesse x1) entre deux réflexions d'un PNJ, divisé par la racine de la vitesse du monde. */
   npcThinkMinutes: count('NPC_THINK_MINUTES', 10),
   /** Gestionnaire de compte (1 = activé sur le monde), modifiable à chaud depuis l'administration. */

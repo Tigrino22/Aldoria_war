@@ -281,6 +281,12 @@ Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur 
 
 Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaque rôle ; les offensifs sont répartis régulièrement (ex. 2 villages : le premier défensif, le second offensif). Dans une tribu, les profils sont déjà mélangés (chef pillard, un conquérant, des bâtisseurs et des pillards), donc certains membres sont offensifs et d'autres défensifs. Les renforts qu'un PNJ envoie à sa tribu menacée comptent aussi les hallebardiers.
 
+### Recrutement accéléré des PNJ
+
+Avant : un village de PNJ ne recrutait que lorsque sa file était vide, un seul lot d'au plus 40 unités par réflexion, après avoir dépensé ses ressources en construction. À x10, la caserne restait donc inactive entre deux réflexions et l'armée montait lentement.
+
+Désormais (`recruitStep` dans `npc.ts`) : la file se remplit dès qu'il lui reste moins de deux réflexions de travail ; jusqu'à 3 lots de types d'unités différents par réflexion (`NPC_RECRUIT_BATCHES`), chacun d'au plus 150 unités (`NPC_RECRUIT_BATCH`, réduit de moitié tant que c'est trop cher ou trop lourd pour la ferme) ; les unités déjà en file comptent dans les effectifs, donc pas de doublon ; le recrutement passe avant la construction pour l'usage des ressources (`NPC_ARMY_FIRST`, 1 par défaut ; 0 remet la construction en premier). Les trois réglages sont modifiables à chaud dans Administration > Monde. Contrepartie : plus de ressources vont à l'armée, donc les bâtiments montent un peu moins vite.
+
 ## Point de ralliement : ordres planifiés et train de nobles
 
 Page « Point de ralliement » du menu, distincte de « Troupes » (`#/ralliement`, ou `#/ralliement/x,y` depuis la carte). Code : `server/src/game/orders.ts` (base de données), `shared/src/orders.ts` (découpe des ordres, aussi utilisée par le client pour afficher le plan avant l'envoi), `client/src/components/RallyOrders.tsx`.

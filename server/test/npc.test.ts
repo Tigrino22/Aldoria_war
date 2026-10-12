@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { STARTING_BUILDINGS, emptyUnits, populationCapacity, populationOf } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
+import { env } from '../src/env';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents } from '../src/game/commands';
@@ -166,11 +167,14 @@ describe('PNJ en jeu', () => {
     const village = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [npc])).rows[0].id as number;
     await pool.query("UPDATE villages SET buildings = buildings || '{\"townhall\": 3, \"barracks\": 1, \"farm\": 3}'::jsonb, wood = 900, clay = 900, iron = 900, wheat = 900 WHERE id = $1", [village]);
     let t = NOON;
+    // Ce test vérifie la construction : on lui donne la priorité sur les ressources (le recrutement passe sinon en premier).
+    env.npcArmyFirst = 0;
     for (let i = 0; i < 12; i++) {
       await tx((c) => npcThink(c, new Outbox(), npc, t));
       t = new Date(t.getTime() + 20 * MIN);
       await processDueEvents(t);
     }
+    env.npcArmyFirst = 1;
     const queue = (await pool.query('SELECT count(*)::int AS n FROM build_queue WHERE village_id = $1', [village])).rows[0].n;
     const v = (await pool.query('SELECT buildings, points FROM villages WHERE id = $1', [village])).rows[0];
     expect(queue + v.points).toBeGreaterThan(0);
@@ -178,6 +182,20 @@ describe('PNJ en jeu', () => {
     const recruits = (await pool.query('SELECT count(*)::int AS n FROM recruit_queue WHERE village_id = $1', [village])).rows[0].n;
     const troops = await tx((c) => getTroops(c, village, village));
     expect(recruits + troops.spearman + troops.swordsman).toBeGreaterThan(0);
+  });
+
+  it('un PNJ met plusieurs lots en file d’un coup, gros lots compris, et recrute avant de construire', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const village = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [npc])).rows[0].id as number;
+    await pool.query("UPDATE villages SET buildings = buildings || '{\"townhall\": 10, \"barracks\": 10, \"farm\": 12, \"wall\": 3, \"warehouse\": 12}'::jsonb, wood = 90000, clay = 90000, iron = 90000, wheat = 90000 WHERE id = $1", [village]);
+    await tx((c) => npcThink(c, new Outbox(), npc, NOON));
+    const rows = (await pool.query('SELECT unit, count FROM recruit_queue WHERE village_id = $1', [village])).rows;
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...rows.map((r) => r.count as number))).toBeGreaterThan(40);
+    // La file est pleine : une réflexion de plus ne la rallonge pas tant qu'il lui reste du travail.
+    await tx((c) => npcThink(c, new Outbox(), npc, new Date(NOON.getTime() + MIN)));
+    const again = (await pool.query('SELECT count(*)::int AS n FROM recruit_queue WHERE village_id = $1', [village])).rows[0].n;
+    expect(again).toBe(rows.length);
   });
 
   it('un pillard espionne puis attaque un joueur le jour, une seule fois par jour, jamais pendant les heures calmes', async () => {

@@ -84,12 +84,13 @@ export function nextRecruit(
   owned: UnitCounts,
   cap: number,
   difficulty: number,
+  maxBatch = 40,
 ): { unit: (typeof UNIT_KEYS)[number]; count: number }[] {
   const target = armyTarget(profile, role, cap, difficulty);
   return UNIT_KEYS.filter((k) => target[k] > owned[k] && meetsRequirements(buildings, UNITS[k].requires))
     .map((k) => ({ unit: k, deficit: target[k] - owned[k], ratio: (target[k] - owned[k]) / target[k] }))
     .sort((a, b) => b.ratio - a.ratio)
-    .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(40, Math.ceil(deficit / 2))) }));
+    .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(maxBatch, Math.ceil(deficit / 2))) }));
 }
 
 /** Éclaireurs envoyés selon le nombre d'échecs de suite : 2, puis 10, puis 30. */
