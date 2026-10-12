@@ -203,6 +203,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         npcOffensiveShare: `${env.npcOffensiveShare} %`,
         npcOffensiveHours: `${env.npcOffensiveHours} h`,
         npcRaids: env.npcRaids ? `activé (${env.npcRaidsPerThink} par réflexion, ${env.npcRaidRadius} cases)` : 'désactivé',
+        npcAttackMargin: `${env.npcAttackMargin} %`,
         npcThinkMinutes: `${env.npcThinkMinutes} min`,
         npcRecruitBatch: `${env.npcRecruitBatch} unités, ${env.npcRecruitBatches} lots par réflexion`,
         npcArmyFirst: env.npcArmyFirst ? 'recrutement avant construction' : 'construction avant recrutement',

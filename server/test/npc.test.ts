@@ -73,9 +73,15 @@ describe('règles des PNJ', () => {
     expect(apres.map((w) => w.unit)).toContain('halberdier');
   });
 
-  it('n’attaque que si la victoire est nette, avec toute l’armée face à des défenseurs et le minimum face à un village vide', () => {
+  it('attaque dès que son armée bat celle d’en face (sans marge par défaut), avec toute l’armée face à des défenseurs et le minimum face à un village vide', () => {
     const defenders = { ...emptyUnits(), spearman: 20 };
-    expect(pickWinningUnits({ ...emptyUnits(), swordsman: 10 }, defenders, 0)).toBeNull();
+    // 8 épéistes (320) font match nul face à 20 lanciers (20 + 300) : pas de victoire, donc pas d'attaque ; 9 suffisent, sans marge.
+    expect(pickWinningUnits({ ...emptyUnits(), swordsman: 8 }, defenders, 0)).toBeNull();
+    expect(pickWinningUnits({ ...emptyUnits(), swordsman: 9 }, defenders, 0)).toEqual({ ...emptyUnits(), swordsman: 9 });
+    // Avec une marge de 30 % réglée par l'administration, 9 épéistes (360) ne suffisent plus (416 demandés).
+    env.npcAttackMargin = 30;
+    expect(pickWinningUnits({ ...emptyUnits(), swordsman: 9 }, defenders, 0)).toBeNull();
+    env.npcAttackMargin = 0;
     const units = pickWinningUnits({ ...emptyUnits(), swordsman: 400 }, defenders, 0);
     expect(units).toEqual({ ...emptyUnits(), swordsman: 400 });
     const vide = pickWinningUnits({ ...emptyUnits(), swordsman: 400 }, emptyUnits(), 0);

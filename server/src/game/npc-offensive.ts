@@ -1,7 +1,7 @@
 import { type UnitCounts, UNIT_KEYS, emptyUnits, resolveCombat, wallDuringCombat } from '@aldoria/shared';
 import type { Db } from '../db';
 import { env } from '../env';
-import { ATTACK_MARGIN } from './npc-rules';
+import { attackBeats } from './npc-rules';
 
 /**
  * Offensives occasionnelles des PNJ : de temps en temps, un village offensif envoie une vraie attaque
@@ -29,7 +29,7 @@ export const parseNextOffensive = (state: { offensive?: { nextAt?: string } } | 
 export const offensiveDue = (nextAt: number | null, now: Date) => !!env.npcOffensive && nextAt !== null && nextAt <= now.getTime();
 
 /**
- * La part voulue de l'armée offensive, si elle bat la défense estimée avec la marge habituelle ; sinon null (offensive annulée :
+ * La part voulue de l'armée offensive, si elle bat la défense estimée avec la marge réglée (`npcAttackMargin`) ; sinon null (offensive annulée :
  * pas d'attaque suicide). Les béliers partent avec le reste de l'armée.
  */
 export function pickOffensiveUnits(available: UnitCounts, defenders: UnitCounts, wall: number, shareOverride?: number): UnitCounts | null {
@@ -38,7 +38,7 @@ export function pickOffensiveUnits(available: UnitCounts, defenders: UnitCounts,
   for (const k of UNIT_KEYS) units[k] = k === 'scout' || k === 'noble' ? 0 : Math.floor(available[k] * share);
   if (units.swordsman + units.cavalry < 1) return null;
   const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
-  return r.attackPower >= ATTACK_MARGIN * r.defensePower ? units : null;
+  return attackBeats(r) ? units : null;
 }
 
 /** Vrai si un PNJ a déjà frappé ce joueur (hors espionnage) pendant le dernier rythme d'offensive : au plus une offensive reçue par période. */

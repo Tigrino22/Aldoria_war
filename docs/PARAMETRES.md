@@ -252,7 +252,7 @@ Avant, un PNJ lançait au plus une attaque par réflexion (toutes les 10 à 20 m
 | Cibles | Barbares et villages des PNJ rivaux, en guerre ou rancuniers, dans 25 cases ; jamais un joueur (les attaques habituelles s'en chargent) |
 | Renseignement | Barbare inconnu ou rapport de plus de 24 h de jeu : 1 éclaireur (2 par réflexion au plus). Village de PNJ : seulement s'il a été vu vide il y a moins de 6 h de jeu |
 | Butin | Estimé comme l'assistant des joueurs (`estimateLoot`) ; pas de pillage sous 100 |
-| Troupes | Le plus petit groupe qui porte le butin (cavaliers, lanciers, épéistes, hallebardiers : toutes les unités qui portent du butin, dans tout village offensif ou défensif) et bat la défense de base avec une marge ×5 |
+| Troupes | Le plus petit groupe qui porte le butin (cavaliers, lanciers, épéistes, hallebardiers : toutes les unités qui portent du butin, dans tout village offensif ou défensif) et bat la défense de base (sans marge, comme toutes les attaques de PNJ) |
 | Cible en cours | Un village déjà visé par une attaque en route est sauté |
 | Rythme | Réflexion toutes les 5 à 15 minutes (`NPC_THINK_MINUTES`, 10 par défaut ; avant : 10 à 20) |
 
@@ -280,6 +280,10 @@ Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur 
 | Conquérant | 60 % | offensif |
 
 Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaque rôle ; les offensifs sont répartis régulièrement (ex. 2 villages : le premier défensif, le second offensif). Dans une tribu, les profils sont déjà mélangés (chef pillard, un conquérant, des bâtisseurs et des pillards), donc certains membres sont offensifs et d'autres défensifs. Les renforts qu'un PNJ envoie à sa tribu menacée comptent aussi les hallebardiers.
+
+### Marge de sécurité des attaques des PNJ
+
+Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes, aux opérations de tribu et aux offensives.
 
 ### Recrutement accéléré des PNJ
 
