@@ -250,7 +250,7 @@ Avant, un PNJ lançait au plus une attaque par réflexion (toutes les 10 à 20 m
 | Règle | Valeur |
 |---|---|
 | Cibles | Barbares et villages des PNJ rivaux, en guerre ou rancuniers, dans 25 cases ; jamais un joueur (les attaques habituelles s'en chargent) |
-| Renseignement | Barbare inconnu ou rapport de plus de 24 h de jeu : 1 éclaireur (2 par réflexion au plus). Village de PNJ : seulement s'il a été vu vide il y a moins de 6 h de jeu |
+| Renseignement | Barbare inconnu ou rapport de plus de 24 h de jeu : 1 éclaireur (2 par réflexion au plus, sur la moitié des éclaireurs du village). Village de PNJ : seulement s'il a été vu vide il y a moins de 6 h de jeu |
 | Butin | Estimé comme l'assistant des joueurs (`estimateLoot`) ; pas de pillage sous 100 |
 | Troupes | Le plus petit groupe qui porte le butin (cavaliers, lanciers, épéistes, hallebardiers : toutes les unités qui portent du butin, dans tout village offensif ou défensif) et bat la défense de base (sans marge, comme toutes les attaques de PNJ) |
 | Cible en cours | Un village déjà visé par une attaque en route est sauté |
@@ -266,10 +266,10 @@ Chaque village d'un PNJ a un rôle (code : `server/src/game/npc-roles.ts`), qui 
 
 | Rôle | Unités recrutées (par niveau visé) |
 |---|---|
-| Offensif | (proportions) épéistes ×7, cavaliers ×2, jusqu'à 30 éclaireurs (min(30, (4 + niveau × 1,5) × max(1, difficulté)), voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
-| Défensif | (proportions) lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), 2 éclaireurs |
+| Offensif | (proportions) épéistes ×7, cavaliers ×2, jusqu'à 60 éclaireurs (min(60, (6 + niveau × 2,5) × max(1, difficulté)), voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
+| Défensif | (proportions) lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), un tiers des éclaireurs d'un village offensif (5 au moins, `defenseScouts`) |
 
-Espionnage des PNJ : avant de piller, un PNJ envoie 2 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), la mission suivante en envoie 10, puis 30 (dans la limite de ceux du village). Après trois échecs de suite sur la même cible, il la laisse tranquille 12 heures de jeu après le dernier échec (`SCOUT_PAUSE_GAME_HOURS`), puis reprend directement avec 30 éclaireurs tant que le dernier échec date de moins de 36 heures de jeu (`SCOUT_MEMORY_GAME_HOURS`) ; au-delà, retour à 2. Un espionnage réussi efface les échecs. Constantes : `SCOUT_WAVES`, `scoutWave`, `scoutPaused`, `SCOUT_MAX_FAILURES` dans `npc-rules.ts`, `offenseScouts` dans `npc-roles.ts`.
+Espionnage des PNJ : avant de piller, un PNJ envoie 10 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), la mission suivante en envoie 25, puis 60 (dans la limite de ceux du village) ; l'échec est retenu pour tout le joueur, pas seulement pour le village visé. S'il a déjà vu des éclaireurs chez la cible (espionnage ou attaque), il en envoie au moins le double plus 5. En guerre (guerre de tribu, riposte, offensive), la vague est doublée et engage au moins les trois quarts des éclaireurs du village (`WAR_SCOUT_SHARE`). Jamais de mission à moins de 5 éclaireurs (`MIN_SCOUT_WAVE`) : le village attend d'en avoir assez. Délai entre deux espionnages d'un même PNJ chez un joueur ou un PNJ : 4 heures de jeu, 1 heure en guerre ; les éclaireurs envoyés aux barbares ne comptent pas. Le pillage intensif n'utilise que la moitié des éclaireurs d'un village. Après trois échecs de suite sur la même cible, il la laisse tranquille 12 heures de jeu après le dernier échec (`SCOUT_PAUSE_GAME_HOURS`), puis reprend directement avec 60 éclaireurs tant que le dernier échec date de moins de 36 heures de jeu (`SCOUT_MEMORY_GAME_HOURS`) ; au-delà, retour à 10. Un espionnage réussi efface les échecs. Constantes : `SCOUT_WAVES`, `scoutWave`, `scoutPaused`, `SCOUT_MAX_FAILURES` dans `npc-rules.ts`, `offenseScouts` et `defenseScouts` dans `npc-roles.ts`.
 
 Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) recrute ses unités principales à 60 %.
 

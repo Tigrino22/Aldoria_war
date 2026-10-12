@@ -37,8 +37,10 @@ export const FARM_LEAD = 3;
 /** Niveau de ferme visé selon le plafond de niveau : la population de ce niveau est l'effectif à atteindre. */
 export const farmTarget = (cap: number) => Math.min(20, cap + FARM_LEAD);
 
-/** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté, pour passer les éclaireurs d'un défenseur. */
-export const offenseScouts = (cap: number, difficulty: number) => Math.min(30, Math.round((4 + cap * 1.5) * Math.max(1, difficulty)));
+/** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté (11 au départ, 60 au plus), pour passer les éclaireurs d'un défenseur. */
+export const offenseScouts = (cap: number, difficulty: number) => Math.min(60, Math.round((6 + cap * 2.5) * Math.max(1, difficulty)));
+/** Éclaireurs d'un village défensif : un tiers de ceux d'un village offensif, jamais moins de 5 (une mission d'espionnage crédible). */
+export const defenseScouts = (cap: number, difficulty: number) => Math.max(5, Math.round(offenseScouts(cap, difficulty) / 3));
 
 /**
  * Armée visée par un village de rôle `role` au niveau `cap` : les unités dont les bâtiments manquent encore sont ignorées au recrutement.
@@ -55,7 +57,7 @@ export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, 
     // Quatre nobles font tomber la loyauté d'un village dans trois cas sur quatre (20 à 35 points chacun).
     if (profile !== 'builder' && cap >= 10) t.noble = NOBLES_PER_CONQUEST;
   } else {
-    t.scout = 2;
+    t.scout = defenseScouts(cap, difficulty);
   }
   const budget = populationCapacity(farmTarget(cap)) * Math.min(1, Math.max(0, difficulty)) - populationOf(t);
   const perShare = (Object.entries(shares) as [keyof UnitCounts, number][]).reduce((sum, [k, n]) => sum + n * UNITS[k].population, 0);
