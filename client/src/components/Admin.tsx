@@ -81,6 +81,7 @@ const SETTING_LABEL: Record<string, string> = {
   worldSpeed: 'Vitesse du monde',
   mapSize: 'Taille de la carte',
   npcCount: 'Nombre de PNJ',
+  accountManager: 'Gestionnaire de compte',
   npcRevenge: 'Riposte des PNJ',
   npcWars: 'Guerres entre tribus de PNJ',
   npcPlayerWars: 'Guerres contre les tribus de joueurs',

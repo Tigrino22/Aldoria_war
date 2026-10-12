@@ -7,7 +7,7 @@ import { env } from './env';
  * cours de partie fausserait les files de construction, les trajets en cours et les coordonnées.
  */
 export interface SettingDef {
-  key: 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
+  key: 'accountManager' | 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
   label: string;
   help: string;
   type: 'number' | 'integer' | 'text' | 'boolean';
@@ -16,6 +16,7 @@ export interface SettingDef {
 }
 
 export const SETTINGS: SettingDef[] = [
+  { key: 'accountManager', label: 'Gestionnaire de compte', help: 'Activé : les joueurs peuvent confier à un pilote automatique la construction et le recrutement de leurs villages, selon leurs modèles. Désactivé : plus rien ne s’exécute automatiquement (les réglages des joueurs sont conservés)', type: 'boolean' },
   { key: 'npcRevenge', label: 'Riposte des PNJ', help: 'Activée : un PNJ attaqué par un joueur lui en veut et contre-attaque pendant 3 jours. Désactivée : il ne riposte plus contre les joueurs (la riposte entre PNJ, les guerres, la défense et les attaques habituelles continuent)', type: 'boolean' },
   { key: 'npcWars', label: 'Guerres entre tribus de PNJ', help: 'Activées : les tribus de PNJ se déclarent la guerre pour quelques jours, se pillent et cherchent à se conquérir. Désactivées : plus de nouvelle guerre ni de frappe contre une tribu ennemie (les rivalités habituelles restent)', type: 'boolean' },
   { key: 'npcPlayerWars', label: 'Guerres contre les tribus de joueurs', help: 'Activées : une tribu de PNJ peut déclarer la guerre à une tribu de joueurs sans provocation (et accepter celle qu’un chef de tribu lui déclare) ; ses membres frappent alors les villages de cette tribu. Désactivées : ces guerres s’arrêtent et aucune nouvelle ne démarre. Sans lien avec la riposte, qui ne concerne que les joueurs qui attaquent un PNJ. Nécessite aussi l’interrupteur des guerres entre PNJ', type: 'boolean' },

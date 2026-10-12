@@ -11,6 +11,7 @@ import { register } from './notify';
 import authRoutes from './routes/auth';
 import mapRoutes from './routes/map';
 import adminRoutes from './routes/admin';
+import managerRoutes from './routes/manager';
 import marketRoutes from './routes/market';
 import questRoutes from './routes/quests';
 import socialRoutes from './routes/social';
@@ -61,6 +62,7 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
 
   await app.register(authRoutes);
   await app.register(villageRoutes);
+  await app.register(managerRoutes);
   await app.register(mapRoutes);
   await app.register(marketRoutes);
   await app.register(adminRoutes);
