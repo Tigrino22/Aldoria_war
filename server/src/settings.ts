@@ -7,7 +7,7 @@ import { env } from './env';
  * cours de partie fausserait les files de construction, les trajets en cours et les coordonnées.
  */
 export interface SettingDef {
-  key: 'accountManager' | 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcOffensive' | 'npcOffensiveShare' | 'npcOffensiveHours' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
+  key: 'accountManager' | 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcOffensive' | 'npcOffensiveShare' | 'npcOffensiveHours' | 'npcRaids' | 'npcRaidsPerThink' | 'npcRaidRadius' | 'npcThinkMinutes' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
   label: string;
   help: string;
   type: 'number' | 'integer' | 'text' | 'boolean';
@@ -23,6 +23,10 @@ export const SETTINGS: SettingDef[] = [
   { key: 'npcOffensive', label: 'Offensives des PNJ', help: 'Activées : de temps en temps, un village offensif de PNJ envoie une vraie attaque (une part de son armée) contre un joueur de sa taille, un ennemi de guerre ou une tribu rivale, après l’avoir espionné ; jamais un joueur sous protection débutant ni pendant les heures calmes. Désactivées : les PNJ reviennent aux pillages habituels', type: 'boolean' },
   { key: 'npcOffensiveShare', label: 'Part de l’armée engagée dans une offensive (%)', help: '50 = la moitié des épéistes, cavaliers et béliers du village part ; l’offensive est annulée si cette part ne bat pas la défense espionnée', type: 'integer', min: 10, max: 100 },
   { key: 'npcOffensiveHours', label: 'Rythme des offensives (heures de jeu)', help: 'Délai moyen entre deux offensives d’un même PNJ ; un joueur ne subit pas plus d’une offensive par période', type: 'integer', min: 1, max: 168 },
+  { key: 'npcRaids', label: 'Pillage intensif des PNJ', help: 'Activé : à chaque réflexion, chaque village de PNJ envoie plusieurs petits pillages vers les villages sans défense qu’il connaît (barbares, villages vides des PNJ rivaux ou en guerre), d’après ses propres rapports, et espionne les barbares inconnus. Jamais contre un joueur. Désactivé : un seul pillage par réflexion, comme avant', type: 'boolean' },
+  { key: 'npcRaidsPerThink', label: 'Pillages par village et par réflexion', help: 'Nombre maximal de pillages qu’un village de PNJ envoie à chaque réflexion (s’il lui reste des troupes)', type: 'integer', min: 1, max: 30 },
+  { key: 'npcRaidRadius', label: 'Rayon du pillage intensif (cases)', help: 'Distance maximale entre le village du PNJ et les villages qu’il pille', type: 'integer', min: 5, max: 60 },
+  { key: 'npcThinkMinutes', label: 'Rythme de réflexion des PNJ (minutes)', help: 'Délai moyen entre deux réflexions d’un PNJ à vitesse x1 (entre la moitié et une fois et demie), divisé par la racine de la vitesse du monde : plus court, les PNJ construisent, recrutent et pillent plus souvent', type: 'integer', min: 2, max: 60 },
   { key: 'npcDifficulty', label: 'Difficulté des PNJ', help: '0,5 = facile, 1 = modérée, 1,5 = difficile', type: 'number', min: 0.25, max: 3 },
   { key: 'npcDaily', label: 'Nouveaux PNJ par jour', help: 'Un PNJ rejoint le monde chaque jour, jusqu’au maximum', type: 'integer', min: 0, max: 20 },
   { key: 'npcMax', label: 'Maximum de PNJ', help: 'Plafond du nombre de PNJ', type: 'integer', min: 0, max: 500 },

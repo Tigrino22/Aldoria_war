@@ -243,6 +243,21 @@ Onglet en lecture seule, actualisé toutes les 5 s, avec une période au choix (
 
 Les batailles viennent des rapports de défense des PNJ (ils contiennent les pertes des deux camps) : un combat entre deux PNJ de tribus différentes ; pour une guerre contre une tribu de joueurs, du rapport de l'attaquant PNJ (les pertes du défenseur y manquent quand l'attaque est anéantie). Les guerres de joueurs apparaissent aussi dans les fronts, avec la mention « joueurs ». Les déclarations et fins de guerre sont écrites dans la table `npc_war_log` (migration 012) par `refreshWars`. Les rapports des PNJ sont conservés 3 jours : c'est la limite de l'historique.
 
+### Pillage intensif des PNJ
+
+Avant, un PNJ lançait au plus une attaque par réflexion (toutes les 10 à 20 minutes), avec toute son armée, vers une seule cible dans 20 cases, et seulement si le butin dépassait 200 : le pillage restait marginal. Désormais (`server/src/game/npc-raids.ts`), après ses constructions et son recrutement, chaque village de PNJ (pas seulement les trois premiers) envoie jusqu'à 6 petits pillages par réflexion, comme un joueur avec l'assistant de pillage.
+
+| Règle | Valeur |
+|---|---|
+| Cibles | Barbares et villages des PNJ rivaux, en guerre ou rancuniers, dans 25 cases ; jamais un joueur (les attaques habituelles s'en chargent) |
+| Renseignement | Barbare inconnu ou rapport de plus de 24 h de jeu : 1 éclaireur (2 par réflexion au plus). Village de PNJ : seulement s'il a été vu vide il y a moins de 6 h de jeu |
+| Butin | Estimé comme l'assistant des joueurs (`estimateLoot`) ; pas de pillage sous 100 |
+| Troupes | Le plus petit groupe qui porte le butin (cavaliers, lanciers, épéistes) et bat la défense de base avec une marge ×5 ; village défensif : la moitié des lanciers seulement |
+| Cible en cours | Un village déjà visé par une attaque en route est sauté |
+| Rythme | Réflexion toutes les 5 à 15 minutes (`NPC_THINK_MINUTES`, 10 par défaut ; avant : 10 à 20) |
+
+Réglages à chaud (Administration > Monde) : « Pillage intensif des PNJ » (`NPC_RAIDS`), « Pillages par village et par réflexion » (`NPC_RAIDS_PER_THINK`), « Rayon du pillage intensif » (`NPC_RAID_RADIUS`), « Rythme de réflexion des PNJ » (`NPC_THINK_MINUTES`).
+
 ## Recrutement des PNJ : villages offensifs et défensifs
 
 Rythme : le niveau visé par les PNJ gagne 1 par jour de monde (`NPC_LEVELS_PER_DAY`, 20 au bout de 18 jours à difficulté ×1). La ferme, qui loge l'armée, monte `FARM_LEAD` = 3 niveaux plus haut que le reste et pèse davantage (poids 1,6 à 1,7). L'armée visée de chaque village remplit toute la ferme visée (niveau de ferme = plafond + 3, 20 au plus, soit jusqu'à 4 740 habitants), éclaireurs et nobles compris (`armyTarget` dans `npc-roles.ts`) ; les proportions ci-dessous se répartissent le reste. Une difficulté inférieure à 1 ne remplit qu'une part de la ferme. Un lot de recrutement peut aller jusqu'à 40 unités, réduit de moitié tant qu'il est trop cher ou trop lourd pour la ferme.

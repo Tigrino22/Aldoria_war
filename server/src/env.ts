@@ -36,6 +36,12 @@ export const env = {
   npcOffensive: count('NPC_OFFENSIVE', 1) > 0 ? 1 : 0,
   npcOffensiveShare: count('NPC_OFFENSIVE_SHARE', 50),
   npcOffensiveHours: count('NPC_OFFENSIVE_HOURS', 24),
+  /** Pillage intensif des PNJ (1 = activé) : pillages par village et par réflexion, rayon (cases) ; modifiables à chaud. */
+  npcRaids: count('NPC_RAIDS', 1) > 0 ? 1 : 0,
+  npcRaidsPerThink: count('NPC_RAIDS_PER_THINK', 6),
+  npcRaidRadius: count('NPC_RAID_RADIUS', 25),
+  /** Délai moyen (minutes réelles à vitesse x1) entre deux réflexions d'un PNJ, divisé par la racine de la vitesse du monde. */
+  npcThinkMinutes: count('NPC_THINK_MINUTES', 10),
   /** Gestionnaire de compte (1 = activé sur le monde), modifiable à chaud depuis l'administration. */
   accountManager: count('ACCOUNT_MANAGER', 1) > 0 ? 1 : 0,
   npcMax: count('NPC_MAX', 200),
