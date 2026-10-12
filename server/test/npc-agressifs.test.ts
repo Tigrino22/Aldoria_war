@@ -54,7 +54,7 @@ describe('PNJ agressifs', () => {
   it('un bâtisseur riposte contre un joueur qui l’a attaqué, sans attendre le délai entre deux attaques', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'builder'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
-    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 10 })));
     const player = await makePlayer('Agresseur');
     const base = await villageOf(player, home.x + 2, home.y, { swordsman: 20 });
     await villageOf(player, home.x + 3, home.y + 1);
@@ -163,7 +163,7 @@ describe('PNJ agressifs', () => {
 
     const npc = await tx((c) => createNpc(c, NOON, 'raider'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
-    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 10 })));
     const giant = await makePlayer('Géant');
     // Trois villages : trois fois les points du PNJ, hors de la fourchette.
     const big = await villageOf(giant, home.x + 2, home.y + 3);
@@ -247,9 +247,18 @@ describe('PNJ agressifs', () => {
   });
 
   it('espionnage : plus d’éclaireurs après un échec, puis la cible est laissée tranquille après trois échecs', async () => {
-    expect([0, 1, 2, 3, 9].map((n) => scoutWave(n, 100))).toEqual([2, 10, 30, 30, 30]);
+    expect([0, 1, 2, 3, 9].map((n) => scoutWave(n, 100))).toEqual([10, 25, 60, 60, 60]);
     expect(scoutWave(2, 5)).toBe(5);
     expect(scoutWave(1, 0)).toBe(0);
+    // Jamais de mission à 1 ou 2 éclaireurs : le village attend d'en avoir au moins 5.
+    expect(scoutWave(0, 2)).toBe(0);
+    expect(scoutWave(0, 4)).toBe(0);
+    // Des éclaireurs déjà vus chez la cible : au moins le double, plus 5.
+    expect(scoutWave(0, 100, { knownScouts: 20 })).toBe(45);
+    // En guerre : vague doublée, et au moins les trois quarts des éclaireurs du village.
+    expect(scoutWave(0, 100, { war: true })).toBe(75);
+    expect(scoutWave(1, 30, { war: true })).toBe(30);
+    expect(scoutWave(0, 8, { war: true })).toBe(8);
     const ordered = [
       { villageId: 1, ok: false, at: 60 },
       { villageId: 2, ok: true, at: 50 },
@@ -263,7 +272,7 @@ describe('PNJ agressifs', () => {
 
     const npc = await tx((c) => createNpc(c, NOON, 'raider'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
-    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 100 })));
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 300 })));
     const other = await makePlayer('Defenseur');
     const v = await villageOf(other, home.x + 2, home.y + 2);
     // Les autres joueurs restent sous protection : cette cible est la seule possible.
@@ -279,17 +288,17 @@ describe('PNJ agressifs', () => {
       ]);
 
     await tx((c) => npcThink(c, new Outbox(), npc, t));
-    expect(await scoutsSent()).toEqual([2]);
+    expect(await scoutsSent()).toEqual([10]);
 
     await pool.query('DELETE FROM commands');
     await failed(new Date(t.getTime() - HOUR));
     await tx((c) => npcThink(c, new Outbox(), npc, t));
-    expect(await scoutsSent()).toEqual([10]);
+    expect(await scoutsSent()).toEqual([25]);
 
     await pool.query('DELETE FROM commands');
     await failed(new Date(t.getTime() - 2 * HOUR));
     await tx((c) => npcThink(c, new Outbox(), npc, t));
-    expect(await scoutsSent()).toEqual([30]);
+    expect(await scoutsSent()).toEqual([60]);
 
     // Troisième échec : la cible est laissée tranquille.
     await pool.query('DELETE FROM commands');
@@ -302,11 +311,55 @@ describe('PNJ agressifs', () => {
     await tx((c) => syncVillage(c, home.id, later));
     await pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $1) WHERE id = $2', [home.id, v]);
     await tx((c) => npcThink(c, new Outbox(), npc, later));
-    expect(await scoutsSent()).toEqual([30]);
-    // Les échecs sont retenus 36 heures : passé ce délai, il repart avec 2 éclaireurs.
+    expect(await scoutsSent()).toEqual([60]);
+    // Les échecs sont retenus 36 heures : passé ce délai, il repart avec 10 éclaireurs (hors offensive, qui engagerait le gros des éclaireurs).
     await pool.query('DELETE FROM commands');
+    env.npcOffensive = 0;
     await tx((c) => npcThink(c, new Outbox(), npc, new Date(t.getTime() + 45 * HOUR)));
-    expect(await scoutsSent()).toEqual([2]);
+    env.npcOffensive = 1;
+    expect(await scoutsSent()).toEqual([10]);
+  });
+
+  it('espionnage crédible : les éclaireurs envoyés aux barbares ne retardent rien, la vague se souvient du joueur, et la guerre engage le gros des éclaireurs', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 40 })));
+    const other = await makePlayer('Espionne');
+    const first = await villageOf(other, home.x + 2, home.y - 2);
+    const second = await villageOf(other, home.x + 3, home.y - 2);
+    await pool.query("UPDATE players SET protection_until = CASE WHEN id = $1 THEN NULL ELSE '2031-01-01'::timestamptz END WHERE NOT is_npc", [other]);
+    const t = new Date(NOON.getTime() + 75 * HOUR);
+    const sameSize = () => pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $1) / 2 WHERE owner_id = $2', [home.id, other]);
+    await sameSize();
+    // Un éclaireur vient de partir vers un barbare (pillage intensif) : cela ne bloque pas l'espionnage d'un joueur.
+    const barbarian = await tx((c) =>
+      createVillage(c, { ownerId: null, name: 'Barbare', x: home.x - 2, y: home.y - 2, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 100, clay: 100, iron: 100, wheat: 100 }, at: t }),
+    );
+    await tx((c) => sendCommand(c, new Outbox(), npc, home.id, { type: 'attack', targetId: barbarian, units: { scout: 1 } }, new Date(t.getTime() - 60_000)));
+    // Un échec sur le premier village : sur le second village du même joueur, le PNJ reprend avec la vague suivante (25).
+    await pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`, [
+      npc,
+      JSON.stringify({ attacker: {}, defender: { village: { id: first } }, intel: null }),
+      new Date(t.getTime() - HOUR),
+    ]);
+    env.npcOffensive = 0;
+    await tx((c) => npcThink(c, new Outbox(), npc, t));
+    const sent = async () =>
+      (await pool.query("SELECT (units->>'scout')::int AS n FROM commands WHERE player_id = $1 AND target_village_id = ANY($2::int[]) AND type = 'attack'", [npc, [first, second]])).rows.map((r) => r.n as number);
+    expect(await sent()).toEqual([25]);
+
+    // En guerre (le joueur l'a attaqué) : au moins les trois quarts des éclaireurs du village partent, sans attendre 4 heures.
+    await pool.query('DELETE FROM commands WHERE player_id = $1', [npc]);
+    await pool.query('DELETE FROM reports WHERE player_id = $1', [npc]);
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 40 })));
+    await tx((c) => setTroops(c, first, first, troops({ swordsman: 20 })));
+    const t2 = new Date(t.getTime() + 2 * HOUR);
+    await tx((c) => sendCommand(c, new Outbox(), other, first, { type: 'attack', targetId: home.id, units: { swordsman: 20 } }, t2));
+    await tx((c) => npcThink(c, new Outbox(), npc, new Date(t2.getTime() + 1000)));
+    env.npcOffensive = 1;
+    const waves = await sent();
+    expect(waves.length).toBeGreaterThan(0);
+    expect(waves[0]).toBe(30);
   });
 
   it('trois nouveaux PNJ par jour, un toutes les 8 heures, jusqu’au plafond', async () => {

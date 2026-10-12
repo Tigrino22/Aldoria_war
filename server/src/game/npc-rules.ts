@@ -94,14 +94,33 @@ export function nextRecruit(
     .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(maxBatch, Math.ceil(deficit / 2))) }));
 }
 
-/** Éclaireurs envoyés selon le nombre d'échecs de suite : 2, puis 10, puis 30. */
-export const SCOUT_WAVES = [2, 10, 30] as const;
+/** Éclaireurs envoyés selon le nombre d'échecs de suite : 10, puis 25, puis 60. */
+export const SCOUT_WAVES = [10, 25, 60] as const;
+/** Plus petite mission d'espionnage qu'un PNJ envoie chez un joueur ou un autre PNJ : avec moins, elle n'est pas crédible et il attend d'en avoir assez. */
+export const MIN_SCOUT_WAVE = 5;
+/** Part des éclaireurs du village engagée en temps de guerre (guerre de tribu, riposte, offensive). */
+export const WAR_SCOUT_SHARE = 0.75;
+
+export interface ScoutWaveContext {
+  /** Éclaireurs vus chez la cible lors du dernier renseignement du PNJ (espionnage ou attaque), s'il en a un. */
+  knownScouts?: number;
+  /** Guerre, riposte ou offensive : le PNJ engage le gros de ses éclaireurs. */
+  war?: boolean;
+}
 
 /**
- * Éclaireurs envoyés en mission : 2 d'abord, puis 10 et 30 après chaque échec (tous les éclaireurs tués), dans la limite de ceux dont le village dispose.
- * Une défense qui compte autant d'éclaireurs que l'attaque les tue tous : il en faut bien davantage pour passer.
+ * Éclaireurs envoyés en mission, dans la limite de ceux dont le village dispose : 10 d'abord, puis 25 et 60 après chaque échec (tous les éclaireurs tués).
+ * Une défense qui compte autant d'éclaireurs que l'attaque les tue tous : si le PNJ en a déjà vu chez la cible, il en envoie au moins le double (plus 5),
+ * de quoi passer avec un tiers de pertes. En guerre, il double la vague et engage au moins les trois quarts de ses éclaireurs.
+ * Renvoie 0 quand le village ne peut pas réunir `MIN_SCOUT_WAVE` éclaireurs : pas de mission à 1 ou 2 éclaireurs.
  */
-export const scoutWave = (failures: number, available: number) => Math.max(0, Math.min(available, SCOUT_WAVES[Math.min(SCOUT_WAVES.length - 1, Math.max(0, failures))]));
+export function scoutWave(failures: number, available: number, ctx: ScoutWaveContext = {}): number {
+  let n: number = SCOUT_WAVES[Math.min(SCOUT_WAVES.length - 1, Math.max(0, failures))];
+  if (ctx.knownScouts && ctx.knownScouts > 0) n = Math.max(n, ctx.knownScouts * 2 + 5);
+  if (ctx.war) n = Math.max(n * 2, Math.ceil(available * WAR_SCOUT_SHARE));
+  n = Math.min(Math.max(0, available), n);
+  return n < MIN_SCOUT_WAVE ? 0 : n;
+}
 
 /** Échecs d'espionnage consécutifs après lesquels un PNJ laisse une cible tranquille un temps. */
 export const SCOUT_MAX_FAILURES = 3;

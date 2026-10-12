@@ -100,7 +100,8 @@ export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: 
   const village = await loadVillage(c, villageId);
   const home = await getTroops(c, villageId, villageId);
   const pool = farmPool(home);
-  let scouts = Math.min(home.scout, SCOUTS_PER_THINK);
+  // La moitié des éclaireurs reste au village pour les vrais espionnages (joueurs et PNJ) : le pillage ne prend que le reste.
+  let scouts = Math.min(Math.floor(home.scout / 2), SCOUTS_PER_THINK);
   if (noTroops(pool) && scouts === 0) return 0;
 
   // Barbares et villages des PNJ hostiles dans le rayon, sauf ceux qu'une attaque (la nôtre ou celle d'un autre) vise déjà.

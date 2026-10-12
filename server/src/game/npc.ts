@@ -45,6 +45,7 @@ import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, 
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { refreshTribeWars } from './tribe-wars';
 import { raidStep } from './npc-raids';
+import { pickIntel } from './intel';
 import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
 
 /** Nombre maximal d'échanges (acceptations ou publications) d'un PNJ par village et par réflexion. */
@@ -67,18 +68,39 @@ const NOBLE_ESCORT = 2;
 /** Nombre maximal de nobles dans un train. */
 const MAX_TRAIN = 6;
 const DAY_MS = 86_400_000;
-/** Délai minimal (en heures de jeu) entre deux missions d'espionnage d'un même PNJ. */
+/** Délai minimal (en heures de jeu) entre deux missions d'espionnage d'un même PNJ chez un joueur ou un PNJ (les barbares ne comptent pas). */
 const SCOUT_COOLDOWN_GAME_HOURS = 4;
+/** Même délai en temps de guerre (guerre de tribu, riposte, offensive) : les espionnages s'enchaînent bien plus vite. */
+const WAR_SCOUT_COOLDOWN_GAME_HOURS = 1;
 
-/** Échecs d'espionnage récents de ce PNJ, par village visé (voir `consecutiveScoutFailures`). */
-async function scoutFailures(c: Db, npcId: number, now: Date): Promise<Map<number, ScoutFailures>> {
+/**
+ * Échecs d'espionnage récents de ce PNJ (voir `consecutiveScoutFailures`), par village visé et par propriétaire : un PNJ qui change de village
+ * chez le même joueur garde la vague qu'il avait atteinte.
+ */
+async function scoutFailures(c: Db, npcId: number, now: Date): Promise<{ byVillage: Map<number, ScoutFailures>; byOwner: Map<number, ScoutFailures> }> {
   const since = new Date(now.getTime() - (SCOUT_MEMORY_GAME_HOURS * 3_600_000) / env.worldSpeed);
   const { rows } = await c.query(
-    `SELECT (data->'defender'->'village'->>'id')::int AS village_id, (data->'intel' IS NOT NULL AND data->'intel' <> 'null'::jsonb) AS ok, created_at
-     FROM reports WHERE player_id = $1 AND type = 'scout' AND created_at > $2 ORDER BY created_at DESC, id DESC LIMIT 300`,
+    `SELECT r.village_id, v.owner_id, r.ok, r.created_at FROM (
+       SELECT (data->'defender'->'village'->>'id')::int AS village_id, (data->'intel' IS NOT NULL AND data->'intel' <> 'null'::jsonb) AS ok, created_at, id
+       FROM reports WHERE player_id = $1 AND type = 'scout' AND created_at > $2 ORDER BY created_at DESC, id DESC LIMIT 300
+     ) r LEFT JOIN villages v ON v.id = r.village_id ORDER BY r.created_at DESC, r.id DESC`,
     [npcId, since],
   );
-  return consecutiveScoutFailures(rows.map((r) => ({ villageId: r.village_id as number, ok: r.ok as boolean, at: new Date(r.created_at).getTime() })));
+  const at = (r: { created_at: Date }) => new Date(r.created_at).getTime();
+  return {
+    byVillage: consecutiveScoutFailures(rows.map((r) => ({ villageId: r.village_id as number, ok: r.ok as boolean, at: at(r) }))),
+    byOwner: consecutiveScoutFailures(rows.filter((r) => r.owner_id !== null).map((r) => ({ villageId: r.owner_id as number, ok: r.ok as boolean, at: at(r) }))),
+  };
+}
+
+/** Éclaireurs vus chez une cible lors du dernier renseignement du PNJ (espionnage réussi ou attaque), ou undefined s'il n'en a pas. */
+async function knownScoutsAt(c: Db, npcId: number, villageId: number): Promise<number | undefined> {
+  const { rows } = await c.query(
+    `SELECT type, data, created_at FROM reports WHERE player_id = $1 AND type IN ('scout', 'attack') AND (data->'defender'->'village'->>'id')::int = $2
+     ORDER BY created_at DESC, id DESC LIMIT 20`,
+    [npcId, villageId],
+  );
+  return pickIntel(rows)?.troops.scout;
 }
 
 const isQuietAt = (d: Date) => isQuiet(d, env.npcTimezone, env.npcQuietStart, env.npcQuietEnd);
@@ -379,7 +401,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   // Après la pause, le PNJ y retourne avec la plus forte vague d'éclaireurs.
   const failures = await scoutFailures(c, npcId, now);
   const all = (await candidates(c, npcId, village, now, { rivals: tribe?.state.rivals ?? [], warTribes, grudges: await npcGrudgesOf(c, npcId, tribe, now) })).filter(
-    (t) => !scoutPaused(failures.get(t.id), now, env.worldSpeed),
+    (t) => !scoutPaused(failures.byVillage.get(t.id), now, env.worldSpeed),
   );
   const barbarians = all.filter((t) => t.ownerId === null);
   const rivalVillages = all.filter((t) => t.rival);
@@ -438,13 +460,23 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const intel = await freshScoutIntel(c, npcId, target.id, now);
   try {
     if (!intel) {
-      if (home.scout < 1) return;
+      // En guerre, en riposte ou pendant une offensive, le PNJ espionne plus souvent et engage le gros de ses éclaireurs.
+      const war = offensive || target.enemy || (hostileToPlayer && grudges.includes(target.ownerId!));
+      const cooldownHours = war ? WAR_SCOUT_COOLDOWN_GAME_HOURS : SCOUT_COOLDOWN_GAME_HOURS;
+      // Seuls comptent les espionnages chez un joueur ou un PNJ : les éclaireurs du pillage intensif vers les barbares ne retardent rien.
       const lastScout = (
-        await c.query("SELECT max(sent_at) AS at FROM commands WHERE player_id = $1 AND type = 'attack' AND coalesce((units->>'scout')::int, 0) > 0", [npcId])
+        await c.query(
+          `SELECT max(cm.sent_at) AS at FROM commands cm JOIN villages v ON v.id = cm.target_village_id
+           WHERE cm.player_id = $1 AND cm.type = 'attack' AND coalesce((cm.units->>'scout')::int, 0) > 0 AND v.owner_id IS NOT NULL`,
+          [npcId],
+        )
       ).rows[0].at;
-      if (lastScout && now.getTime() - new Date(lastScout).getTime() < (SCOUT_COOLDOWN_GAME_HOURS * 3_600_000) / env.worldSpeed) return;
-      // Après un échec, on envoie bien plus d'éclaireurs : 2, puis 10, puis 30.
-      const scouts = { ...emptyUnits(), scout: scoutWave(failures.get(target.id)?.count ?? 0, home.scout) };
+      if (lastScout && now.getTime() - new Date(lastScout).getTime() < (cooldownHours * 3_600_000) / env.worldSpeed) return;
+      // Après un échec, on envoie bien plus d'éclaireurs : 10, puis 25, puis 60 (au moins le double de ceux déjà vus chez la cible).
+      const failed = Math.max(failures.byVillage.get(target.id)?.count ?? 0, target.ownerId !== null ? (failures.byOwner.get(target.ownerId)?.count ?? 0) : 0);
+      const count = scoutWave(failed, home.scout, { knownScouts: await knownScoutsAt(c, npcId, target.id), war });
+      if (count === 0) return;
+      const scouts = { ...emptyUnits(), scout: count };
       if (arrivesQuiet(scouts)) return;
       await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units: scouts }, now);
       return;
