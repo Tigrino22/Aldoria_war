@@ -16,4 +16,12 @@
 .ta-card.kind-trade .ta-fill, .ta-card.kind-trade .ta-fill { background: var(--gold); }
 .ta-card.kind-support .ta-fill { background: var(--ok); }
 .ta-card .mv-time .btn { margin-top: 4px; }
-@media (max-width: 640px) { .troop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Sur téléphone : liste des unités ; cartes sur ordinateur. */
+.troop-list { display: none; }
+.troop-list th, .troop-list td { padding: 6px 4px; }
+.troop-list .btn { padding-inline: 8px; white-space: nowrap; }
+@media (max-width: 640px) {
+  .troop-grid { display: none; }
+  .troop-list { display: block; }
+  .troop-list th:nth-child(3), .troop-list td:nth-child(3) { display: none; }
+}

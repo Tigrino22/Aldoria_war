@@ -135,6 +135,38 @@ export default function RallyPoint() {
             <p className="troop-summary">
               <b>{fmt(UNIT_KEYS.reduce((t, k) => t + v.troopsHome[k], 0))}</b> unités · <b>{fmt(UNIT_KEYS.reduce((t, k) => t + v.troopsHome[k] * UNITS[k].population, 0))}</b> places de population
             </p>
+            <div className="table-wrap troop-list">
+              <table className="troop-table disband-table">
+                <thead>
+                  <tr>
+                    <th>Unité</th>
+                    <th>Effectif</th>
+                    <th>Population</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {UNIT_KEYS.filter((k) => v.troopsHome[k] > 0).map((k) => (
+                    <tr key={k}>
+                      <td>
+                        <span className="row nowrap">
+                          <UnitIcon unit={k} size={28} /> {UNITS[k].name}
+                        </span>
+                      </td>
+                      <td>
+                        <b>{fmt(v.troopsHome[k])}</b>
+                      </td>
+                      <td>{fmt(v.troopsHome[k] * UNITS[k].population)}</td>
+                      <td>
+                        <button className="btn small danger-outline" onClick={() => setDisband(k)}>
+                          Dissoudre…
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <div className="troop-grid">
               {UNIT_KEYS.filter((k) => v.troopsHome[k] > 0).map((k) => (
                 <article key={k} className="troop-card">
