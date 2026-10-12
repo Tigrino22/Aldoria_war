@@ -44,6 +44,7 @@ import { villageRoles, type VillageRole } from './npc-roles';
 import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, recentlyHit } from './npc-offensive';
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { refreshTribeWars } from './tribe-wars';
+import { raidStep } from './npc-raids';
 import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
 
 /** Nombre maximal d'échanges (acceptations ou publications) d'un PNJ par village et par réflexion. */
@@ -55,8 +56,8 @@ let rng: () => number = Math.random;
 /** Permet aux tests de rendre les décisions des PNJ déterministes. */
 export const setNpcRandom = (fn: () => number) => (rng = fn);
 
-/** Un PNJ agit toutes les 10 à 20 minutes, plus souvent quand le monde va vite. */
-const delayMs = () => Math.max(30_000, ((10 + rng() * 10) * 60_000) / Math.sqrt(env.worldSpeed));
+/** Un PNJ agit en moyenne toutes les `npcThinkMinutes` minutes (de la moitié à une fois et demie), plus souvent quand le monde va vite. */
+const delayMs = () => Math.max(30_000, ((0.5 + rng()) * env.npcThinkMinutes * 60_000) / Math.sqrt(env.worldSpeed));
 /** Délai avant qu'un PNJ qui a perdu tous ses villages ne reparte ailleurs. */
 const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 /** Rayon (en cases) dans lequel un PNJ cherche des cibles. */
@@ -617,6 +618,9 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
       if (after === before) break;
     }
   }
+  // Pillage intensif : chaque village (pas seulement les trois premiers) envoie ses pillages vers les villages sans défense qu'il connaît.
+  const hostiles = { tribes: [...(tribe?.state.rivals ?? []), ...warEnemiesOf(tribe, now)], npcs: await npcGrudgesOf(c, npcId, tribe, now) };
+  for (const v of villages) await raidStep(c, outbox, npcId, v.id, hostiles, now);
   // Les rapports d'un PNJ ne servent qu'à ses décisions récentes et au suivi des guerres de l'administration (72 h au plus).
   await c.query("DELETE FROM reports WHERE player_id = $1 AND created_at < $2", [npcId, new Date(now.getTime() - 3 * DAY_MS)]);
   return angry;

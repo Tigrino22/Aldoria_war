@@ -88,6 +88,8 @@ const SETTING_LABEL: Record<string, string> = {
   npcOffensive: 'Offensives des PNJ',
   npcOffensiveShare: 'Part de l’armée engagée',
   npcOffensiveHours: 'Rythme des offensives',
+  npcRaids: 'Pillage intensif',
+  npcThinkMinutes: 'Rythme de réflexion des PNJ',
   npcDifficulty: 'Difficulté des PNJ',
   npcTimezone: 'Fuseau des heures calmes',
   quietHours: 'Heures calmes',
