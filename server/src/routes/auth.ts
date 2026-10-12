@@ -46,7 +46,7 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
   const villages = (await c.query('SELECT id, name, x, y, points FROM villages WHERE owner_id = $1 ORDER BY id', [playerId])).rows;
   const counts = (
     await c.query(
-      `SELECT (SELECT count(*)::int FROM reports WHERE player_id = $1 AND NOT read) AS reports,
+      `SELECT (SELECT count(*)::int FROM reports WHERE player_id = $1 AND NOT read AND NOT archived) AS reports,
               (SELECT count(*)::int FROM messages WHERE to_id = $1 AND NOT read) AS messages`,
       [playerId],
     )

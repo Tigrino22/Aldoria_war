@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BUILDINGS, BUILDING_KEYS, RESOURCES, UNIT_KEYS, type AttackReportData, type Intel, type Resources, type ReportSummary, type ScoutReportData, type TradeReportData, type UnitCounts } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
@@ -146,12 +146,8 @@ function AttackReport({ d }: { d: AttackReportData }) {
 export default function Reports({ id }: { id?: number }) {
   const { run, refreshMe } = useGame();
   const [, go] = useRoute();
-  const [list, setList] = useState<ReportSummary[]>([]);
   const [report, setReport] = useState<any>(null);
 
-  useEffect(() => {
-    run(async () => setList(await api('/api/reports')));
-  }, [run, id]);
   useEffect(() => {
     setReport(null);
     if (id)
@@ -194,16 +190,102 @@ export default function Reports({ id }: { id?: number }) {
     );
   }
 
+  return <ReportList />;
+}
+
+const CATEGORIES: { key: string; label: string }[] = [
+  { key: 'all', label: 'Toutes les catégories' },
+  { key: 'attack', label: 'Attaques' },
+  { key: 'defense', label: 'Défenses' },
+  { key: 'scout', label: 'Espionnage' },
+  { key: 'trade', label: 'Livraisons' },
+  { key: 'support', label: 'Renforts' },
+];
+
+const LEGEND: { tone: string; label: string }[] = [
+  { tone: 'scout', label: 'Espionnage' },
+  { tone: 'win', label: 'Réussite sans perte' },
+  { tone: 'mixed', label: 'Réussite avec pertes' },
+  { tone: 'loss', label: 'Défaite ou 100 % des troupes perdues' },
+];
+
+function ReportList() {
+  const { run, refreshMe } = useGame();
+  const [list, setList] = useState<ReportSummary[]>([]);
+  const [archives, setArchives] = useState(false);
+  const [category, setCategory] = useState('all');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+
+  const load = useCallback(
+    () => run(async () => { setList(await api(`/api/reports?archived=${archives ? 1 : 0}`)); refreshMe(); }),
+    [run, refreshMe, archives],
+  );
+  useEffect(() => { setSelected(new Set()); setConfirming(false); load(); }, [load]);
+
+  const shown = list.filter((r) => category === 'all' || r.type === category);
+  const allSelected = shown.length > 0 && shown.every((r) => selected.has(r.id));
+  const toggle = (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(shown.map((r) => r.id)));
+  const bulk = (action: 'delete' | 'archive' | 'unarchive') =>
+    run(async () => {
+      await api('/api/reports/bulk', { method: 'POST', body: { ids: [...selected], action } });
+      setSelected(new Set());
+      setConfirming(false);
+      await load();
+    });
+
   return (
-    <Panel title="Rapports">
-      {list.length === 0 ? (
-        <p className="muted">Aucun rapport pour l'instant. Ils apparaissent après chaque combat, espionnage, livraison ou arrivée de renforts.</p>
+    <Panel
+      title={archives ? 'Rapports archivés' : 'Rapports'}
+      actions={<button className="btn small ghost" onClick={() => setArchives(!archives)}>{archives ? 'Retour aux rapports' : 'Archives'}</button>}
+    >
+      <ul className="report-legend row small">
+        {LEGEND.map((l) => (
+          <li key={l.tone}><span className={`dot tone-${l.tone}`} /> {l.label}</li>
+        ))}
+      </ul>
+      <div className="report-toolbar row">
+        <label className="row small">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={!shown.length} /> Tout sélectionner
+        </label>
+        <select value={category} onChange={(e) => { setCategory(e.target.value); setSelected(new Set()); }} aria-label="Catégorie">
+          {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+        </select>
+        {selected.size > 0 && (
+          <>
+            <span className="muted small">{selected.size} sélectionné{selected.size > 1 ? 's' : ''}</span>
+            {archives ? (
+              <button className="btn small" onClick={() => bulk('unarchive')}>Désarchiver</button>
+            ) : (
+              <button className="btn small" onClick={() => bulk('archive')}>Archiver</button>
+            )}
+            {confirming ? (
+              <>
+                <button className="btn small danger" onClick={() => bulk('delete')}>Confirmer la suppression</button>
+                <button className="btn small ghost" onClick={() => setConfirming(false)}>Annuler</button>
+              </>
+            ) : (
+              <button className="btn small danger" onClick={() => setConfirming(true)}>Supprimer</button>
+            )}
+          </>
+        )}
+      </div>
+      {shown.length === 0 ? (
+        <p className="muted">
+          {archives
+            ? 'Aucun rapport archivé.'
+            : list.length
+              ? 'Aucun rapport dans cette catégorie.'
+              : "Aucun rapport pour l'instant. Ils apparaissent après chaque combat, espionnage, livraison ou arrivée de renforts."}
+        </p>
       ) : (
-        <ul className="list">
-          {list.map((r) => (
+        <ul className="list report-list">
+          {shown.map((r) => (
             <li key={r.id}>
+              <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Sélectionner : ${r.title}`} />
               <a href={`#/rapports/${r.id}`} className={r.read ? '' : 'unread'}>
-                <span className={`dot type-${r.type}`} />
+                <span className={`dot tone-${r.tone}`} />
                 <span>{r.title}</span>
                 <span className="muted small">{clockTime(r.createdAt)}</span>
               </a>

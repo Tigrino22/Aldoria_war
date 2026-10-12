@@ -1,3 +1,4 @@
+import type { ReportTone } from './report-tone';
 import type { BuildingKey, Buildings, Resource, Resources, UnitCounts, UnitKey } from './config';
 
 /** Types échangés entre l'API et le client. */
@@ -157,6 +158,8 @@ export interface ReportSummary {
   title: string;
   createdAt: string;
   read: boolean;
+  archived: boolean;
+  tone: ReportTone;
 }
 
 export interface CombatSide {
