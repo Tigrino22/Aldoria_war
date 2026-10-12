@@ -41,4 +41,26 @@ describe('ménage des rapports', () => {
     expect((await pool.query('SELECT 1 FROM reports WHERE id = $1', [foreign])).rowCount).toBe(1);
     expect((await app.inject({ method: 'GET', url: '/api/reports', headers: other })).json()).toHaveLength(1);
   });
+
+  it("les mouvements entrants indiquent la tribu de l'expéditeur", async () => {
+    const { tx } = await import('../src/db');
+    const { createVillage, villageState } = await import('../src/game/village');
+    const { STARTING_BUILDINGS, emptyUnits } = await import('@aldoria/shared');
+    const mkp = async (n: string) => (await pool.query("INSERT INTO players (username, password_hash) VALUES ($1, 'x') RETURNING id", [n])).rows[0].id as number;
+    const att = await mkp('Assaillant');
+    const def = await mkp('Cible');
+    const tribe = (await pool.query("INSERT INTO tribes (name, tag, leader_id) VALUES ('Les Loups', 'LOUP', $1) RETURNING id", [att])).rows[0].id;
+    await pool.query('UPDATE players SET tribe_id = $1 WHERE id = $2', [tribe, att]);
+    const now = new Date();
+    const mk = (owner: number, x: number, y: number) =>
+      tx((c) => createVillage(c, { ownerId: owner, name: 'V', x, y, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: now, troops: { ...emptyUnits(), swordsman: 5 } }));
+    const from = await mk(att, 300, 300);
+    const to = await mk(def, 302, 300);
+    await pool.query(
+      "INSERT INTO commands (type, player_id, origin_village_id, home_village_id, target_village_id, units, sent_at, arrive_at) VALUES ('attack', $1, $2, $2, $3, $4, now(), now() + interval '1 hour')",
+      [att, from, to, JSON.stringify({ ...emptyUnits(), swordsman: 5 })],
+    );
+    const state = await tx(async (c) => villageState(c, (await c.query('SELECT * FROM villages WHERE id = $1', [to])).rows[0], def));
+    expect(state.incoming[0].origin.ownerTag).toBe('LOUP');
+  });
 });

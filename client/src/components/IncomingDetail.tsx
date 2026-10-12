@@ -20,7 +20,7 @@ export default function IncomingDetail({ incoming }: { incoming: CommandView[] }
               <span className="mv-type">{c.type === 'attack' ? 'Attaque' : 'Soutien'}</span>
               <span>
                 de <a href={`#/carte/${c.origin.x},${c.origin.y}`}>{c.origin.name} ({c.origin.x}|{c.origin.y})</a>
-                {c.origin.ownerName && <span className="muted"> · <PlayerLink name={c.origin.ownerName} /></span>}
+                {c.origin.ownerName && <span className="muted"> · {c.origin.ownerTag && `[${c.origin.ownerTag}] `}<PlayerLink name={c.origin.ownerName} /></span>}
                 <span className="muted"> → {c.target.name} ({c.target.x}|{c.target.y})</span>
               </span>
               <span className="mv-time">
