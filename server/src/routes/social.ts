@@ -179,7 +179,7 @@ export default async function socialRoutes(app: FastifyInstance) {
       const { tribeId } = await tribeOf(c, playerId);
       if (!tribeId) throw new GameError("Vous n'avez pas de tribu");
       const { rows } = await c.query(
-        `SELECT c.id, c.arrive_at, t.id AS target_id, t.name AS target_name, t.x AS tx, t.y AS ty, pt.id AS defender_id, pt.username AS defender,
+        `SELECT c.id, c.arrive_at, c.sent_at, t.id AS target_id, t.name AS target_name, t.x AS tx, t.y AS ty, pt.id AS defender_id, pt.username AS defender,
                 o.name AS origin_name, o.x AS ox, o.y AS oy, po.username AS attacker
          FROM commands c
          JOIN villages t ON t.id = c.target_village_id JOIN players pt ON pt.id = t.owner_id
@@ -190,6 +190,7 @@ export default async function socialRoutes(app: FastifyInstance) {
       );
       return rows.map((r) => ({
         id: r.id,
+        sentAt: new Date(r.sent_at).toISOString(),
         arriveAt: new Date(r.arrive_at).toISOString(),
         target: { id: r.target_id, name: r.target_name, x: r.tx, y: r.ty, ownerName: r.defender },
         origin: { name: r.origin_name, x: r.ox, y: r.oy, ownerName: r.attacker },

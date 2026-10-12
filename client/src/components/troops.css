@@ -1,0 +1,27 @@
+/* Onglet Troupes : cartes d'unités et mouvements */
+.troop-summary { margin: 0 0 12px; color: var(--muted); }
+.troop-summary b { color: var(--ink); font: 700 18px var(--display); }
+.troop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.troop-card { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; padding: 14px 10px 12px; background: var(--panel-2); border: 1px solid var(--line); border-bottom: 3px solid var(--gold); border-radius: var(--radius); }
+.troop-card h3 { margin: 6px 0 0; font: 700 14px var(--display); }
+.troop-count { font: 700 26px var(--display); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.troop-card .btn { margin-top: 8px; }
+.ta-card.kind-support { border-left-color: var(--ok); }
+.ta-card.kind-support .ta-kind { color: var(--ok); }
+.ta-card.kind-return { border-left-color: var(--muted); }
+.ta-card.kind-return .ta-kind { color: var(--muted); }
+.ta-card.kind-return .ta-fill { background: var(--muted); }
+.ta-card.kind-trade, .ta-card.kind-trade { border-left-color: var(--gold); }
+.ta-card.kind-trade .ta-kind, .ta-card.kind-trade .ta-kind { color: var(--gold); }
+.ta-card.kind-trade .ta-fill, .ta-card.kind-trade .ta-fill { background: var(--gold); }
+.ta-card.kind-support .ta-fill { background: var(--ok); }
+.ta-card .mv-time .btn { margin-top: 4px; }
+/* Sur téléphone : liste des unités ; cartes sur ordinateur. */
+.troop-list { display: none; }
+.troop-list th, .troop-list td { padding: 6px 4px; }
+.troop-list .btn { padding-inline: 8px; white-space: nowrap; }
+@media (max-width: 640px) {
+  .troop-grid { display: none; }
+  .troop-list { display: block; }
+  .troop-list th:nth-child(3), .troop-list td:nth-child(3) { display: none; }
+}
