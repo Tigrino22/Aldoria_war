@@ -40,11 +40,12 @@ describe('Offensives des PNJ', () => {
     await pool.end();
   });
 
-  it('pickOffensiveUnits : la moitié de l’armée, sans éclaireurs ni nobles, annulée si trop faible', () => {
+  it('pickOffensiveUnits : la moitié de l’armée, sans éclaireurs ni nobles, jamais annulée pour cause d’armée trop faible', () => {
     const army = troops({ swordsman: 100, cavalry: 40, ram: 10, scout: 5, noble: 2 });
-    const u = pickOffensiveUnits(army, emptyUnits(), 0)!;
+    const u = pickOffensiveUnits(army)!;
     expect(u).toMatchObject({ swordsman: 50, cavalry: 20, ram: 5, scout: 0, noble: 0 });
-    expect(pickOffensiveUnits(army, troops({ swordsman: 5000 }), 0)).toBeNull();
+    // Rien à envoyer : seul cas où l'offensive est reportée.
+    expect(pickOffensiveUnits(troops({ spearman: 50, scout: 5 }))).toBeNull();
   });
 
   it('à l’heure programmée, le PNJ frappe un joueur de sa taille avec 50 % de son armée, puis reprogramme', async () => {

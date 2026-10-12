@@ -283,7 +283,7 @@ Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaq
 
 ### Marge de sécurité des attaques des PNJ
 
-Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes, aux opérations de tribu et aux offensives.
+Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes et aux opérations de tribu. Les offensives occasionnelles n'en tiennent pas compte : elles partent toujours avec leur part d'armée (« Part de l'armée engagée dans une offensive »), même si elle ne bat pas la défense espionnée, car leur but est de déstabiliser les joueurs.
 
 ### Recrutement accéléré des PNJ
 

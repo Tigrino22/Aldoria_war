@@ -1,7 +1,6 @@
-import { type UnitCounts, UNIT_KEYS, emptyUnits, resolveCombat, wallDuringCombat } from '@aldoria/shared';
+import { type UnitCounts, UNIT_KEYS, emptyUnits } from '@aldoria/shared';
 import type { Db } from '../db';
 import { env } from '../env';
-import { attackBeats } from './npc-rules';
 
 /**
  * Offensives occasionnelles des PNJ : de temps en temps, un village offensif envoie une vraie attaque
@@ -10,7 +9,7 @@ import { attackBeats } from './npc-rules';
  */
 
 const HOUR_MS = 3_600_000;
-/** Après une offensive annulée (armée trop faible), le PNJ réessaie au bout d'un quart du rythme normal. */
+/** Sans troupe à envoyer, l'offensive est reportée : le PNJ réessaie au bout d'un quart du rythme normal. */
 const RETRY_DIVISOR = 4;
 
 /** Délai (en ms réelles) entre deux offensives d'un PNJ, en heures de jeu ramenées à la vitesse du monde. */
@@ -29,16 +28,14 @@ export const parseNextOffensive = (state: { offensive?: { nextAt?: string } } | 
 export const offensiveDue = (nextAt: number | null, now: Date) => !!env.npcOffensive && nextAt !== null && nextAt <= now.getTime();
 
 /**
- * La part voulue de l'armée offensive, si elle bat la défense estimée avec la marge réglée (`npcAttackMargin`) ; sinon null (offensive annulée :
- * pas d'attaque suicide). Les béliers partent avec le reste de l'armée.
+ * La part voulue de l'armée offensive (celle du village : épéistes, cavaliers, béliers), qu'elle batte la défense espionnée ou non : une offensive
+ * sert aussi à déstabiliser les joueurs, elle n'est jamais annulée pour cause d'armée trop faible. Null seulement s'il n'y a rien à envoyer.
  */
-export function pickOffensiveUnits(available: UnitCounts, defenders: UnitCounts, wall: number, shareOverride?: number): UnitCounts | null {
+export function pickOffensiveUnits(available: UnitCounts, shareOverride?: number): UnitCounts | null {
   const share = (shareOverride ?? env.npcOffensiveShare) / 100;
   const units = emptyUnits();
   for (const k of UNIT_KEYS) units[k] = k === 'scout' || k === 'noble' ? 0 : Math.floor(available[k] * share);
-  if (units.swordsman + units.cavalry < 1) return null;
-  const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
-  return attackBeats(r) ? units : null;
+  return units.swordsman + units.cavalry < 1 ? null : units;
 }
 
 /** Vrai si un PNJ a déjà frappé ce joueur (hors espionnage) pendant le dernier rythme d'offensive : au plus une offensive reçue par période. */
