@@ -4,3 +4,6 @@
 .disband h2 { margin: 0; }
 .disband-sum { display: grid; gap: 8px; background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
 .disband-sum > div { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 99999; background: rgb(20 14 8 / 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; overflow-y: auto; }
+.disband input[type='number'] { width: 90px; }
+.disband .row.between { justify-content: space-between; }
