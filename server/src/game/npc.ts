@@ -501,38 +501,65 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   }
 }
 
-async function economyStep(c: Db, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
+/** Construit le prochain bâtiment du plan du PNJ. */
+async function buildStep(c: Db, profile: NpcProfile, villageId: number, cap: number, now: Date) {
   const v = await syncVillage(c, villageId, now);
   const queued = (await c.query('SELECT building, level FROM build_queue WHERE village_id = $1', [villageId])).rows;
   const levels: Buildings = { ...v.buildings };
   for (const q of queued) levels[q.building as BuildingKey] = Math.max(levels[q.building as BuildingKey], q.level);
   const next = chooseBuilding(profile, levels, cap);
-  if (next) {
-    try {
-      await enqueueBuild(c, villageId, next, now);
-    } catch (err) {
-      if (!(err instanceof GameError)) throw err;
-    }
+  if (!next) return;
+  try {
+    await enqueueBuild(c, villageId, next, now);
+  } catch (err) {
+    if (!(err instanceof GameError)) throw err;
   }
+}
 
-  const inQueue = (await c.query('SELECT count(*)::int AS n FROM recruit_queue WHERE village_id = $1', [villageId])).rows[0].n;
-  if (inQueue > 0 || v.buildings.barracks < 1) return;
+/**
+ * Recrutement : la file se remplit dès qu'il lui reste moins de deux réflexions de travail (elle ne reste donc jamais vide entre deux réflexions),
+ * avec jusqu'à `npcRecruitBatches` lots de types différents, chacun d'au plus `npcRecruitBatch` unités.
+ */
+async function recruitStep(c: Db, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
+  const v = await syncVillage(c, villageId, now);
+  if (v.buildings.barracks < 1) return;
+  const { rows: q } = await c.query(
+    `SELECT coalesce(extract(epoch FROM max(start_at + make_interval(secs => count * unit_seconds)) - $2::timestamptz), 0)::float AS left FROM recruit_queue WHERE village_id = $1`,
+    [villageId, now],
+  );
+  if (q[0].left > (2 * env.npcThinkMinutes * 60) / Math.sqrt(env.worldSpeed)) return;
   const owned = await getTroops(c, villageId, villageId);
   const away = (await c.query("SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed AND type IN ('attack', 'support', 'return')", [villageId])).rows;
   for (const r of away) {
     const u = normalizeUnits(r.units);
     for (const k of Object.keys(owned) as (keyof UnitCounts)[]) owned[k] += u[k];
   }
-  for (const choice of nextRecruit(profile, role, v.buildings, owned, cap, env.npcDifficulty).slice(0, 3)) {
+  const queuedUnits = (await c.query('SELECT unit, count - delivered AS n FROM recruit_queue WHERE village_id = $1', [villageId])).rows;
+  for (const r of queuedUnits) owned[r.unit as keyof UnitCounts] += r.n;
+  let batches = 0;
+  for (const choice of nextRecruit(profile, role, v.buildings, owned, cap, env.npcDifficulty, env.npcRecruitBatch)) {
+    if (batches >= env.npcRecruitBatches) break;
     // Trop cher ou trop de monde pour la ferme : on réduit le lot de moitié jusqu'à ce qu'il passe.
     for (let count = choice.count; count >= 1; count = Math.floor(count / 2)) {
       try {
         await enqueueRecruit(c, villageId, choice.unit, count, now);
-        return;
+        batches++;
+        break;
       } catch (err) {
         if (!(err instanceof GameError)) throw err;
       }
     }
+  }
+}
+
+async function economyStep(c: Db, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
+  // Le premier servi prend les ressources : par défaut l'armée, sauf si l'administration remet la construction en tête.
+  if (env.npcArmyFirst) {
+    await recruitStep(c, profile, role, villageId, cap, now);
+    await buildStep(c, profile, villageId, cap, now);
+  } else {
+    await buildStep(c, profile, villageId, cap, now);
+    await recruitStep(c, profile, role, villageId, cap, now);
   }
 }
 

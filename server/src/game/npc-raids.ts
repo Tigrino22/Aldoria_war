@@ -5,7 +5,7 @@ import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { sendCommand } from './commands';
 import { estimateLoot, pickIntel } from './intel';
-import { carryOf } from './npc-rules';
+import { attackBeats, carryOf } from './npc-rules';
 import { getTroops, loadVillage } from './village';
 
 /**
@@ -17,8 +17,6 @@ import { getTroops, loadVillage } from './village';
  * Réglages à chaud : `npcRaids` (interrupteur), `npcRaidsPerThink` (pillages par village et par réflexion), `npcRaidRadius` (rayon).
  */
 
-/** Force d'attaque visée face à un village vide : cinq fois sa défense de base, pour ne perdre (presque) personne. */
-export const FARM_MARGIN = 5;
 /** Butin estimé en dessous duquel un pillage ne vaut pas le déplacement. */
 export const FARM_MIN_LOOT = 100;
 /** Éclaireurs envoyés au plus par village et par réflexion vers des barbares inconnus (ou à revoir). */
@@ -40,7 +38,7 @@ export function farmPool(home: UnitCounts): UnitCounts {
 }
 
 /**
- * Le plus petit groupe qui emporte `goal` ressources et bat largement (`FARM_MARGIN`) la défense d'un village vide à muraille `wall`.
+ * Le plus petit groupe qui emporte `goal` ressources et bat la défense d'un village vide à muraille `wall`.
  * S'il n'y a pas de quoi tout porter, part ce qui suffit à gagner (tout le butin possible). Null si le groupe ne gagne pas.
  */
 export function pickFarmUnits(pool: UnitCounts, goal: number, wall: number): UnitCounts | null {
@@ -53,7 +51,7 @@ export function pickFarmUnits(pool: UnitCounts, goal: number, wall: number): Uni
   const wins = () => {
     if (noTroops(units)) return false;
     const r = resolveCombat({ attackers: units, defenders: [emptyUnits()], wallLevel: wallDuringCombat(wall, 0) });
-    return r.attackPower >= FARM_MARGIN * r.defensePower;
+    return attackBeats(r);
   };
   // Pas assez fort pour passer sans pertes : on ajoute un à un les attaquants les plus solides.
   while (!wins()) {

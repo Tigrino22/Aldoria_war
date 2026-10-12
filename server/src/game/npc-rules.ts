@@ -13,6 +13,7 @@ import {
   wallDuringCombat,
 } from '@aldoria/shared';
 
+import { env } from '../env';
 import { armyTarget, FARM_LEAD, type VillageRole } from './npc-roles';
 
 export { FARM_LEAD, NOBLES_PER_CONQUEST } from './npc-roles';
@@ -84,12 +85,13 @@ export function nextRecruit(
   owned: UnitCounts,
   cap: number,
   difficulty: number,
+  maxBatch = 40,
 ): { unit: (typeof UNIT_KEYS)[number]; count: number }[] {
   const target = armyTarget(profile, role, cap, difficulty);
   return UNIT_KEYS.filter((k) => target[k] > owned[k] && meetsRequirements(buildings, UNITS[k].requires))
     .map((k) => ({ unit: k, deficit: target[k] - owned[k], ratio: (target[k] - owned[k]) / target[k] }))
     .sort((a, b) => b.ratio - a.ratio)
-    .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(40, Math.ceil(deficit / 2))) }));
+    .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(maxBatch, Math.ceil(deficit / 2))) }));
 }
 
 /** Éclaireurs envoyés selon le nombre d'échecs de suite : 2, puis 10, puis 30. */
@@ -135,8 +137,11 @@ export function consecutiveScoutFailures(reports: { villageId: number; ok: boole
 export const scoutPaused = (f: ScoutFailures | undefined, now: Date, worldSpeed: number) =>
   !!f && f.count >= SCOUT_MAX_FAILURES && now.getTime() - f.lastAt < (SCOUT_PAUSE_GAME_HOURS * 3_600_000) / worldSpeed;
 
-/** Marge de sécurité demandée avant d'attaquer : la force d'attaque doit dépasser 1,3 fois la défense estimée. */
-export const ATTACK_MARGIN = 1.3;
+/**
+ * Un PNJ attaque dès que son armée bat l'armée espionnée : la marge de sécurité (`npcAttackMargin`, en % de la défense estimée) vaut 0 par défaut.
+ * La victoire est celle du combat (force d'attaque strictement supérieure).
+ */
+export const attackBeats = (r: { attackPower: number; defensePower: number }) => r.attackPower > r.defensePower && r.attackPower >= (1 + env.npcAttackMargin / 100) * r.defensePower;
 
 const noTroops = (u: UnitCounts) => UNIT_KEYS.every((k) => u[k] === 0);
 
@@ -150,7 +155,7 @@ export function pickWinningUnits(available: UnitCounts, defenders: UnitCounts, w
     for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
     if (UNIT_KEYS.every((k) => units[k] === 0)) continue;
     const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
-    if (r.attackPower >= ATTACK_MARGIN * r.defensePower) return units;
+    if (attackBeats(r)) return units;
   }
   return null;
 }
@@ -248,7 +253,7 @@ export function pickRaidUnits(
     for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
     if (UNIT_KEYS.every((k) => units[k] === 0)) continue;
     const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
-    if (r.attackPower < ATTACK_MARGIN * r.defensePower) continue;
+    if (!attackBeats(r)) continue;
     best = units;
     if (carryOf(units) >= 0.8 * total) break;
   }
