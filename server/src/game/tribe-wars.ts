@@ -5,6 +5,7 @@ import { Outbox } from '../notify';
 import { WAR_DAYS } from './npc-wars';
 import { WAR_SCORE_SQL } from './war-stats';
 import { GRUDGE_DAYS, REAL_ATTACK } from './npc-tribes';
+import { allyTribeIdsOf, areAllied } from './tribe-alliances';
 
 /**
  * Guerres qui concernent une tribu de joueurs (table `tribe_wars`) :
@@ -107,7 +108,7 @@ export interface TribeWarsView {
   active: TribeWarLine[];
   /** Guerres terminées depuis une semaine. */
   recent: TribeWarLine[];
-  /** Tribus à qui l'on peut déclarer la guerre (aucune guerre en cours avec elles). */
+  /** Tribus à qui l'on peut déclarer la guerre (ni guerre en cours ni alliance avec elles). */
   targets: { id: number; tag: string; name: string; isNpc: boolean; members: number; points: number }[];
   canDeclare: boolean;
   declaredCount: number;
@@ -161,7 +162,7 @@ export async function tribeWarsView(c: Pick<Db, 'query'>, playerId: number, now:
   });
   const isActive = (r: (typeof lines)[number]) => !r.ended_at && new Date(r.until).getTime() > now.getTime();
   const active = lines.filter(isActive).map(line);
-  const busy = new Set(active.map((l) => l.other.id));
+  const busy = new Set([...active.map((l) => l.other.id), ...(await allyTribeIdsOf(c, tribeId))]);
   const targets = (
     await c.query(
       `SELECT t.id, t.tag, t.name, t.is_npc,
@@ -213,6 +214,7 @@ export async function declareWar(c: Db, outbox: Outbox, playerId: number, target
     [tribeId, targetId, now],
   );
   if (existing.rows.length) throw new GameError('Une guerre est déjà en cours avec cette tribu');
+  if (await areAllied(c, tribeId, targetId)) throw new GameError('Cette tribu est votre alliée : rompez d’abord l’alliance');
   const declared = (await c.query('SELECT count(*)::int AS n FROM tribe_wars WHERE declarer_id = $1 AND ended_at IS NULL AND until > $2', [tribeId, now])).rows[0].n as number;
   if (declared >= MAX_DECLARED_WARS) throw new GameError(`Votre tribu ne peut pas déclarer plus de ${MAX_DECLARED_WARS} guerres en même temps`);
 
@@ -220,6 +222,8 @@ export async function declareWar(c: Db, outbox: Outbox, playerId: number, target
   const id = (
     await c.query('INSERT INTO tribe_wars (declarer_id, target_id, declared_by, started_at, until) VALUES ($1, $2, $3, $4, $5) RETURNING id', [tribeId, targetId, playerId, now, until])
   ).rows[0].id as number;
+  // Une proposition d'alliance en attente entre les deux tribus n'a plus de sens.
+  await c.query('DELETE FROM tribe_alliance_invites WHERE (from_tribe = $1 AND to_tribe = $2) OR (from_tribe = $2 AND to_tribe = $1)', [tribeId, targetId]);
   if (!target.is_npc) {
     await notifyMembers(
       c,

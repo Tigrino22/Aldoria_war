@@ -8,6 +8,7 @@ import { playerFromToken } from './auth';
 import { GameError } from './errors';
 import { env } from './env';
 import { register } from './notify';
+import allianceRoutes from './routes/alliances';
 import authRoutes from './routes/auth';
 import mapRoutes from './routes/map';
 import adminRoutes from './routes/admin';
@@ -64,6 +65,7 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   await app.register(villageRoutes);
   await app.register(managerRoutes);
   await app.register(mapRoutes);
+  await app.register(allianceRoutes);
   await app.register(marketRoutes);
   await app.register(adminRoutes);
   await app.register(questRoutes);

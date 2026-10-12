@@ -6,6 +6,7 @@ import { pool } from '../db';
 import { forbidden } from '../errors';
 import { env } from '../env';
 import { estimateLoot, pickIntel } from '../game/intel';
+import { allyTribeIdsOf } from '../game/tribe-alliances';
 
 export default async function mapRoutes(app: FastifyInstance) {
   app.get('/api/map', async (req) => {
@@ -40,7 +41,7 @@ export default async function mapRoutes(app: FastifyInstance) {
     );
   });
 
-  /** Tribus en guerre avec celle du joueur (et plus tard ses alliées), pour les couleurs de la carte. */
+  /** Tribus en guerre avec celle du joueur et tribus alliées, pour les couleurs de la carte. */
   app.get('/api/map/relations', async (req): Promise<MapRelations> => {
     const playerId = await requirePlayer(req);
     const { rows } = await pool.query(
@@ -49,7 +50,8 @@ export default async function mapRoutes(app: FastifyInstance) {
        WHERE p.id = $1 AND w.ended_at IS NULL AND w.until > now()`,
       [playerId],
     );
-    return { warTribeIds: rows.map((r) => r.id as number), allyTribeIds: [] };
+    const tribeId = (await pool.query('SELECT tribe_id FROM players WHERE id = $1', [playerId])).rows[0]?.tribe_id ?? null;
+    return { warTribeIds: rows.map((r) => r.id as number), allyTribeIds: await allyTribeIdsOf(pool, tribeId) };
   });
 
   /** Villages barbares autour d'un village du joueur, avec le résultat de sa dernière attaque ou de son dernier espionnage. */
