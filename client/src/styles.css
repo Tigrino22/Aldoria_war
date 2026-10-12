@@ -264,6 +264,16 @@ textarea { width: 100%; resize: vertical; }
 .dot.type-support { background: var(--ok); }
 .dot.type-scout { background: #5b7a3c; }
 .dot.type-trade { background: var(--gold); }
+.dot.tone-neutral { background: var(--muted); }
+.dot.tone-scout { background: #2f7fd0; }
+.dot.tone-win { background: var(--ok); }
+.dot.tone-mixed { background: #e0b020; }
+.dot.tone-loss { background: var(--danger); }
+.report-legend { list-style: none; padding: 0; margin: 0 0 10px; gap: 6px 16px; }
+.report-legend li { display: flex; align-items: center; gap: 6px; }
+.report-toolbar { margin-bottom: 8px; gap: 10px; }
+.report-list li { display: flex; align-items: center; gap: 6px; }
+.report-list li > a { flex: 1; min-width: 0; }
 .verdict { font: 700 18px var(--display); }
 .verdict.win { color: var(--ok); }
 .verdict.loss { color: var(--danger); }

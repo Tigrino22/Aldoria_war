@@ -342,18 +342,18 @@ async function troopGroups(c: Db, where: 'here' | 'away', villageId: number): Pr
 }
 
 const COMMAND_SELECT = `
-  SELECT c.*, o.name AS o_name, o.x AS o_x, o.y AS o_y, po.username AS o_owner,
-         t.name AS t_name, t.x AS t_x, t.y AS t_y, pt.username AS t_owner
+  SELECT c.*, o.name AS o_name, o.x AS o_x, o.y AS o_y, po.username AS o_owner, tro.tag AS o_tag,
+         t.name AS t_name, t.x AS t_x, t.y AS t_y, pt.username AS t_owner, trt.tag AS t_tag
   FROM commands c
-  JOIN villages o ON o.id = c.origin_village_id LEFT JOIN players po ON po.id = o.owner_id
-  JOIN villages t ON t.id = c.target_village_id LEFT JOIN players pt ON pt.id = t.owner_id`;
+  JOIN villages o ON o.id = c.origin_village_id LEFT JOIN players po ON po.id = o.owner_id LEFT JOIN tribes tro ON tro.id = po.tribe_id
+  JOIN villages t ON t.id = c.target_village_id LEFT JOIN players pt ON pt.id = t.owner_id LEFT JOIN tribes trt ON trt.id = pt.tribe_id`;
 
 export function toCommandView(r: any, showUnits: boolean): CommandView {
   return {
     id: r.id,
     type: r.type,
-    origin: { id: r.origin_village_id, name: r.o_name, x: r.o_x, y: r.o_y, ownerName: r.o_owner },
-    target: { id: r.target_village_id, name: r.t_name, x: r.t_x, y: r.t_y, ownerName: r.t_owner },
+    origin: { id: r.origin_village_id, name: r.o_name, x: r.o_x, y: r.o_y, ownerName: r.o_owner, ownerTag: r.o_tag ?? null },
+    target: { id: r.target_village_id, name: r.t_name, x: r.t_x, y: r.t_y, ownerName: r.t_owner, ownerTag: r.t_tag ?? null },
     units: showUnits ? normalizeUnits(r.units) : null,
     loot: showUnits ? r.loot : null,
     merchants: r.merchants ?? 0,

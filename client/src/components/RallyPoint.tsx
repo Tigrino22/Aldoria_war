@@ -16,7 +16,7 @@ function Movement({ c, direction, onCancel }: { c: CommandView; direction: 'in' 
       <span className="mv-type">{TYPE_LABEL[c.type]}</span>
       <span>
         {direction === 'in' ? 'de' : 'vers'} <a href={`#/carte/${other.x},${other.y}`}>{other.name} ({other.x}|{other.y})</a>
-        {other.ownerName && <span className="muted"> · <PlayerLink name={other.ownerName} /></span>}
+        {other.ownerName && <span className="muted"> · {other.ownerTag && `[${other.ownerTag}] `}<PlayerLink name={other.ownerName} /></span>}
       </span>
       {c.units && <UnitList units={c.units} empty="" />}
       <span className="mv-time">

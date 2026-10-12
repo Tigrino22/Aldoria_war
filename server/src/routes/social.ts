@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { PlayerProfile } from '@aldoria/shared';
+import { reportTone, type PlayerProfile } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
@@ -37,11 +37,28 @@ export default async function socialRoutes(app: FastifyInstance) {
   // ---------- Rapports ----------
   app.get('/api/reports', async (req) => {
     const playerId = await requirePlayer(req);
+    const archived = (req.query as { archived?: string }).archived === '1';
     const { rows } = await pool.query(
-      'SELECT id, type, title, read, created_at FROM reports WHERE player_id = $1 ORDER BY created_at DESC, id DESC LIMIT 200',
-      [playerId],
+      `SELECT id, type, title, read, archived, created_at,
+              jsonb_build_object('attackerWins', data->'attackerWins', 'conquered', data->'conquered',
+                                 'attacker', jsonb_build_object('units', data->'attacker'->'units', 'losses', data->'attacker'->'losses'),
+                                 'defender', jsonb_build_object('units', data->'defender'->'units', 'losses', data->'defender'->'losses')) AS tone_data
+       FROM reports WHERE player_id = $1 AND archived = $2 ORDER BY created_at DESC, id DESC LIMIT 200`,
+      [playerId, archived],
     );
-    return rows.map((r) => ({ id: r.id, type: r.type, title: r.title, read: r.read, createdAt: r.created_at }));
+    return rows.map((r) => ({
+      id: r.id, type: r.type, title: r.title, read: r.read, archived: r.archived, createdAt: r.created_at,
+      tone: reportTone(r.type, r.tone_data),
+    }));
+  });
+
+  // Actions en lot : suppression, archivage ou retour des archives.
+  app.post('/api/reports/bulk', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { ids, action } = z.object({ ids: z.array(z.number().int()).min(1).max(500), action: z.enum(['delete', 'archive', 'unarchive']) }).parse(req.body);
+    if (action === 'delete') await pool.query('DELETE FROM reports WHERE player_id = $1 AND id = ANY($2::int[])', [playerId, ids]);
+    else await pool.query('UPDATE reports SET archived = $3 WHERE player_id = $1 AND id = ANY($2::int[])', [playerId, ids, action === 'archive']);
+    return { ok: true };
   });
 
   app.get('/api/reports/:id', async (req) => {
