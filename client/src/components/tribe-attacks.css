@@ -20,3 +20,4 @@
   .ta-card { flex-direction: column; align-items: flex-start; }
   .ta-card .mv-time { margin-left: 0; flex-direction: row; align-items: baseline; gap: 8px; }
 }
+.ta-member.threat { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
