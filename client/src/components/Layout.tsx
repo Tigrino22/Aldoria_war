@@ -26,8 +26,9 @@ import Admin from './Admin';
 import Raid from './Raid';
 import { api } from '../api';
 
-// La carte embarque PixiJS : elle n'est chargée qu'à la première ouverture.
-const MapView = lazy(() => import('./MapView'));
+// La carte embarque PixiJS : elle n'alourdit pas le premier affichage, puis se précharge dès que le jeu est au repos.
+const loadMap = () => import('./MapView');
+const MapView = lazy(loadMap);
 
 interface NavItem {
   path: string;
@@ -120,6 +121,10 @@ export default function Layout() {
   const page = route[0] ?? 'village';
   const [drawer, setDrawer] = useState(false);
   useEffect(() => setDrawer(false), [route.join('/')]);
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 2000));
+    idle(() => void loadMap());
+  }, []);
   const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : 0);
 
   if (!me.villages.length) {

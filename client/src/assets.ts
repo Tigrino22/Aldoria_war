@@ -20,7 +20,7 @@ import flag from './assets/map/flag.svg';
 import trees from './assets/map/trees.png';
 import hill from './assets/map/hill.png';
 import villageBg from './assets/village-bg.png';
-import ground from './assets/map/ground.png';
+import ground from './assets/map/ground.jpg';
 import spots from './assets/village-spots.json';
 import logo from './assets/logo.svg';
 import scroll from './assets/ui/scroll.svg';

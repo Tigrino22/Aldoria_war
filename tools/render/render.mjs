@@ -73,7 +73,8 @@ for (const r of ['wood', 'clay', 'iron', 'wheat'])
   if (want(r)) save(`${out}/resources/${r}.png`, await page.evaluate((n) => window.renderIcon(n), r));
 for (const u of ['spearman', 'halberdier', 'swordsman', 'scout', 'cavalry', 'ram', 'noble'])
   if (want(u)) save(`${out}/units/${u}.png`, await page.evaluate((n) => window.renderIcon(n), u));
-if (want('ground')) save(`${out}/map/ground.png`, await page.evaluate(() => window.exportTexture('grass')));
+// Herbe de la carte en JPEG : pas de transparence utile, dix fois plus léger, la carte s'ouvre plus vite.
+if (want('ground')) save(`${out}/map/ground.jpg`, await page.evaluate(() => window.exportTexture('grass', 'image/jpeg', 0.82)));
 
 await browser.close();
 server.close();
