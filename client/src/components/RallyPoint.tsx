@@ -103,7 +103,7 @@ function DisbandDialog({ v, unit, onClose }: { v: VillageState; unit: UnitKey; o
             Annuler
           </button>
           <button className="btn danger" disabled={n < 1} onClick={confirm}>
-            Dissoudre {fmt(n)} unité{n > 1 ? 's' : ''}
+            Valider ({fmt(n)})
           </button>
         </div>
       </div>
