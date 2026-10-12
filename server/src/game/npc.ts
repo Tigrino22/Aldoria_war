@@ -452,8 +452,8 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     // Les troupes dépendent du butin : assez pour gagner et emporter l'essentiel du stock, toute l'armée s'il le faut.
     // Pour se venger ou faire la guerre, un PNJ frappe fort : au moins 70 % de son armée offensive.
     if (offensive) {
-      // Offensive : une part de l'armée si elle suffit, sinon on annule (et on réessaie plus tôt) ; pas de train de nobles ni de seuil de butin.
-      const units = pickOffensiveUnits(attackers, intel.troops, intel.wall);
+      // Offensive : une part de l'armée part dans tous les cas, même trop faible pour vaincre (elle déstabilise) ; pas de train de nobles ni de seuil de butin.
+      const units = pickOffensiveUnits(attackers);
       if (!units) return void (await finishOffensive(4));
       const arrival = arrivalOf(units, target);
       if (hostileToPlayer && isQuietAt(arrival)) return;
