@@ -44,11 +44,13 @@ import { buildingImg } from '../assets';
 import { duration, fmt } from '../format';
 import { useGame, useRoute } from '../game';
 import { Cost, Panel, ResIcon, UnitIcon } from '../ui';
+import WikiGuide from './WikiGuide';
 
 // Toutes les valeurs affichées ici sont calculées à partir de @aldoria/shared, exactement comme sur le serveur :
 // modifier l'équilibrage dans shared/src/config.ts met le wiki à jour automatiquement.
 
 const SECTIONS = [
+  { id: 'guide', title: 'Guide du débutant' },
   { id: 'debuter', title: 'Bien débuter' },
   { id: 'ressources', title: 'Ressources et production' },
   { id: 'construction', title: 'Construction' },
@@ -154,7 +156,8 @@ export default function Wiki({ section, item }: { section?: string; item?: strin
         {!current && <Home />}
         {current === 'batiments' && (item && item in BUILDINGS ? <BuildingSheet k={item as BuildingKey} /> : <BuildingIndex />)}
         {current === 'troupes' && (item && item in UNITS ? <UnitSheet k={item as UnitKey} /> : <UnitIndex />)}
-        {current && current !== 'batiments' && current !== 'troupes' && <Guide id={current} />}
+        {current === 'guide' && <WikiGuide />}
+        {current && current !== 'batiments' && current !== 'troupes' && current !== 'guide' && <Guide id={current} />}
         {current && (
           <p>
             <button className="btn small ghost" onClick={() => go(item ? `wiki/${current}` : 'wiki')}>
@@ -175,6 +178,10 @@ function Home() {
         Tout ce qu'il faut savoir pour faire grandir votre village. Les chiffres de ce wiki sont calculés directement à partir des règles du jeu, ils sont donc
         toujours à jour. Ce monde tourne en <b>vitesse x{world.speed}</b> : les productions sont multipliées par {world.speed} et les durées divisées par {world.speed}.
       </p>
+      <a className="wiki-card wiki-card-featured" href="#/wiki/guide">
+        Nouveau sur Aldoria ? Commencez par le guide du débutant
+        <span className="muted small">Premiers pas, ordre de construction, pillage, défense et premier noble, pas à pas.</span>
+      </a>
       <div className="wiki-grid">
         {SECTIONS.map((s) => (
           <a key={s.id} className="wiki-card" href={`#/wiki/${s.id}`}>
@@ -188,7 +195,7 @@ function Home() {
 
 // ---------- Fonctionnalités ----------
 
-function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
+function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide'> }) {
   const { world } = useGame();
   const s = world.speed;
   const title = SECTIONS.find((x) => x.id === id)!.title;
@@ -211,7 +218,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <b>Protection débutant :</b> pendant {duration((BEGINNER_PROTECTION_HOURS / s) * 3600)} (soit {BEGINNER_PROTECTION_HOURS} h à vitesse x1), aucun joueur ne
           peut vous attaquer. Attention : si vous attaquez vous-même un autre joueur, votre protection s'arrête aussitôt. Les villages barbares peuvent être attaqués sans perdre la protection.
         </p>
-        <p>Conseil de départ : montez les quatre bâtiments de ressources, puis l'{B('townhall')} au niveau 3 pour débloquer la {B('barracks')} et le {B('market')}.</p>
+        <p>Pour un pas-à-pas complet, voir le <a href="#/wiki/guide">guide du débutant</a>. Conseil de départ : montez les quatre bâtiments de ressources, puis l'{B('townhall')} au niveau 3 pour débloquer la {B('barracks')} et le {B('market')}.</p>
         <p>
           <b>Premiers pas :</b> une liste de quêtes vous guide au début ; chaque quête accomplie rapporte une récompense à récupérer.
         </p>
