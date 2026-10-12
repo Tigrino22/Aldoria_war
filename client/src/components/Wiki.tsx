@@ -431,10 +431,18 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
         <p>
           Les villages barbares ne recrutent pas : une garnison vaincue ne revient pas, mais leurs bâtiments gagnent des niveaux avec le temps. Les plus lointains sont aussi les mieux défendus.
         </p>
-        <p>Touchez un village sur la carte pour voir son propriétaire, ses points et lui envoyer des troupes ou des marchands. Le pseudo d'un joueur ouvre son profil et la liste de ses villages.</p>
         <p>
-          <b>Repères :</b> le bouton « Quadrillage » affiche une grille de cases avec leurs coordonnées, et « Mini-map » une vue d'ensemble du monde où vous cliquez pour vous déplacer
-          (bleu : vous, vert : votre tribu, rouge : les autres, gris : barbares). Le champ « x|y » saute directement à une case ; les deux options sont mémorisées sur votre appareil.
+          Touchez un village sur la carte pour voir son propriétaire, ses points et lui envoyer des troupes ou des marchands. À la souris, il suffit de survoler un village : la même fiche
+          s'affiche, avec le temps de trajet de chaque unité depuis votre village actif. Le pseudo d'un joueur ouvre son profil et la liste de ses villages.
+        </p>
+        <p>
+          <b>Couleurs :</b> jaune pour vos villages, blanc pour votre village actif, bleu pour votre tribu, bleu ciel pour les tribus alliées, rouge vif pour les tribus en guerre déclarée avec la
+          vôtre, rouge foncé pour les autres joueurs et gris pour les barbares. Ces couleurs sont fixes. Le bouton « Couleurs » permet d'ajouter des repères : un joueur ou une tribu précise prend la
+          couleur de votre choix sur la carte et la mini-map (les couleurs fixes restent prioritaires). Les repères sont gardés sur votre appareil.
+        </p>
+        <p>
+          <b>Se repérer :</b> « Quadrillage » affiche une grille de 10 cases avec leurs coordonnées, « Mini-map » une vue d'ensemble du monde où vous cliquez pour vous déplacer, et le champ
+          « x|y » saute directement à une case. En dézoomant, les villages deviennent des pastilles colorées pour voir tout le monde d'un coup d'œil.
           La carte se manipule au doigt (glisser, pincer) comme à la souris.
         </p>
         <p>

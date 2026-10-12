@@ -252,6 +252,14 @@ describe('jeu', () => {
     const t = (await app.inject({ method: 'GET', url: `/api/tribes/${tribe.json().id}`, headers: auth(a.token) })).json();
     expect(t.members).toHaveLength(2);
 
+    // Couleurs de la carte : tribus en guerre (dans les deux sens), alliances encore vides, protection débutant.
+    const other = (await pool.query("INSERT INTO tribes (name, tag) VALUES ('Saxons', 'SAX') RETURNING id")).rows[0].id;
+    await pool.query('INSERT INTO tribe_wars (declarer_id, target_id, started_at, until) VALUES ($1, $2, now(), now() + interval \'1 day\')', [other, tribe.json().id]);
+    const rel = (await app.inject({ method: 'GET', url: '/api/map/relations', headers: auth(b.token) })).json();
+    expect(rel).toEqual({ warTribeIds: [other], allyTribeIds: [] });
+    const mine = (await app.inject({ method: 'GET', url: '/api/map', headers: auth(a.token) })).json().find((v: { ownerName: string }) => v.ownerName === 'Gauvain');
+    expect(mine.protected).toBe(true);
+
     const msg = await app.inject({ method: 'POST', url: '/api/messages', headers: auth(b.token), payload: { to: 'gauvain', subject: 'Salut', body: 'On attaque ce soir ?' } });
     expect(msg.statusCode).toBe(200);
     const inbox = (await app.inject({ method: 'GET', url: '/api/messages', headers: auth(a.token) })).json();

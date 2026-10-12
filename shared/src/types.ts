@@ -127,6 +127,16 @@ export interface MapVillage {
   ownerName: string | null;
   tribeId: number | null;
   tribeTag: string | null;
+  /** Le propriétaire est sous protection débutant (attaques impossibles). */
+  protected: boolean;
+}
+
+/** Tribus liées à celle du joueur, pour colorer la carte. */
+export interface MapRelations {
+  /** Tribus en guerre déclarée avec la sienne (dans un sens ou dans l'autre). */
+  warTribeIds: number[];
+  /** Tribus alliées. Toujours vide tant que les alliances entre tribus n'existent pas. */
+  allyTribeIds: number[];
 }
 
 /** Résultat de la dernière attaque ou du dernier espionnage d'un village barbare (pastille de l'assistant de pillage). */

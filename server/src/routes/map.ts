@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { RESOURCES, UNIT_KEYS, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
+import { RESOURCES, UNIT_KEYS, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { forbidden } from '../errors';
@@ -19,7 +19,7 @@ export default async function mapRoutes(app: FastifyInstance) {
       })
       .parse(req.query);
     const { rows } = await pool.query(
-      `SELECT v.id, v.name, v.x, v.y, v.points, v.owner_id, p.username, t.id AS tribe_id, t.tag
+      `SELECT v.id, v.name, v.x, v.y, v.points, v.owner_id, p.username, p.protection_until > now() AS protected, t.id AS tribe_id, t.tag
        FROM villages v LEFT JOIN players p ON p.id = v.owner_id LEFT JOIN tribes t ON t.id = p.tribe_id
        WHERE v.x BETWEEN $1 AND $3 AND v.y BETWEEN $2 AND $4`,
       [q.x0, q.y0, q.x1, q.y1],
@@ -35,8 +35,21 @@ export default async function mapRoutes(app: FastifyInstance) {
         ownerName: r.username,
         tribeId: r.tribe_id,
         tribeTag: r.tag,
+        protected: r.protected === true,
       }),
     );
+  });
+
+  /** Tribus en guerre avec celle du joueur (et plus tard ses alliées), pour les couleurs de la carte. */
+  app.get('/api/map/relations', async (req): Promise<MapRelations> => {
+    const playerId = await requirePlayer(req);
+    const { rows } = await pool.query(
+      `SELECT DISTINCT CASE WHEN w.declarer_id = p.tribe_id THEN w.target_id ELSE w.declarer_id END AS id
+       FROM players p JOIN tribe_wars w ON p.tribe_id IN (w.declarer_id, w.target_id)
+       WHERE p.id = $1 AND w.ended_at IS NULL AND w.until > now()`,
+      [playerId],
+    );
+    return { warTribeIds: rows.map((r) => r.id as number), allyTribeIds: [] };
   });
 
   /** Villages barbares autour d'un village du joueur, avec le résultat de sa dernière attaque ou de son dernier espionnage. */

@@ -149,8 +149,8 @@ const trim = (url, size) => trimAsync(url, size);
 
 window.ready = true;
 
-window.exportTexture = (name) => {
+window.exportTexture = (name, type = 'image/png', quality) => {
   const img = texture(name).image;
-  return img.toDataURL('image/png');
+  return img.toDataURL(type, quality);
 };
 window.textureNames = () => Object.keys(WORLD);

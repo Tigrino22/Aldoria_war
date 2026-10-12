@@ -1,11 +1,126 @@
-.map-wrap { position: relative; }
-.minimap { position: absolute; left: 10px; bottom: 10px; z-index: 5; background: rgb(43 32 24 / 0.88); border: 2px solid var(--gold); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.4); }
-.minimap canvas { width: 170px; height: 170px; border-radius: 5px; cursor: crosshair; display: block; touch-action: none; }
-.minimap span { color: #f2e6c8; font-size: 11px; text-align: center; }
+/* Carte du monde : la carte occupe tout l'écran, les commandes flottent dessus dans un verre de bois sombre. */
+.map-page { position: relative; display: flex; flex-direction: column; }
+.map-stage {
+  --glass: rgb(26 19 12 / 0.82);
+  --glass-line: rgb(243 226 179 / 0.18);
+  --glass-ink: #f3e9d2;
+  --glass-muted: #c9b995;
+  position: relative; height: calc(100dvh - 110px); min-height: 360px; border-radius: 16px; overflow: hidden;
+  background: #24301a; border: 1px solid #1a130c; box-shadow: 0 10px 30px rgb(0 0 0 / 0.25);
+}
+.map-canvas { position: absolute; inset: 0; }
+.map-canvas canvas { display: block; }
+.map-vignette { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 90px rgb(10 7 3 / 0.55), inset 0 0 0 1px rgb(255 255 255 / 0.04); border-radius: inherit; }
+.map-loading { position: absolute; inset: 0; display: grid; place-content: center; grid-auto-flow: column; gap: 10px; align-items: center; color: var(--glass-ink); font-size: 14px; background: radial-gradient(circle at 50% 45%, #3c5428, #1f2a15); }
+.map-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgb(243 233 210 / 0.25); border-top-color: var(--glass-ink); animation: map-spin 0.8s linear infinite; }
+@keyframes map-spin { to { transform: rotate(360deg); } }
+
+/* Barre d'outils, légende, zoom. */
+.map-bar, .map-legend, .map-zoom, .map-cell, .minimap, .map-tip, .map-popup, .map-panel {
+  background: var(--glass); color: var(--glass-ink); border: 1px solid var(--glass-line);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.map-bar { position: absolute; top: 12px; left: 12px; z-index: 10; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 12px; max-width: calc(100% - 24px); }
+.map-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; min-width: 34px; padding: 0 10px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--glass-ink); font: 600 13px var(--body); cursor: pointer;
+}
+.map-btn:hover { background: rgb(243 226 179 / 0.1); }
+.map-btn.on { background: rgb(243 226 179 / 0.16); box-shadow: inset 0 0 0 1px rgb(243 226 179 / 0.3); }
+.map-btn > span[aria-hidden] { font-size: 15px; line-height: 1; }
+.map-sep { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--glass-line); }
+.map-jump { display: flex; align-items: center; gap: 2px; }
+.map-jump input {
+  width: 74px; height: 30px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--glass-line); background: rgb(0 0 0 / 0.25);
+  color: var(--glass-ink); font: 600 13px var(--body); font-variant-numeric: tabular-nums;
+}
+.map-jump input::placeholder { color: var(--glass-muted); }
+.map-swatches { display: inline-flex; }
+.map-swatches i { width: 10px; height: 10px; border-radius: 50%; margin-left: -3px; border: 1.5px solid #1a130c; }
+.map-swatches i:first-child { margin-left: 0; }
+
+.map-legend { position: absolute; top: 12px; right: 12px; z-index: 9; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 12px; padding: 8px 12px; border-radius: 12px; font-size: 12px; max-width: 46%; }
+.map-legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.map-legend i, .mc-fixed i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1.5px rgb(0 0 0 / 0.5); }
+
+.map-zoom { position: absolute; right: 12px; bottom: 12px; z-index: 9; display: flex; flex-direction: column; border-radius: 12px; padding: 4px; gap: 2px; }
+.map-zoom .map-btn { font-size: 20px; padding: 0; width: 36px; height: 36px; }
+.map-cell { position: absolute; right: 60px; bottom: 12px; z-index: 9; padding: 6px 10px; border-radius: 10px; font: 600 12px var(--body); font-variant-numeric: tabular-nums; }
+
+/* Mini-map. */
+.minimap { position: absolute; left: 12px; bottom: 12px; z-index: 9; padding: 6px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px; }
+.minimap canvas { width: 200px; height: 200px; border-radius: 9px; cursor: crosshair; display: block; touch-action: none; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4); }
+.minimap span { color: var(--glass-muted); font-size: 11px; text-align: center; letter-spacing: 0.03em; }
+
+/* Fiche d'un village (survol et clic). */
+.map-tip { position: absolute; left: 0; top: 0; z-index: 20; width: 300px; padding: 12px; border-radius: 12px; pointer-events: none; opacity: 0; transition: opacity 0.12s; will-change: transform; }
+.map-tip.show { opacity: 1; }
+.mvc { display: flex; flex-direction: column; gap: 8px; }
+.mvc-head { display: flex; align-items: center; gap: 10px; }
+.mvc-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgb(0 0 0 / 0.45), 0 0 10px currentColor; }
+.mvc-title { display: flex; flex-direction: column; min-width: 0; }
+.mvc-title b { font: 700 15px var(--display); letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mvc-tag { color: var(--glass-muted); font-weight: 600; }
+.mvc-sub { color: var(--glass-muted); font-size: 12px; }
+.mvc-sub a { color: var(--glass-ink); }
+.mvc-facts { display: flex; flex-wrap: wrap; gap: 4px; }
+.mvc-chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--glass-line); background: rgb(0 0 0 / 0.2); }
+.mvc-chip.warn { border-color: #e0a84a; color: #f3cf8c; }
+.mvc-times { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; padding-top: 8px; border-top: 1px solid var(--glass-line); }
+.mvc-time { display: flex; align-items: center; gap: 6px; font: 600 12px var(--body); font-variant-numeric: tabular-nums; }
+.mvc-time img { width: 24px; height: 24px; object-fit: contain; border-radius: 6px; background: rgb(243 226 179 / 0.85); padding: 1px; flex: none; }
+.mvc-unit { color: var(--glass-muted); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Fenêtre du village choisi et panneau des couleurs. */
+.map-popup, .map-panel {
+  position: absolute; right: 12px; top: 60px; z-index: 30; width: min(370px, calc(100% - 24px)); max-height: calc(100% - 72px); overflow: auto;
+  padding: 14px; border-radius: 14px; display: flex; flex-direction: column; gap: 12px;
+}
+.map-popup { --glass-ink: var(--ink); --glass-muted: var(--muted); --glass-line: var(--line); background: var(--panel); color: var(--ink); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: var(--line); }
+.map-popup a:not(.btn) { color: var(--accent); }
+.map-popup .mvc-chip { background: var(--panel-2); }
+.map-popup .mvc-chip.warn { color: var(--warn); border-color: var(--warn); }
+.map-popup .mvc-time img { background: var(--panel-2); }
+.map-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 8px; border: 0; background: rgb(243 226 179 / 0.1); color: var(--glass-ink); cursor: pointer; }
+.map-popup .mvc { padding-right: 34px; }
+.map-panel header { display: flex; align-items: center; }
+.map-panel h3 { margin: 0; font: 700 16px var(--display); }
+.map-panel h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--glass-muted); }
+.map-panel .muted { color: var(--glass-muted); margin: 0 0 8px; }
+.map-panel .map-close { position: static; margin-left: auto; }
+.mc-fixed { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
+.mc-fixed li { display: flex; align-items: center; gap: 8px; }
+.mc-marks { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mc-marks li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px; border-radius: 10px; background: rgb(0 0 0 / 0.2); }
+.mc-marks .map-close { position: static; margin-left: auto; width: 26px; height: 26px; }
+.mc-name { font-weight: 600; font-size: 13px; }
+.mc-name small { color: var(--glass-muted); font-weight: 500; margin-right: 2px; }
+.mc-palette { display: flex; flex-wrap: wrap; gap: 5px; }
+.mc-palette button { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgb(0 0 0 / 0.5); cursor: pointer; padding: 0; }
+.mc-palette button.on { box-shadow: 0 0 0 2px var(--glass-ink); }
+.mc-marks .mc-palette { order: 3; width: 100%; }
+.mc-marks .mc-palette button { width: 16px; height: 16px; }
+.mc-add { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--glass-line); }
+.mc-add input { height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--glass-line); background: rgb(0 0 0 / 0.25); color: var(--glass-ink); font: 14px var(--body); }
+.mc-kind { display: inline-flex; padding: 3px; border-radius: 9px; background: rgb(0 0 0 / 0.25); align-self: flex-start; }
+.mc-kind button { border: 0; background: transparent; color: var(--glass-muted); font: 600 13px var(--body); padding: 6px 14px; border-radius: 7px; cursor: pointer; }
+.mc-kind button.on { background: rgb(243 226 179 / 0.18); color: var(--glass-ink); }
+.mc-error { color: #f3a08c; margin: 0; }
+
+/* Téléphone : boutons en icônes, légende dans le panneau, fenêtres en bas de l'écran. */
 @media (max-width: 640px) {
-  .minimap canvas { width: 110px; height: 110px; }
+  .content > .map-page { margin-inline: 0; }
+  .map-stage { border-radius: 0; border-inline: 0; }
+  .map-bar { top: 8px; left: 8px; max-width: calc(100% - 16px); }
+  .map-btn .lbl { display: none; }
+  .map-btn { padding: 0 8px; min-height: 38px; min-width: 38px; }
+  .map-jump input { width: 64px; height: 34px; }
+  .map-legend { display: none; }
+  .map-cell { display: none; }
+  .map-zoom { right: 8px; bottom: 8px; }
+  .minimap { left: 8px; bottom: 8px; padding: 4px; border-radius: 12px; }
+  .minimap canvas { width: 124px; height: 124px; }
   .minimap span { display: none; }
-  .minimap { padding: 4px; }
-  /* La fenêtre d'actions du village passe au premier plan : on range la mini-map tant qu'elle est ouverte. */
-  .map-wrap.has-popup .minimap { display: none; }
+  .map-stage.has-popup .minimap { display: none; }
+  .map-popup, .map-panel { top: auto; bottom: 8px; right: 8px; left: 8px; width: auto; max-height: 72%; border-radius: 16px; }
 }
