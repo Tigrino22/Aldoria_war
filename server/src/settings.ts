@@ -7,7 +7,7 @@ import { env } from './env';
  * cours de partie fausserait les files de construction, les trajets en cours et les coordonnées.
  */
 export interface SettingDef {
-  key: 'accountManager' | 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
+  key: 'accountManager' | 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcOffensive' | 'npcOffensiveShare' | 'npcOffensiveHours' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
   label: string;
   help: string;
   type: 'number' | 'integer' | 'text' | 'boolean';
@@ -20,6 +20,9 @@ export const SETTINGS: SettingDef[] = [
   { key: 'npcRevenge', label: 'Riposte des PNJ', help: 'Activée : un PNJ attaqué par un joueur lui en veut et contre-attaque pendant 3 jours. Désactivée : il ne riposte plus contre les joueurs (la riposte entre PNJ, les guerres, la défense et les attaques habituelles continuent)', type: 'boolean' },
   { key: 'npcWars', label: 'Guerres entre tribus de PNJ', help: 'Activées : les tribus de PNJ se déclarent la guerre pour quelques jours, se pillent et cherchent à se conquérir. Désactivées : plus de nouvelle guerre ni de frappe contre une tribu ennemie (les rivalités habituelles restent)', type: 'boolean' },
   { key: 'npcPlayerWars', label: 'Guerres contre les tribus de joueurs', help: 'Activées : une tribu de PNJ peut déclarer la guerre à une tribu de joueurs sans provocation (et accepter celle qu’un chef de tribu lui déclare) ; ses membres frappent alors les villages de cette tribu. Désactivées : ces guerres s’arrêtent et aucune nouvelle ne démarre. Sans lien avec la riposte, qui ne concerne que les joueurs qui attaquent un PNJ. Nécessite aussi l’interrupteur des guerres entre PNJ', type: 'boolean' },
+  { key: 'npcOffensive', label: 'Offensives des PNJ', help: 'Activées : de temps en temps, un village offensif de PNJ envoie une vraie attaque (une part de son armée) contre un joueur de sa taille, un ennemi de guerre ou une tribu rivale, après l’avoir espionné ; jamais un joueur sous protection débutant ni pendant les heures calmes. Désactivées : les PNJ reviennent aux pillages habituels', type: 'boolean' },
+  { key: 'npcOffensiveShare', label: 'Part de l’armée engagée dans une offensive (%)', help: '50 = la moitié des épéistes, cavaliers et béliers du village part ; l’offensive est annulée si cette part ne bat pas la défense espionnée', type: 'integer', min: 10, max: 100 },
+  { key: 'npcOffensiveHours', label: 'Rythme des offensives (heures de jeu)', help: 'Délai moyen entre deux offensives d’un même PNJ ; un joueur ne subit pas plus d’une offensive par période', type: 'integer', min: 1, max: 168 },
   { key: 'npcDifficulty', label: 'Difficulté des PNJ', help: '0,5 = facile, 1 = modérée, 1,5 = difficile', type: 'number', min: 0.25, max: 3 },
   { key: 'npcDaily', label: 'Nouveaux PNJ par jour', help: 'Un PNJ rejoint le monde chaque jour, jusqu’au maximum', type: 'integer', min: 0, max: 20 },
   { key: 'npcMax', label: 'Maximum de PNJ', help: 'Plafond du nombre de PNJ', type: 'integer', min: 0, max: 500 },
