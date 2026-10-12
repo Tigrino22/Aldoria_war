@@ -477,7 +477,11 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>Le chef invite, exclut et rédige la description de la tribu. Pour inviter, il ouvre le profil du joueur (en touchant son pseudo) et utilise le bouton « Inviter dans ma tribu » : ce bouton n'apparaît que pour le chef, et seulement si le joueur est libre et n'a pas déjà reçu d'invitation.</li>
           <li>On ne peut appartenir qu'à une tribu à la fois.</li>
           <li>La page de tribu propose aux membres trois outils : les menaces (attaques extérieures en approche sur les villages de la tribu), les attaques en cours des membres (cible, heure d'arrivée et nature de chaque attaque, sans les effectifs) et un message envoyé à toute la tribu.</li>
-          <li>Les tribus peuvent s'allier ou se faire la guerre ; les renforts d'un allié sont les bienvenus.</li>
+          <li>
+            <b>Alliances :</b> le chef propose une alliance à une autre tribu de joueurs depuis l'onglet « Alliances » de la page Tribu (ou le bouton « Proposer une alliance » sur la page de cette tribu). Le chef d'en face
+            l'accepte ou la refuse ; une seule proposition à la fois entre deux tribus, jamais avec une tribu en guerre contre vous ni avec une tribu de PNJ, et 5 alliées au plus. L'alliance est réciproque :
+            les villages des alliés apparaissent en bleu ciel sur la carte et ne peuvent pas être visés par une déclaration de guerre. L'un ou l'autre chef peut la rompre à tout moment ; les membres des deux tribus sont prévenus.
+          </li>
           <li>
             <b>Guerres :</b> l'onglet « Guerres » de la page Tribu liste les guerres de votre tribu (déclarées par vous ou contre vous) avec le temps restant. Le chef peut déclarer la guerre à une tribu de joueurs ou de PNJ pour 4 jours
             (3 guerres déclarées à la fois au plus) et y mettre fin quand il veut. Une tribu de PNJ peut aussi vous déclarer la guerre sans provocation, ou en riposte quand l'un des vôtres attaque un de ses membres (si la riposte est activée) : ses membres frappent alors les villages de votre tribu, jamais pendant les

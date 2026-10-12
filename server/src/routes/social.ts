@@ -5,6 +5,7 @@ import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
 import { GameError, forbidden, notFound } from '../errors';
+import { allianceRelation, allyTribeIdsOf } from '../game/tribe-alliances';
 import { declareWar, endWar, tribeWarsView } from '../game/tribe-wars';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -259,6 +260,14 @@ export default async function socialRoutes(app: FastifyInstance) {
     const invites = isMember
       ? (await pool.query('SELECT i.id, p.username FROM tribe_invites i JOIN players p ON p.id = i.player_id WHERE i.tribe_id = $1', [id])).rows
       : [];
+    const allyIds = await allyTribeIdsOf(pool, id);
+    const allies = allyIds.length ? (await pool.query('SELECT id, tag, name FROM tribes WHERE id = ANY($1::int[]) ORDER BY tag', [allyIds])).rows : [];
+    const wars = (
+      await pool.query(
+        `SELECT count(*)::int AS n FROM tribe_wars WHERE $1 IN (declarer_id, target_id) AND ended_at IS NULL AND until > now()`,
+        [id],
+      )
+    ).rows[0].n as number;
     return {
       id: t.id,
       name: t.name,
@@ -268,6 +277,10 @@ export default async function socialRoutes(app: FastifyInstance) {
       isNpc: t.is_npc,
       members,
       invites,
+      allies,
+      wars,
+      viewer: await allianceRelation(pool, playerId, id, new Date()),
+      createdAt: t.created_at ? new Date(t.created_at).toISOString() : null,
       points: members.reduce((s, m) => s + m.points, 0),
       killsAttack: members.reduce((s, m) => s + m.killsAttack, 0),
       killsDefense: members.reduce((s, m) => s + m.killsDefense, 0),

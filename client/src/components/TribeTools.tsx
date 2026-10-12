@@ -20,7 +20,7 @@ export function progress(sentAt: string, arriveAt: string): number {
 }
 
 /** Attaques extérieures en approche, groupées par membre menacé. Les troupes restent secrètes. */
-function Threats() {
+export function Threats() {
   const { run } = useGame();
   const [threats, setThreats] = useState<Threat[] | null>(null);
   useEffect(() => {
@@ -79,7 +79,7 @@ function Threats() {
   );
 }
 
-function Broadcast() {
+export function Broadcast() {
   const { run, toast } = useGame();
   const [form, setForm] = useState({ subject: '', body: '' });
   return (
@@ -117,7 +117,7 @@ interface MemberAttack {
 const KIND_LABEL = { attack: 'Attaque', conquest: 'Conquête', scout: 'Espionnage' } as const;
 
 /** Attaques lancées par les membres de la tribu, groupées par joueur. Les effectifs ne sont jamais montrés. */
-function MemberAttacks() {
+export function MemberAttacks() {
   const { run } = useGame();
   const [attacks, setAttacks] = useState<MemberAttack[] | null>(null);
   useEffect(() => {
