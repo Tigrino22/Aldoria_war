@@ -1,7 +1,7 @@
+import './tribe-attacks.css';
 import { useEffect, useMemo, useState } from 'react';
-import { UNITS, UNIT_KEYS, type UnitKey, emptyUnits, travelTime, distance } from '@aldoria/shared';
 import { api } from '../api';
-import { clockTime, duration } from '../format';
+import { clockTime } from '../format';
 import { useGame } from '../game';
 import { Countdown, Panel, PlayerLink } from '../ui';
 
@@ -11,14 +11,6 @@ interface Threat {
   target: { id: number; name: string; x: number; y: number; ownerName: string };
   origin: { name: string; x: number; y: number; ownerName: string | null };
 }
-interface MemberVillage {
-  id: number;
-  name: string;
-  x: number;
-  y: number;
-  ownerName: string;
-}
-
 function Threats() {
   const { run } = useGame();
   const [threats, setThreats] = useState<Threat[] | null>(null);
@@ -81,69 +73,81 @@ function Broadcast() {
   );
 }
 
-/** Pour une attaque groupée : à quelle heure chaque village doit partir pour que tout arrive au même moment. */
-function Planner() {
-  const { world, run } = useGame();
-  const [villages, setVillages] = useState<MemberVillage[]>([]);
-  const [target, setTarget] = useState('');
-  const [arrival, setArrival] = useState('');
-  const [unit, setUnit] = useState<UnitKey>('swordsman');
+interface MemberAttack {
+  id: number;
+  kind: 'attack' | 'conquest' | 'scout';
+  sentAt: string;
+  arriveAt: string;
+  attacker: { id: number; name: string };
+  origin: { name: string; x: number; y: number };
+  target: { name: string; x: number; y: number; ownerName: string | null; ownerTag: string | null };
+}
+const KIND_LABEL = { attack: 'Attaque', conquest: 'Conquête', scout: 'Espionnage' } as const;
+
+/** Attaques lancées par les membres de la tribu, groupées par joueur. Les effectifs ne sont jamais montrés. */
+function MemberAttacks() {
+  const { run } = useGame();
+  const [attacks, setAttacks] = useState<MemberAttack[] | null>(null);
   useEffect(() => {
-    run(async () => setVillages(await api<MemberVillage[]>('/api/tribes/mine/villages')));
+    const load = () => run(async () => setAttacks(await api<MemberAttack[]>('/api/tribes/mine/attacks')));
+    load();
+    const t = setInterval(load, 30_000);
+    return () => clearInterval(t);
   }, [run]);
-
-  const coords = useMemo(() => {
-    const m = target.match(/^\s*(\d+)\s*[|,;/ ]\s*(\d+)\s*$/);
-    return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
-  }, [target]);
-  const arrivalMs = arrival ? Date.parse(arrival) : NaN;
-  const rows =
-    coords && Number.isFinite(arrivalMs)
-      ? villages.map((v) => {
-          const travel = travelTime({ ...emptyUnits(), [unit]: 1 }, v, coords, world.speed);
-          return { v, dist: distance(v, coords), travel, depart: arrivalMs - travel * 1000 };
-        })
-      : [];
-
+  const byMember = useMemo(() => {
+    const m = new Map<string, MemberAttack[]>();
+    for (const a of attacks ?? []) m.set(a.attacker.name, [...(m.get(a.attacker.name) ?? []), a]);
+    return [...m.entries()];
+  }, [attacks]);
+  if (!attacks) return null;
   return (
-    <Panel title="Planificateur d'attaque groupée">
-      <div className="form">
-        <label htmlFor="pl-target">Cible (x|y)</label>
-        <input id="pl-target" placeholder="52|47" value={target} onChange={(e) => setTarget(e.target.value)} />
-        <label htmlFor="pl-arrival">Heure d'arrivée souhaitée</label>
-        <input id="pl-arrival" type="datetime-local" step={1} value={arrival} onChange={(e) => setArrival(e.target.value)} />
-        <label htmlFor="pl-unit">Unité la plus lente de l'armée</label>
-        <select id="pl-unit" value={unit} onChange={(e) => setUnit(e.target.value as UnitKey)}>
-          {UNIT_KEYS.map((k) => (
-            <option key={k} value={k}>
-              {UNITS[k].name}
-            </option>
+    <Panel title={`Attaques en cours des membres (${attacks.length})`}>
+      {attacks.length === 0 ? (
+        <p className="muted">Aucun membre n'a d'attaque en route pour l'instant.</p>
+      ) : (
+        <div className="tribe-attacks">
+          {byMember.map(([name, list]) => (
+            <section key={name} className="ta-member">
+              <header className="ta-head">
+                <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>
+                <PlayerLink name={name} />
+                <span className="chip">{list.length} attaque{list.length > 1 ? 's' : ''}</span>
+              </header>
+              <ul className="ta-list">
+                {list.map((a) => {
+                  const total = Date.parse(a.arriveAt) - Date.parse(a.sentAt);
+                  const pct = total > 0 ? Math.min(100, Math.max(0, ((Date.now() - Date.parse(a.sentAt)) / total) * 100)) : 100;
+                  return (
+                    <li key={a.id} className={`ta-card kind-${a.kind}`}>
+                      <div className="ta-main">
+                        <span className="ta-kind">{KIND_LABEL[a.kind]}</span>
+                        <span className="ta-route">
+                          <span className="muted small">{a.origin.name} ({a.origin.x}|{a.origin.y}) →</span>{' '}
+                          <a href={`#/carte/${a.target.x},${a.target.y}`}>
+                            {a.target.name} ({a.target.x}|{a.target.y})
+                          </a>
+                          {a.target.ownerName ? (
+                            <span className="muted small"> · {a.target.ownerTag && `[${a.target.ownerTag}] `}<PlayerLink name={a.target.ownerName} /></span>
+                          ) : (
+                            <span className="muted small"> · Barbares</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="mv-time">
+                        <Countdown to={a.arriveAt} />
+                        <span className="muted small">{clockTime(a.arriveAt)}</span>
+                      </div>
+                      <div className="ta-bar" aria-hidden="true">
+                        <div className="ta-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           ))}
-        </select>
-      </div>
-      {rows.length > 0 && (
-        <div className="table-wrap">
-          <table className="rank-table">
-            <thead>
-              <tr><th>Joueur</th><th>Village</th><th>Distance</th><th>Trajet</th><th>Départ à</th></tr>
-            </thead>
-            <tbody>
-              {rows
-                .sort((a, b) => a.depart - b.depart)
-                .map(({ v, dist, travel, depart }) => (
-                  <tr key={v.id} className={depart < Date.now() ? 'late' : ''}>
-                    <td><PlayerLink name={v.ownerName} /></td>
-                    <td>{v.name} ({v.x}|{v.y})</td>
-                    <td>{dist.toFixed(1)}</td>
-                    <td>{duration(travel)}</td>
-                    <td>{depart < Date.now() ? 'trop tard' : clockTime(new Date(depart))}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
         </div>
       )}
-      <p className="muted small">L'heure s'entend dans le fuseau de votre appareil. Tout village marqué « trop tard » ne peut plus arriver à temps.</p>
     </Panel>
   );
 }
@@ -152,7 +156,7 @@ export default function TribeTools() {
   return (
     <>
       <Threats />
-      <Planner />
+      <MemberAttacks />
       <Broadcast />
     </>
   );

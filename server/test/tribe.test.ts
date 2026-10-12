@@ -32,8 +32,7 @@ describe('outils de tribu', () => {
     const tribe = (await app.inject({ method: 'POST', url: '/api/tribes', headers: auth(chef.token), payload: { name: 'Les Loups', tag: 'LOUP' } })).json();
     await pool.query('UPDATE players SET tribe_id = $1 WHERE id = $2', [tribe.id, membre.id]);
 
-    const villages = (await app.inject({ method: 'GET', url: '/api/tribes/mine/villages', headers: auth(membre.token) })).json();
-    expect(villages.map((v: any) => v.ownerName).sort()).toEqual(['Chef', 'Membre']);
+    expect((await app.inject({ method: 'GET', url: '/api/tribes/mine/villages', headers: auth(membre.token) })).statusCode).toBe(404);
 
     const sent = await app.inject({ method: 'POST', url: '/api/tribes/mine/broadcast', headers: auth(chef.token), payload: { subject: 'Rendez-vous', body: 'Ce soir 21h' } });
     expect(sent.json().sent).toBe(1);
@@ -49,6 +48,18 @@ describe('outils de tribu', () => {
     expect(threats).toHaveLength(1);
     expect(threats[0].origin.ownerName).toBe('Ennemi');
     expect(threats[0].target.ownerName).toBe('Membre');
+
+    // Une attaque sortante d'un membre apparaît dans la vue des attaques en cours, sans effectifs.
+    await pool.query('UPDATE players SET protection_until = NULL');
+    await tx((c) => c.query("INSERT INTO troops (village_id, home_village_id, units) VALUES ($1, $1, '{\"swordsman\": 10}') ON CONFLICT (village_id, home_village_id) DO UPDATE SET units = EXCLUDED.units", [membre.village]));
+    await tx((c) => sendCommand(c, new Outbox(), membre.id, membre.village, { type: 'attack', targetId: ennemi.village, units: { swordsman: 4 } }, new Date()));
+    const attacks = (await app.inject({ method: 'GET', url: '/api/tribes/mine/attacks', headers: auth(chef.token) })).json();
+    expect(attacks).toHaveLength(1);
+    expect(attacks[0].attacker.name).toBe('Membre');
+    expect(attacks[0].target.ownerName).toBe('Ennemi');
+    expect(attacks[0].kind).toBe('attack');
+    expect(JSON.stringify(attacks)).not.toContain('swordsman');
+    expect((await app.inject({ method: 'GET', url: '/api/tribes/mine/attacks', headers: auth(ennemi.token) })).statusCode).toBe(400);
 
     const outsider = await app.inject({ method: 'GET', url: '/api/tribes/mine/threats', headers: auth(ennemi.token) });
     expect(outsider.statusCode).toBe(400);

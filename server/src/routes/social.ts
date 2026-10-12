@@ -140,18 +140,35 @@ export default async function socialRoutes(app: FastifyInstance) {
   });
 
   // ---------- Outils de tribu ----------
-  /** Villages des membres de la tribu (réservé aux membres), pour planifier des attaques groupées. */
-  app.get('/api/tribes/mine/villages', async (req) => {
+  /** Attaques en cours des membres de la tribu : cible, heure d'arrivée et nature. Les effectifs restent secrets. */
+  app.get('/api/tribes/mine/attacks', async (req) => {
     const playerId = await requirePlayer(req);
     return act(async (c) => {
       const { tribeId } = await tribeOf(c, playerId);
       if (!tribeId) throw new GameError("Vous n'avez pas de tribu");
       const { rows } = await c.query(
-        `SELECT v.id, v.name, v.x, v.y, v.points, p.id AS owner_id, p.username FROM villages v JOIN players p ON p.id = v.owner_id
-         WHERE p.tribe_id = $1 ORDER BY p.username, v.id`,
+        `SELECT c.id, c.arrive_at, c.sent_at, (c.units->>'noble')::int > 0 AS has_noble,
+                (SELECT bool_and(key = 'scout') FROM jsonb_each_text(c.units) WHERE value::int > 0) AS scouts_only,
+                p.id AS attacker_id, p.username AS attacker,
+                o.name AS origin_name, o.x AS ox, o.y AS oy,
+                t.name AS target_name, t.x AS tx, t.y AS ty, pt.username AS defender, tt.tag AS defender_tag
+         FROM commands c
+         JOIN players p ON p.id = c.player_id
+         JOIN villages o ON o.id = c.origin_village_id
+         JOIN villages t ON t.id = c.target_village_id LEFT JOIN players pt ON pt.id = t.owner_id LEFT JOIN tribes tt ON tt.id = pt.tribe_id
+         WHERE c.type = 'attack' AND NOT c.processed AND p.tribe_id = $1
+         ORDER BY c.arrive_at LIMIT 200`,
         [tribeId],
       );
-      return rows.map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, points: r.points, ownerId: r.owner_id, ownerName: r.username }));
+      return rows.map((r) => ({
+        id: r.id,
+        kind: r.has_noble ? 'conquest' : r.scouts_only ? 'scout' : 'attack',
+        sentAt: new Date(r.sent_at).toISOString(),
+        arriveAt: new Date(r.arrive_at).toISOString(),
+        attacker: { id: r.attacker_id, name: r.attacker },
+        origin: { name: r.origin_name, x: r.ox, y: r.oy },
+        target: { name: r.target_name, x: r.tx, y: r.ty, ownerName: r.defender, ownerTag: r.defender_tag ?? null },
+      }));
     });
   });
 

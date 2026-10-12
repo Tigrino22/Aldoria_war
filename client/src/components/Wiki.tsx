@@ -468,7 +468,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           <li>Fondez une tribu avec un nom (3 à 32 caractères) et un tag (2 à 6 lettres ou chiffres), ou rejoignez-en une sur invitation.</li>
           <li>Le chef invite, exclut et rédige la description de la tribu. Pour inviter, il ouvre le profil du joueur (en touchant son pseudo) et utilise le bouton « Inviter dans ma tribu » : ce bouton n'apparaît que pour le chef, et seulement si le joueur est libre et n'a pas déjà reçu d'invitation.</li>
           <li>On ne peut appartenir qu'à une tribu à la fois.</li>
-          <li>La page de tribu propose aux membres trois outils : les menaces (attaques extérieures en approche sur les villages de la tribu), un planificateur d'attaque groupée (heure de départ de chaque village pour arriver ensemble) et un message envoyé à toute la tribu.</li>
+          <li>La page de tribu propose aux membres trois outils : les menaces (attaques extérieures en approche sur les villages de la tribu), les attaques en cours des membres (cible, heure d'arrivée et nature de chaque attaque, sans les effectifs) et un message envoyé à toute la tribu.</li>
           <li>Les tribus peuvent s'allier ou se faire la guerre ; les renforts d'un allié sont les bienvenus.</li>
           <li>
             <b>Guerres :</b> l'onglet « Guerres » de la page Tribu liste les guerres de votre tribu (déclarées par vous ou contre vous) avec le temps restant. Le chef peut déclarer la guerre à une tribu de joueurs ou de PNJ pour 4 jours
