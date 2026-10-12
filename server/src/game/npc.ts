@@ -620,7 +620,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   }
   // Pillage intensif : chaque village (pas seulement les trois premiers) envoie ses pillages vers les villages sans défense qu'il connaît.
   const hostiles = { tribes: [...(tribe?.state.rivals ?? []), ...warEnemiesOf(tribe, now)], npcs: await npcGrudgesOf(c, npcId, tribe, now) };
-  for (const [i, v] of villages.entries()) await raidStep(c, outbox, npcId, roles[i], v.id, hostiles, now);
+  for (const v of villages) await raidStep(c, outbox, npcId, v.id, hostiles, now);
   // Les rapports d'un PNJ ne servent qu'à ses décisions récentes et au suivi des guerres de l'administration (72 h au plus).
   await c.query("DELETE FROM reports WHERE player_id = $1 AND created_at < $2", [npcId, new Date(now.getTime() - 3 * DAY_MS)]);
   return angry;

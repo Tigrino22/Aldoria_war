@@ -13,10 +13,14 @@ const scoutRow = (minutesAgo: number, troops = emptyUnits()) => ({
 });
 
 describe('pillage intensif des PNJ', () => {
-  it('un village défensif n’envoie que la moitié de ses lanciers', () => {
-    const home = { ...emptyUnits(), spearman: 100, halberdier: 50, cavalry: 10 };
-    expect(farmPool(home, 'defense')).toMatchObject({ spearman: 50, cavalry: 10, halberdier: 0 });
-    expect(farmPool(home, 'offense').spearman).toBe(100);
+  it('tous les porteurs peuvent piller, hallebardiers compris', () => {
+    const home = { ...emptyUnits(), spearman: 100, halberdier: 50, swordsman: 20, cavalry: 10, scout: 5, ram: 3 };
+    expect(farmPool(home)).toEqual({ ...emptyUnits(), spearman: 100, halberdier: 50, swordsman: 20, cavalry: 10 });
+  });
+
+  it('complète avec les hallebardiers quand il n’y a rien d’autre', () => {
+    const units = pickFarmUnits({ ...emptyUnits(), halberdier: 100 }, 300, 0)!;
+    expect(units.halberdier).toBeGreaterThanOrEqual(30);
   });
 
   it('envoie juste de quoi porter le butin', () => {

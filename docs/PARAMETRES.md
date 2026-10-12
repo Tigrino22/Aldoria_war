@@ -252,7 +252,7 @@ Avant, un PNJ lançait au plus une attaque par réflexion (toutes les 10 à 20 m
 | Cibles | Barbares et villages des PNJ rivaux, en guerre ou rancuniers, dans 25 cases ; jamais un joueur (les attaques habituelles s'en chargent) |
 | Renseignement | Barbare inconnu ou rapport de plus de 24 h de jeu : 1 éclaireur (2 par réflexion au plus). Village de PNJ : seulement s'il a été vu vide il y a moins de 6 h de jeu |
 | Butin | Estimé comme l'assistant des joueurs (`estimateLoot`) ; pas de pillage sous 100 |
-| Troupes | Le plus petit groupe qui porte le butin (cavaliers, lanciers, épéistes) et bat la défense de base avec une marge ×5 ; village défensif : la moitié des lanciers seulement |
+| Troupes | Le plus petit groupe qui porte le butin (cavaliers, lanciers, épéistes, hallebardiers : toutes les unités qui portent du butin, dans tout village offensif ou défensif) et bat la défense de base avec une marge ×5 |
 | Cible en cours | Un village déjà visé par une attaque en route est sauté |
 | Rythme | Réflexion toutes les 5 à 15 minutes (`NPC_THINK_MINUTES`, 10 par défaut ; avant : 10 à 20) |
 

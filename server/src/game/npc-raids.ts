@@ -6,7 +6,6 @@ import type { Outbox } from '../notify';
 import { sendCommand } from './commands';
 import { estimateLoot, pickIntel } from './intel';
 import { carryOf } from './npc-rules';
-import type { VillageRole } from './npc-roles';
 import { getTroops, loadVillage } from './village';
 
 /**
@@ -28,20 +27,15 @@ const SCOUTS_PER_THINK = 2;
 const RESCOUT_GAME_HOURS = 24;
 /** Un village de PNJ hostile n'est pillé sans espionnage récent que si on l'a vu vide il y a moins de 6 heures de jeu. */
 const HOSTILE_INTEL_GAME_HOURS = 6;
-/** Part des lanciers qu'un village défensif peut envoyer piller : le reste garde le village, hallebardiers compris. */
-const DEFENSE_RAID_SHARE = 0.5;
-
-/** Ordre de remplissage d'un pillage : les cavaliers (rapides, gros sacs), puis les lanciers, puis les épéistes. */
-const FARM_ORDER = ['cavalry', 'spearman', 'swordsman'] as const;
+/** Ordre de remplissage d'un pillage : les cavaliers (rapides, gros sacs), puis lanciers, épéistes et hallebardiers. */
+const FARM_ORDER = ['cavalry', 'spearman', 'swordsman', 'halberdier'] as const;
 
 const noTroops = (u: UnitCounts) => Object.values(u).every((n) => n === 0);
 
-/** Troupes qu'un village peut envoyer piller : toute la force de frappe d'un village offensif, la moitié des lanciers (et ses épéistes) d'un village défensif. */
-export function farmPool(home: UnitCounts, role: VillageRole): UnitCounts {
+/** Troupes qu'un village peut envoyer piller : tous ses porteurs, offensifs ou défensifs (ni éclaireurs, ni béliers, ni nobles). */
+export function farmPool(home: UnitCounts): UnitCounts {
   const pool = emptyUnits();
-  pool.cavalry = home.cavalry;
-  pool.swordsman = home.swordsman;
-  pool.spearman = role === 'offense' ? home.spearman : Math.floor(home.spearman * DEFENSE_RAID_SHARE);
+  for (const k of FARM_ORDER) pool[k] = home[k];
   return pool;
 }
 
@@ -63,7 +57,7 @@ export function pickFarmUnits(pool: UnitCounts, goal: number, wall: number): Uni
   };
   // Pas assez fort pour passer sans pertes : on ajoute un à un les attaquants les plus solides.
   while (!wins()) {
-    const k = (['cavalry', 'swordsman', 'spearman'] as const).find((u) => units[u] < pool[u]);
+    const k = (['cavalry', 'swordsman', 'spearman', 'halberdier'] as const).find((u) => units[u] < pool[u]);
     if (!k) return null;
     units[k]++;
   }
@@ -103,11 +97,11 @@ export interface FarmHostiles {
 }
 
 /** Envoie les pillages d'un village. Renvoie le nombre de pillages partis. */
-export async function raidStep(c: Db, outbox: Outbox, npcId: number, role: VillageRole, villageId: number, hostiles: FarmHostiles, now: Date): Promise<number> {
+export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: number, hostiles: FarmHostiles, now: Date): Promise<number> {
   if (!env.npcRaids) return 0;
   const village = await loadVillage(c, villageId);
   const home = await getTroops(c, villageId, villageId);
-  const pool = farmPool(home, role);
+  const pool = farmPool(home);
   let scouts = Math.min(home.scout, SCOUTS_PER_THINK);
   if (noTroops(pool) && scouts === 0) return 0;
 
