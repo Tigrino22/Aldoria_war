@@ -304,6 +304,9 @@ textarea { width: 100%; resize: vertical; }
 .wiki-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .wiki-card { display: block; padding: 12px; border: 1px solid var(--line); background: var(--panel-2); border-radius: var(--radius); color: var(--ink); text-decoration: none; font-weight: 600; }
 .wiki-card:hover { border-color: var(--accent); }
+.wiki-card-featured { display: flex; flex-direction: column; gap: 4px; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+.wiki-card-featured .small { font-weight: 400; }
+.wiki-body ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .wiki-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
 .wiki-item { display: flex; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--line); background: var(--panel-2); border-radius: var(--radius); color: var(--ink); text-decoration: none; }
 .wiki-item:hover { border-color: var(--accent); }
