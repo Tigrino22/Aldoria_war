@@ -18,10 +18,15 @@
 .ta-card .mv-time .btn { margin-top: 4px; }
 /* Sur téléphone : liste des unités ; cartes sur ordinateur. */
 .troop-list { display: none; }
+.troop-split { display: none; }
+.troop-name { display: flex; flex-direction: column; line-height: 1.25; }
+.troop-split-card { display: flex; gap: 14px; margin-top: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.troop-list .troop-split { display: none; }
 .troop-list th, .troop-list td { padding: 6px 4px; }
 .troop-list .btn { padding-inline: 8px; white-space: nowrap; }
 @media (max-width: 640px) {
   .troop-grid { display: none; }
   .troop-list { display: block; }
-  .troop-list th:nth-child(3), .troop-list td:nth-child(3) { display: none; }
+  .troop-list .col-split { display: none; }
+  .troop-list .troop-split { display: block; }
 }

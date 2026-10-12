@@ -14,6 +14,7 @@ import {
 } from '@aldoria/shared';
 import { api } from '../api';
 import { duration, fmt } from '../format';
+import { awayTroops } from '../troops';
 import { useGame, useNow, useRoute } from '../game';
 import { CancelButton, Cost, Countdown, liveResources, Panel, UnitIcon } from '../ui';
 
@@ -48,13 +49,7 @@ export default function Barracks() {
   // Effectifs du village : présents, en formation, et partis (attaque, renfort en route, retour, stationnés ailleurs).
   const training = emptyUnits();
   for (const q of v.recruitQueue) training[q.unit] += q.count - q.delivered;
-  const away = emptyUnits();
-  const addAway = (units: UnitCounts | null) => {
-    if (units) for (const k of UNIT_KEYS) away[k] += units[k];
-  };
-  for (const c of v.outgoing) if (c.type === 'attack' || c.type === 'support') addAway(c.units);
-  for (const c of v.incoming) if (c.type === 'return') addAway(c.units);
-  for (const g of v.supportAway) addAway(g.units);
+  const away = awayTroops(v);
   const total = (k: UnitKey) => v.troopsHome[k] + training[k] + away[k];
   const owned = UNIT_KEYS.filter((k) => total(k) > 0);
 

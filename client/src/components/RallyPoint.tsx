@@ -4,6 +4,7 @@ import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { CancelButton, Cost, Countdown, Panel, PlayerLink, UnitIcon, UnitList } from '../ui';
+import { awayTroops } from '../troops';
 import { progress } from './TribeTools';
 import './disband.css';
 import './tribe-attacks.css';
@@ -114,6 +115,9 @@ export default function RallyPoint() {
   const { village: v, run, refreshVillage } = useGame();
   const [disband, setDisband] = useState<UnitKey | null>(null);
   if (!v) return <p className="muted">Chargement…</p>;
+  const away = awayTroops(v);
+  const total = (k: UnitKey) => v.troopsHome[k] + away[k];
+  const owned = UNIT_KEYS.filter((k) => total(k) > 0);
 
   const cancelMove = (id: number) =>
     run(async () => {
@@ -130,35 +134,42 @@ export default function RallyPoint() {
   return (
     <div className="stack">
       <Panel title="Troupes au village">
-        {UNIT_KEYS.some((k) => v.troopsHome[k] > 0) ? (
+        {owned.length > 0 ? (
           <>
             <p className="troop-summary">
-              <b>{fmt(UNIT_KEYS.reduce((t, k) => t + v.troopsHome[k], 0))}</b> unités · <b>{fmt(UNIT_KEYS.reduce((t, k) => t + v.troopsHome[k] * UNITS[k].population, 0))}</b> places de population
+              <b>{fmt(owned.reduce((t, k) => t + total(k), 0))}</b> unités au total · <b>{fmt(UNIT_KEYS.reduce((t, k) => t + v.troopsHome[k], 0))}</b> au village ·{' '}
+              <b>{fmt(UNIT_KEYS.reduce((t, k) => t + away[k], 0))}</b> en campagne
             </p>
             <div className="table-wrap troop-list">
               <table className="troop-table disband-table">
                 <thead>
                   <tr>
                     <th>Unité</th>
-                    <th>Effectif</th>
-                    <th>Population</th>
+                    <th className="col-split">Au village</th>
+                    <th className="col-split">En campagne</th>
+                    <th>Total</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {UNIT_KEYS.filter((k) => v.troopsHome[k] > 0).map((k) => (
+                  {owned.map((k) => (
                     <tr key={k}>
                       <td>
                         <span className="row nowrap">
-                          <UnitIcon unit={k} size={28} /> {UNITS[k].name}
+                          <UnitIcon unit={k} size={28} />
+                          <span className="troop-name">
+                            {UNITS[k].name}
+                            <span className="muted small troop-split" title="Au village · en campagne">🏠 {fmt(v.troopsHome[k])} · ⚔ {fmt(away[k])}</span>
+                          </span>
                         </span>
                       </td>
+                      <td className="col-split">{fmt(v.troopsHome[k])}</td>
+                      <td className={`col-split ${away[k] ? '' : 'muted'}`}>{fmt(away[k])}</td>
                       <td>
-                        <b>{fmt(v.troopsHome[k])}</b>
+                        <b>{fmt(total(k))}</b>
                       </td>
-                      <td>{fmt(v.troopsHome[k] * UNITS[k].population)}</td>
                       <td>
-                        <button className="btn small danger-outline" onClick={() => setDisband(k)}>
+                        <button className="btn small danger-outline" disabled={v.troopsHome[k] < 1} onClick={() => setDisband(k)}>
                           Dissoudre…
                         </button>
                       </td>
@@ -168,19 +179,23 @@ export default function RallyPoint() {
               </table>
             </div>
             <div className="troop-grid">
-              {UNIT_KEYS.filter((k) => v.troopsHome[k] > 0).map((k) => (
+              {owned.map((k) => (
                 <article key={k} className="troop-card">
                   <UnitIcon unit={k} size={64} />
                   <h3>{UNITS[k].name}</h3>
-                  <strong className="troop-count">{fmt(v.troopsHome[k])}</strong>
-                  <span className="muted small">{fmt(v.troopsHome[k] * UNITS[k].population)} pop.</span>
-                  <button className="btn small danger-outline" onClick={() => setDisband(k)}>
+                  <strong className="troop-count">{fmt(total(k))}</strong>
+                  <span className="muted small">au total</span>
+                  <span className="troop-split-card">
+                    <span title="Au village">🏠 {fmt(v.troopsHome[k])}</span>
+                    <span title="En campagne" className={away[k] ? '' : 'muted'}>⚔ {fmt(away[k])}</span>
+                  </span>
+                  <button className="btn small danger-outline" disabled={v.troopsHome[k] < 1} onClick={() => setDisband(k)}>
                     Dissoudre…
                   </button>
                 </article>
               ))}
             </div>
-            <p className="muted small">Dissoudre des unités libère leurs places de population. Aucune ressource n'est remboursée.</p>
+            <p className="muted small">Seules les unités présentes au village peuvent être dissoutes. Dissoudre libère des places de population, sans remboursement.</p>
           </>
         ) : (
           <p className="muted">Aucune troupe au village. Recrutez à la caserne.</p>
