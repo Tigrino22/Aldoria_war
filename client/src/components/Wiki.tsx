@@ -444,6 +444,11 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
           jamais à un joueur sous protection débutant, mais il riposte contre qui l'a attaqué, lui ou sa tribu.
         </p>
         <p>
+          <b>Offensives des PNJ :</b> de temps en temps (environ une fois par jour de jeu), un village offensif de PNJ espionne une cible puis lui envoie la moitié de son armée : un joueur de force comparable,
+          un ennemi de guerre ou une tribu rivale. L'offensive est annulée si cette moitié ne suffit pas à battre la défense espionnée. Un joueur ne subit pas plus d'une offensive par période,
+          jamais pendant les heures calmes ni sous protection débutant. L'administration peut la couper, ou régler la part de l'armée et le rythme.
+        </p>
+        <p>
           <b>Riposte et guerres des PNJ :</b> si la riposte est activée sur le monde, un PNJ attaqué par un joueur lui en veut pendant 3 jours, de même que les PNJ de sa tribu et des tribus alliées.
           Si le joueur appartient à une tribu, la tribu du PNJ lui déclare en plus la guerre pour 4 jours. Indépendamment de la riposte, les tribus de PNJ se font la guerre entre elles
           et peuvent aussi déclarer la guerre à une tribu de joueurs sans provocation (4 jours, puis une trêve de plusieurs jours). Pendant une guerre, leurs membres frappent les villages ennemis, même éloignés,

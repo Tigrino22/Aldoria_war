@@ -41,6 +41,7 @@ import {
 } from './npc-rules';
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
 import { villageRoles, type VillageRole } from './npc-roles';
+import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, recentlyHit } from './npc-offensive';
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { refreshTribeWars } from './tribe-wars';
 import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
@@ -403,8 +404,31 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   // Quand une guerre ou une vengeance contre un autre PNJ occupe la tribu, les joueurs passent au second plan.
   const playerChance = enemyVillages.length ? 0.1 : profile === 'builder' ? 0.15 : 0.4;
   const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < playerChance) ? players : prey;
-  if (pool.length === 0) return;
-  const target = pool.map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
+  // Offensive occasionnelle : à l'heure programmée, le PNJ vise un ennemi de guerre, un rival ou un joueur de sa taille (jamais celui qu'un PNJ a déjà frappé
+  // pendant la période), garde la même cible d'un tour à l'autre le temps de l'espionner, puis frappe avec une part de son armée.
+  const npcState = (await c.query('SELECT npc_state FROM players WHERE id = $1', [npcId])).rows[0]?.npc_state ?? {};
+  let nextOff = parseNextOffensive(npcState);
+  if (nextOff === null && env.npcOffensive) {
+    nextOff = nextOffensiveAt(now, rng()).getTime();
+    await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text)) WHERE id = $1", [npcId, new Date(nextOff).toISOString()]);
+  }
+  let offensive = false;
+  let offensivePool: Candidate[] = [];
+  if (!revengePool.length && offensiveDue(nextOff, now)) {
+    const fresh = sameSize.filter((t) => !quiet);
+    const hitSafe: Candidate[] = [];
+    for (const t of fresh) if (!(await recentlyHit(c, t.ownerId!, now))) hitSafe.push(t);
+    offensivePool = [...warPlayers, ...enemyVillages, ...hitSafe, ...rivalVillages.filter((t) => !t.enemy)];
+    offensive = offensivePool.length > 0;
+  }
+  if (!offensive && pool.length === 0) return;
+  const keptId = offensive ? (npcState.offensive?.targetId as number | undefined) : undefined;
+  const target = (offensive ? offensivePool.find((t) => t.id === keptId) : undefined) ?? (offensive ? offensivePool : pool).map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
+  if (offensive) {
+    await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text, 'targetId', $3::int)) WHERE id = $1", [npcId, new Date(nextOff!).toISOString(), target.id]);
+  }
+  const finishOffensive = async (factor: number) =>
+    c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text)) WHERE id = $1", [npcId, nextOffensiveAt(now, rng(), factor).toISOString()]);
 
   const hostileToPlayer = target.ownerId !== null && !target.rival;
   // L'arrivée d'une attaque ou d'un espion chez un joueur ne doit jamais tomber pendant les heures calmes.
@@ -426,6 +450,16 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     }
     // Les troupes dépendent du butin : assez pour gagner et emporter l'essentiel du stock, toute l'armée s'il le faut.
     // Pour se venger ou faire la guerre, un PNJ frappe fort : au moins 70 % de son armée offensive.
+    if (offensive) {
+      // Offensive : une part de l'armée si elle suffit, sinon on annule (et on réessaie plus tôt) ; pas de train de nobles ni de seuil de butin.
+      const units = pickOffensiveUnits(attackers, intel.troops, intel.wall);
+      if (!units) return void (await finishOffensive(4));
+      const arrival = arrivalOf(units, target);
+      if (hostileToPlayer && isQuietAt(arrival)) return;
+      await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units }, now);
+      await finishOffensive(1);
+      return;
+    }
     const avenging = (hostileToPlayer && grudges.includes(target.ownerId!)) || target.enemy;
     // Chaque noble du train part avec une petite escorte d'épéistes (un noble seul ne survit pas à la défense de base) : on la met de côté avant de choisir l'assaut.
     let nobles = trainSize();
