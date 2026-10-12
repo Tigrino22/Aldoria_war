@@ -63,6 +63,7 @@ const SECTIONS = [
   { id: 'carte', title: 'Carte et villages barbares' },
   { id: 'social', title: 'Rapports, messages, tribus, classement' },
   { id: 'compte', title: 'Compte et villages' },
+  { id: 'gestionnaire', title: 'Gestionnaire de compte (pilote automatique)' },
   { id: 'batiments', title: 'Fiches des bâtiments' },
   { id: 'troupes', title: 'Fiches des troupes' },
 ] as const;
@@ -515,6 +516,70 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes'> }) {
             La page Compte (votre pseudo en haut de l'écran) permet de supprimer définitivement votre compte : vos villages deviennent barbares, vos troupes en route sont perdues, vos rapports et
             messages sont effacés.
           </li>
+        </ul>
+      </>
+    ),
+    gestionnaire: (
+      <>
+        <p>
+          Le <b>gestionnaire de compte</b> est un pilote automatique : vous fixez une fois ce que chaque village doit construire et recruter, et il le fait à votre place, dès que les ressources le
+          permettent, même quand vous n'êtes pas connecté. Vous gardez vos connexions pour la stratégie militaire. Il se trouve dans le menu, sous « Gestionnaire de compte », et chaque village de
+          « Mes villages » a aussi son interrupteur.
+        </p>
+        <p><b>Comment ça marche</b></p>
+        <ul>
+          <li>Toutes les minutes, le gestionnaire regarde chaque village dont l'interrupteur est sur « Actif ».</li>
+          <li>
+            Il agit exactement comme vous le feriez à la main : mêmes coûts, mêmes prérequis, même file de {BUILD_QUEUE_LIMIT} constructions, même limite de population de la {B('farm')}. Il n'a aucun
+            avantage sur un joueur connecté.
+          </li>
+          <li>Il ne retire jamais de troupes, n'annule rien et ne touche ni au marché ni aux attaques : il construit et recrute seulement.</li>
+        </ul>
+        <p><b>Les modèles</b></p>
+        <p>
+          Un modèle est un réglage que vous pouvez appliquer à plusieurs villages. Deux modèles vous sont donnés au départ, « Offensif » (épéistes, cavaliers, béliers, éclaireurs) et « Défensif »
+          (lanciers, hallebardiers, muraille haute). Vous pouvez les modifier, en créer d'autres (10 au maximum) ou les supprimer. Un modèle contient :
+        </p>
+        <ul>
+          <li>
+            <b>Une liste de bâtiments, par ordre de priorité,</b> chacun avec son niveau cible. Le gestionnaire monte le premier bâtiment de la liste qui n'a pas atteint son niveau. Un même bâtiment peut
+            revenir plusieurs fois (par exemple ferme 8, caserne 10, puis ferme 20). Si un prérequis manque (une {B('barracks')} pour la {B('wall')}, un {B('townhall')} assez haut…), il construit d'abord
+            le prérequis.
+          </li>
+          <li>
+            <b>Un effectif voulu par unité.</b> Les troupes déjà au village, en déplacement et en cours de recrutement comptent dans l'effectif. Le gestionnaire recrute celles qui sont le plus en retard
+            sur leur objectif, par lots d'au plus deux heures de recrutement, pour que la file reste réactive. Il demande une {B('barracks')} et les prérequis de chaque unité, comme à la main.
+          </li>
+          <li>
+            <b>Le curseur « part du prochain bâtiment utilisable par les troupes »</b> (voir plus bas).
+          </li>
+        </ul>
+        <p><b>Bâtiments ou troupes : qui passe d'abord ?</b></p>
+        <p>
+          Un bâtiment coûte presque toujours bien plus cher que quelques soldats. Sans précaution, les troupes dépenseraient tout dès qu'elles le peuvent et le bâtiment n'aurait jamais ses ressources. Le
+          gestionnaire met donc de côté le coût du prochain bâtiment, et les troupes n'utilisent que le reste. Le curseur règle la part de ce coût qui reste accessible aux troupes :
+        </p>
+        <ul>
+          <li><b>0 %</b> : bâtiments d'abord. Les troupes n'utilisent que l'excédent, donc rien ne part tant que le bâtiment n'est pas payé.</li>
+          <li><b>30 %</b> (réglage des deux modèles de départ) : un compromis, les troupes avancent déjà pendant que le bâtiment se prépare.</li>
+          <li><b>100 %</b> : troupes d'abord, rien n'est réservé pour les bâtiments.</li>
+        </ul>
+        <p>
+          Quand un bâtiment attend ses ressources, le gestionnaire ne passe jamais au suivant : sinon les petits bâtiments mangeraient tout et les gros ne seraient jamais construits. Le message « en
+          attente » de « Mes villages » vous dit ce qui manque. Si le coût d'un bâtiment dépasse la capacité de l'{B('warehouse')}, rien n'est réservé pour lui : montez l'entrepôt plus haut dans la liste.
+        </p>
+        <p><b>Types de village</b></p>
+        <p>
+          Choisissez le modèle de chaque village dans « Mes villages » ou dans la page du gestionnaire : « Offensif » pour vos villages d'attaque, « Défensif » pour ceux qui tiennent les troupes en
+          défense, ou un modèle de votre création. Le bouton « Personnaliser ce village » règle un village sans toucher au modèle ; « Suivre le modèle » revient au modèle.
+        </p>
+        <p><b>Bon à savoir</b></p>
+        <ul>
+          <li>Un village n'est pas confié au gestionnaire tant que vous n'avez pas activé son interrupteur. Les nouveaux villages démarrent arrêtés.</li>
+          <li>Si un village est conquis par un autre joueur, ses réglages disparaissent.</li>
+          <li>Si vous supprimez un modèle, les villages qui le suivaient n'ont plus de modèle : le gestionnaire les laisse tranquilles jusqu'à ce que vous en choisissiez un.</li>
+          <li>L'administrateur peut désactiver le gestionnaire pour tout le monde. Vos réglages sont alors conservés, mais rien ne s'exécute.</li>
+          <li>Le journal de chaque village garde les dernières actions (« Ferme niveau 12 lancé », « 120 lanciers en recrutement »).</li>
         </ul>
       </>
     ),
