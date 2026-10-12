@@ -16,6 +16,7 @@ import ResourceBar from './ResourceBar';
 import Tribe from './Tribe';
 import TownHall from './TownHall';
 import VillageView from './VillageView';
+import Manager from './Manager';
 import Overview from './Overview';
 import Profile from './Profile';
 import Wiki from './Wiki';
@@ -45,6 +46,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'marche', label: 'Marché', img: buildingImg('market', 15) },
       { path: 'marche/offres', label: 'Offres du marché', img: buildingImg('market', 15) },
       { path: 'apercu', label: 'Mes villages', img: MAP_IMG.village3 },
+      { path: 'gestionnaire', label: 'Gestionnaire de compte', img: buildingImg('townhall', 15) },
     ],
   },
   {
@@ -220,6 +222,7 @@ export default function Layout() {
           {page === 'marche' && <Market focus={route[1]} />}
           {page === 'compte' && <Account />}
           {page === 'apercu' && <Overview />}
+          {page === 'gestionnaire' && <Manager />}
           {page === 'admin' && me.isAdmin && <Admin />}
           {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
         </main>

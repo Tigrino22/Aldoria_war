@@ -4,12 +4,14 @@ import { api } from '../api';
 import { fmt } from '../format';
 import { useGame, useNow } from '../game';
 import IncomingDetail from './IncomingDetail';
+import { ManagerSwitch, useManager } from './Manager';
 import { Countdown, Panel, ResIcon, UnitList, liveResources } from '../ui';
 
 export default function Overview() {
   const { me, run, setVillageId, villageId } = useGame();
   const now = useNow();
   const [villages, setVillages] = useState<VillageState[] | null>(null);
+  const manager = useManager();
 
   useEffect(() => {
     run(async () => setVillages(await api<VillageState[]>('/api/overview')));
@@ -36,6 +38,10 @@ export default function Overview() {
             </span>
           ))}
         </p>
+        <p className="row">
+          <button className="btn small" onClick={() => (location.hash = '#/gestionnaire')}>Gestionnaire de compte</button>
+          <span className="muted small">Construction et recrutement automatiques, par modèle (offensif, défensif…)</span>
+        </p>
       </Panel>
       {villages.map((v) => {
         const res = liveResources(v, now);
@@ -59,6 +65,18 @@ export default function Overview() {
               </p>
             )}
             <IncomingDetail incoming={v.incoming} />
+            {manager.data && manager.data.available && (() => {
+              const mv = manager.data.villages.find((m) => m.id === v.id);
+              if (!mv) return null;
+              const tpl = manager.data.templates.find((t) => t.id === mv.templateId);
+              return (
+                <div className="row mgr-line">
+                  <b>Gestionnaire :</b>
+                  <ManagerSwitch v={mv} data={manager.data} reload={manager.reload} />
+                  <span className="muted small">{mv.custom ? 'réglage propre' : tpl ? `modèle ${tpl.name}` : 'aucun modèle'}{mv.enabled && mv.blocked ? ` · en attente : ${mv.blocked}` : ''}</span>
+                </div>
+              );
+            })()}
             <p>
               {RESOURCES.map((r) => (
                 <span key={r} className={`inline-res ${res[r] >= v.capacity ? 'full' : ''}`} title={RESOURCE_NAMES[r]}>

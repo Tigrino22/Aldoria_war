@@ -32,6 +32,8 @@ export const env = {
   npcWars: count('NPC_WARS', 1) > 0 ? 1 : 0,
   /** Guerres entre tribus de PNJ et tribus de joueurs (1 = activées), indépendantes de la riposte et modifiables à chaud. */
   npcPlayerWars: count('NPC_PLAYER_WARS', 1) > 0 ? 1 : 0,
+  /** Gestionnaire de compte (1 = activé sur le monde), modifiable à chaud depuis l'administration. */
+  accountManager: count('ACCOUNT_MANAGER', 1) > 0 ? 1 : 0,
   npcMax: count('NPC_MAX', 200),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',

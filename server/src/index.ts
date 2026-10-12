@@ -5,6 +5,7 @@ import { processDueEvents } from './game/commands';
 import { assignTriblessNpcs, ensureNpcTribes, ensureNpcs, processNpcs } from './game/npc';
 import { ensureWorld } from './game/world';
 import { withGameLock } from './lock';
+import { processManager } from './manager/engine';
 import { migrate } from './migrate';
 import { loadSettings } from './settings';
 
@@ -36,8 +37,14 @@ async function main() {
         }, 30_000)
       : null;
 
+  // Le gestionnaire de compte : une fois par minute, il fait avancer les villages que les joueurs lui ont confiés.
+  const managerTimer = setInterval(() => {
+    withGameLock(() => processManager(new Date())).catch((err) => app.log.error(err));
+  }, 60_000);
+
   const stop = async () => {
     clearInterval(timer);
+    clearInterval(managerTimer);
     if (npcTimer) clearInterval(npcTimer);
     await app.close();
     await pool.end();

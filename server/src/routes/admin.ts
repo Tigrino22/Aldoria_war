@@ -196,6 +196,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         worldSpeed: env.worldSpeed,
         mapSize: env.mapSize,
         npcCount: env.npcCount,
+        accountManager: env.accountManager ? 'activé' : 'désactivé',
         npcRevenge: env.npcRevenge ? 'activée' : 'désactivée',
         npcPlayerWars: env.npcPlayerWars ? 'activées' : 'désactivées',
         npcWars: env.npcWars ? 'activées' : 'désactivées',
