@@ -5,30 +5,49 @@ import { fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { liveResources } from '../ui';
 import Barracks from './Barracks';
-import Messages from './Messages';
 import RallyPoint from './RallyPoint';
-import RallyPage from './RallyPage';
-import Ranking from './Ranking';
-import Reports from './Reports';
-import Market from './Market';
-import Account from './Account';
 import ResourceBar from './ResourceBar';
-import Tribe from './Tribe';
 import TownHall from './TownHall';
 import VillageView from './VillageView';
-import Manager from './Manager';
-import Overview from './Overview';
-import Profile from './Profile';
-import Wiki from './Wiki';
-import WorldStats from './WorldStats';
-import WorldWars from './WorldWars';
-import Admin from './Admin';
-import Raid from './Raid';
 import { api } from '../api';
 
 // La carte embarque PixiJS : elle n'alourdit pas le premier affichage, puis se précharge dès que le jeu est au repos.
 const loadMap = () => import('./MapView');
 const MapView = lazy(loadMap);
+
+// Pages secondaires : chargées à la première visite (puis préchargées au repos), pour que le jeu s'ouvre plus vite.
+const PAGES = {
+  Messages: () => import('./Messages'),
+  RallyPage: () => import('./RallyPage'),
+  Ranking: () => import('./Ranking'),
+  Reports: () => import('./Reports'),
+  Market: () => import('./Market'),
+  Account: () => import('./Account'),
+  Tribe: () => import('./Tribe'),
+  Manager: () => import('./Manager'),
+  Overview: () => import('./Overview'),
+  Profile: () => import('./Profile'),
+  Wiki: () => import('./Wiki'),
+  WorldStats: () => import('./WorldStats'),
+  WorldWars: () => import('./WorldWars'),
+  Admin: () => import('./Admin'),
+  Raid: () => import('./Raid'),
+};
+const Messages = lazy(PAGES.Messages);
+const RallyPage = lazy(PAGES.RallyPage);
+const Ranking = lazy(PAGES.Ranking);
+const Reports = lazy(PAGES.Reports);
+const Market = lazy(PAGES.Market);
+const Account = lazy(PAGES.Account);
+const Tribe = lazy(PAGES.Tribe);
+const Manager = lazy(PAGES.Manager);
+const Overview = lazy(PAGES.Overview);
+const Profile = lazy(PAGES.Profile);
+const Wiki = lazy(PAGES.Wiki);
+const WorldStats = lazy(PAGES.WorldStats);
+const WorldWars = lazy(PAGES.WorldWars);
+const Admin = lazy(PAGES.Admin);
+const Raid = lazy(PAGES.Raid);
 
 interface NavItem {
   path: string;
@@ -130,7 +149,10 @@ export default function Layout() {
   }, [drawer]);
   useEffect(() => {
     const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 2000));
-    idle(() => void loadMap());
+    idle(() => {
+      void loadMap();
+      for (const load of Object.values(PAGES)) void load();
+    });
   }, []);
   const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : 0);
 
@@ -213,6 +235,7 @@ export default function Layout() {
           </button>
         </aside>
         <main className="content">
+          <Suspense fallback={<p className="muted">Chargement…</p>}>
           {page === 'village' && route[1] !== 'hotel' && <VillageView />}
           {(page === 'hotel' || (page === 'village' && route[1] === 'hotel')) && (village ? <TownHall v={village} /> : <p className="muted">Chargement du village…</p>)}
           {page === 'caserne' && <Barracks />}
@@ -237,6 +260,7 @@ export default function Layout() {
           {page === 'gestionnaire' && <Manager />}
           {page === 'admin' && me.isAdmin && <Admin />}
           {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
+          </Suspense>
         </main>
       </div>
       <nav className="nav" aria-label="Navigation">

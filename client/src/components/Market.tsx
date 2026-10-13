@@ -18,6 +18,8 @@ import { useGame, useNow, useRoute } from '../game';
 import { Countdown, liveResources, Panel, ResIcon } from '../ui';
 import './offers.css';
 
+const OFFERS_PAGE = 50;
+
 /** Marché : envoyer des ressources à un autre village de joueur et suivre les convois. */
 export default function Market({ focus }: { focus?: string }) {
   const { village: v, me, world, setVillage, run, toast, refreshVillage } = useGame();
@@ -31,8 +33,11 @@ export default function Market({ focus }: { focus?: string }) {
   const [offers, setOffers] = useState<{ offers: MarketOfferView[]; mine: MarketOfferView[] } | null>(null);
   const [filter, setFilter] = useState<Resource | null>(null);
   const [filterPay, setFilterPay] = useState<Resource | null>(null);
+  // Les offres s'affichent par pages : des milliers de lignes ralentiraient le téléphone à chaque seconde.
+  const [limit, setLimit] = useState(OFFERS_PAGE);
   const [form, setForm] = useState<{ give: Resource; giveAmount: string; want: Resource; wantAmount: string }>({ give: 'wood', giveAmount: '', want: 'clay', wantAmount: '' });
   const villageId = v?.id;
+  useEffect(() => setLimit(OFFERS_PAGE), [filter, filterPay, villageId]);
   const hasMarket = (v?.buildings.market ?? 0) > 0;
   const loadOffers = useCallback(() => run(async () => setOffers(await api(`/api/villages/${villageId}/market/offers`))), [run, villageId]);
   useEffect(() => {
@@ -166,7 +171,8 @@ export default function Market({ focus }: { focus?: string }) {
       )();
     // Taux affiché sur la même ligne : combien l'acheteur doit rendre pour 1 unité reçue.
     const ratio = (o: MarketOfferView) => (o.want.amount / o.give.amount).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
-    const Deal = ({ o }: { o: MarketOfferView }) => (
+    // Fonction et non composant : un composant déclaré ici serait recréé (démonté puis remonté) à chaque seconde.
+    const deal = (o: MarketOfferView) => (
       <span className="offer-deal">
         <span className="inline-res"><ResIcon r={o.give.resource} size={22} /><b>{fmt(o.give.amount)}</b></span>
         <span className="arrow" aria-label="contre">⇄</span>
@@ -204,7 +210,7 @@ export default function Market({ focus }: { focus?: string }) {
             <p className="muted">Aucune offre pour le moment.</p>
           ) : (
             <ul className="offers">
-              {shown.map((o) => {
+              {shown.slice(0, limit).map((o) => {
                 const can = Math.floor(res[o.want.resource]) >= o.want.amount;
                 return (
                   <li key={o.id}>
@@ -215,7 +221,7 @@ export default function Market({ focus }: { focus?: string }) {
                       </b>
                       <span className="muted small">{o.villageName} · {o.distance} cases · expire dans {left(o.expiresAt)}</span>
                     </span>
-                    <Deal o={o} />
+                    {deal(o)}
                     <button className="btn primary small" disabled={busy || !can || noMarket} title={noMarket ? "Construisez d'abord un marché" : can ? undefined : "Vous n'avez pas assez de ressources"} onClick={() => accept(o)}>
                       Accepter
                     </button>
@@ -223,6 +229,11 @@ export default function Market({ focus }: { focus?: string }) {
                 );
               })}
             </ul>
+          )}
+          {shown.length > limit && (
+            <button className="btn ghost small offers-more" onClick={() => setLimit((n) => n + OFFERS_PAGE)}>
+              Afficher {Math.min(OFFERS_PAGE, shown.length - limit)} offres de plus ({shown.length - limit} restantes)
+            </button>
           )}
         </Panel>
         <Panel title="Créer une offre">
@@ -264,7 +275,7 @@ export default function Market({ focus }: { focus?: string }) {
                     <b>Publiée par vous</b>
                     <span className="muted small">expire dans {left(o.expiresAt)}</span>
                   </span>
-                  <Deal o={o} />
+                  {deal(o)}
                   <button className="btn ghost small" disabled={busy} onClick={() => cancel(o)}>
                     Annuler
                   </button>

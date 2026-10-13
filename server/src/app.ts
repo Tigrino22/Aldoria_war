@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
 import rateLimit from '@fastify/rate-limit';
+import zlib from 'node:zlib';
+import compress from '@fastify/compress';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import path from 'node:path';
@@ -38,6 +40,9 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
     }
   });
 
+  // Réponses compressées (gzip/brotli) : les listes JSON et le code du site pèsent 4 à 5 fois moins sur mobile.
+  // Brotli au niveau 4 : presque aussi compact que le maximum, pour une fraction du calcul (le serveur gratuit a peu de processeur).
+  await app.register(compress, { threshold: 1024, brotliOptions: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } } });
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
   await app.register(websocket);
 
@@ -76,9 +81,18 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   // tout chemin inconnu hors /api renvoie la page d'accueil).
   if (env.staticDir) {
     const root = path.resolve(env.staticDir);
-    await app.register(fastifyStatic, { root, wildcard: false });
+    await app.register(fastifyStatic, {
+      root,
+      wildcard: false,
+      cacheControl: false,
+      // Les fichiers de assets/ portent une empreinte dans leur nom : le navigateur les garde un an sans redemander.
+      // La page d'accueil, elle, est toujours revérifiée pour récupérer la dernière version du jeu.
+      setHeaders(res, filePath) {
+        res.setHeader('cache-control', filePath.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache');
+      },
+    });
     app.setNotFoundHandler((req, reply) => {
-      if (req.method === 'GET' && !req.url.startsWith('/api')) return reply.sendFile('index.html');
+      if (req.method === 'GET' && !req.url.startsWith('/api')) return reply.header('cache-control', 'no-cache').sendFile('index.html');
       return reply.status(404).send({ error: 'Introuvable' });
     });
   }
