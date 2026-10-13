@@ -4,6 +4,7 @@ import { api } from '../api';
 import { clockTime, coords, fmt } from '../format';
 import { useGame, useRoute } from '../game';
 import { Panel, UnitIcon } from '../ui';
+import { PageBanner } from './PageBanner';
 import './raid.css';
 
 type Slot = 'A' | 'B';
@@ -158,7 +159,19 @@ export default function Raid() {
   const picked = list.filter((t) => selected.has(t.id));
 
   return (
-    <>
+    <div className="pg raid">
+      <PageBanner
+        icon="pillage"
+        kicker={`Armée · depuis ${v.name} (${v.x}|${v.y})`}
+        title="Assistant de pillage"
+        lead="Préparez deux modèles de troupes, puis envoyez-les en un clic sur les villages barbares des environs."
+        stats={[
+          { value: list.length, label: 'villages à piller', tone: 'gold' },
+          { value: possible.A, label: 'envois A possibles' },
+          { value: possible.B, label: 'envois B possibles' },
+          { value: hidden, label: 'attaques déjà en route' },
+        ]}
+      />
       <Panel title="Mes modèles de pillage">
         {SLOTS.map((slot) => <ModelEditor key={slot} slot={slot} model={models[slot]} village={v} onSave={(m) => save(slot, m)} />)}
         <p className="muted small">Les modèles sont mémorisés sur cet appareil. Cliquez sur A ou B à côté d’un village pour l’attaquer avec ce modèle.</p>
@@ -234,6 +247,6 @@ export default function Raid() {
           </div>
         )}
       </Panel>
-    </>
+    </div>
   );
 }
