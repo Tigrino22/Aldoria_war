@@ -1,0 +1,58 @@
+/* Les sélecteurs passent par .app pour l'emporter sur styles.css, chargé après. */
+/* Menu : bois sombre sur la texture de la carte, titres dorés et médaillons, comme la bannière de la page Tribu. */
+:root {
+  --nav-ink: #efe3c4;
+  --nav-muted: #b9a982;
+  --nav-glass: rgb(26 19 12 / 0.72);
+  --nav-line: rgb(243 226 179 / 0.16);
+  --nav-gold: #e0b23c;
+}
+
+/* La texture du sol de la carte est écrite dans chaque règle : une url() dans une variable CSS n'est pas réécrite au build. */
+
+/* Médaillon commun aux icônes du menu latéral et du tiroir mobile. */
+.app .nav-medal {
+  flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--nav-gold);
+  background: radial-gradient(circle at 35% 30%, #4a3826, #1c140d 70%);
+  box-shadow: inset 0 0 0 1px rgb(224 178 60 / 0.55), 0 2px 6px rgb(0 0 0 / 0.35);
+}
+.app .nav-svg { display: block; }
+
+/* Menu latéral (ordinateur). */
+.app .side {
+  background: linear-gradient(180deg, rgb(20 14 9 / 0.86), rgb(20 14 9 / 0.94)), url('../assets/map/ground.jpg') center / 420px; border-right: 1px solid #1a130c; color: var(--nav-ink);
+  box-shadow: inset -10px 0 30px rgb(0 0 0 / 0.25);
+}
+.app .side-group h4 { color: var(--nav-gold); margin-bottom: 6px; }
+.app .side-group a { color: var(--nav-ink); padding: 5px 8px; gap: 10px; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; }
+.app .side-group a:hover { background: rgb(255 255 255 / 0.06); border-color: var(--nav-line); }
+.app .side-group a.active {
+  background: linear-gradient(90deg, rgb(224 178 60 / 0.24), rgb(224 178 60 / 0.06)); border-color: rgb(224 178 60 / 0.5); color: #fff6dc;
+  box-shadow: inset 3px 0 0 var(--nav-gold);
+}
+.app .side-group a.active .nav-medal { background: radial-gradient(circle at 35% 30%, #f1cc63, #a77a14 75%); color: #2b2018; box-shadow: inset 0 0 0 1px #f6dc8c, 0 2px 8px rgb(224 178 60 / 0.35); }
+.app .side-quit { display: inline-flex; align-items: center; gap: 8px; color: var(--nav-muted); }
+.app .side-quit:hover { color: var(--nav-ink); }
+
+/* Barre du bas (mobile). */
+.app .nav { background: linear-gradient(180deg, rgb(20 14 9 / 0.86), rgb(20 14 9 / 0.94)), url('../assets/map/ground.jpg') center / 420px; border-top: 1px solid rgb(224 178 60 / 0.35); box-shadow: 0 -6px 20px rgb(0 0 0 / 0.3); }
+.app .nav button { color: var(--nav-muted); }
+.app .nav-icon { display: grid; place-items: center; width: 26px; height: 26px; color: var(--nav-muted); }
+.app .nav button.active { color: #fff6dc; background: rgb(224 178 60 / 0.16); box-shadow: inset 0 0 0 1px rgb(224 178 60 / 0.45); }
+.app .nav button.active .nav-icon { color: var(--nav-gold); }
+.app .nav .burger { padding: 0 4px; }
+
+/* Tiroir « Menu » (mobile). */
+.app .sheet { background: linear-gradient(180deg, rgb(20 14 9 / 0.86), rgb(20 14 9 / 0.94)), url('../assets/map/ground.jpg') center / 420px; color: var(--nav-ink); border-top: 1px solid rgb(224 178 60 / 0.4); }
+.app .sheet-head { background: rgb(22 16 10 / 0.96); }
+.app .sheet-grip { background: rgb(224 178 60 / 0.45); }
+.app .sheet-close { background: var(--nav-glass); border-color: var(--nav-line); color: var(--nav-ink); }
+.app .sheet h4 { color: var(--nav-gold); }
+.app .sheet-grid a {
+  background: var(--nav-glass); border-color: var(--nav-line); color: var(--nav-ink);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); padding: 12px 4px 10px; gap: 7px;
+}
+.app .sheet-grid a .nav-medal { width: 44px; height: 44px; }
+.app .sheet-grid a.active { border-color: var(--nav-gold); box-shadow: inset 0 0 0 1px var(--nav-gold); color: #fff6dc; }
+.app .sheet-grid a.active .nav-medal { background: radial-gradient(circle at 35% 30%, #f1cc63, #a77a14 75%); color: #2b2018; }
+.app .sheet-quit { display: inline-flex; align-items: center; gap: 8px; color: var(--nav-ink); border-color: var(--nav-line); }
