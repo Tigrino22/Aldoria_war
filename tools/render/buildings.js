@@ -555,3 +555,8 @@ export const BUILDERS = {
 };
 
 export { deciduousTree, pineTree };
+
+// La porte s'aligne sur l'enceinte, tracée face à l'écran : elle tourne avec l'angle de la caméra.
+const GATE_YAW = THREE.MathUtils.degToRad(32);
+const gate = BUILDERS.wall;
+BUILDERS.wall = (stage) => at(group(gate(stage)), 0, 0, 0, GATE_YAW);

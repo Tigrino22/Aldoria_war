@@ -16,8 +16,7 @@ import { buildingImg, SPOT_WIDTH, VILLAGE_SPOTS as SPOTS, villageBg, wallRingImg
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { NavIcon } from './NavIcon';
-import TribeCrest from './TribeCrest';
-import { CancelButton, Cost, Countdown, liveResources, Panel } from '../ui';
+import { CancelButton, Cost, Countdown, liveResources } from '../ui';
 import Quests from './Quests';
 import { effect, effectiveLevels } from './buildingInfo';
 
@@ -102,27 +101,6 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
 
 import IncomingDetail from './IncomingDetail';
 
-/**
- * Propositions de style pour la vue du village (à départager, puis on ne garde que la retenue).
- * Le décor et les bâtiments ne changent pas : seuls le cadre, la lumière, les étiquettes et les panneaux autour.
- */
-type VillageStyle = 'actuel' | 'blason' | 'doree' | 'etatmajor';
-const STYLES: { key: VillageStyle; name: string }[] = [
-  { key: 'actuel', name: 'Actuel' },
-  { key: 'blason', name: 'A · Blason' },
-  { key: 'doree', name: 'B · Heure dorée' },
-  { key: 'etatmajor', name: 'C · État-major' },
-];
-const STYLE_KEY = 'aldoria.villageStyle';
-function readStyle(): VillageStyle {
-  try {
-    const s = localStorage.getItem(STYLE_KEY);
-    return STYLES.some((x) => x.key === s) ? (s as VillageStyle) : 'actuel';
-  } catch {
-    return 'actuel';
-  }
-}
-
 /** Avancement (0 à 1) de chaque construction de la file : la première a commencé à son arrivée en tête, les suivantes à la fin de la précédente. */
 function queueProgress(v: VillageState, now: number, speed: number): number[] {
   let prevEnd = 0;
@@ -144,14 +122,12 @@ function Scene({
   selected,
   onPick,
   progress,
-  fancy,
   children,
 }: {
   v: VillageState;
   selected: BuildingKey | null;
   onPick: (k: BuildingKey) => void;
   progress: Partial<Record<BuildingKey, number>>;
-  fancy: boolean;
   children?: React.ReactNode;
 }) {
   const levels = effectiveLevels(v);
@@ -176,17 +152,11 @@ function Scene({
           >
             <img src={buildingImg(k, v.buildings[k])} alt="" />
             <span className="spot-hit" />
-            {!fancy && (
-              <span className="spot-label">
-                {BUILDINGS[k].name} <b>{v.buildings[k]}</b>
-              </span>
-            )}
           </button>
         );
       })}
-      {fancy && (
-        // Étiquettes sur leur propre calque : jamais cachées par une tour ou un bâtiment voisin.
-        <div className="spot-labels">
+      {/* Étiquettes sur leur propre calque : jamais cachées par une tour ou un bâtiment voisin. */}
+      <div className="spot-labels">
           {BUILDING_KEYS.map((k) => {
             const working = levels[k] > v.buildings[k];
             return (
@@ -208,8 +178,7 @@ function Scene({
               </button>
             );
           })}
-        </div>
-      )}
+      </div>
       {children}
     </div>
   );
@@ -264,6 +233,7 @@ function QueueCard({ v, progress, className = '' }: { v: VillageState; progress:
 
 /** Liste compacte des bâtiments en tuiles (styles proposés). */
 function BuildingTiles({ v, onPick, selected }: { v: VillageState; onPick: (k: BuildingKey) => void; selected: BuildingKey | null }) {
+  const { world } = useGame();
   const levels = effectiveLevels(v);
   return (
     <section className="vv-card">
@@ -275,13 +245,14 @@ function BuildingTiles({ v, onPick, selected }: { v: VillageState; onPick: (k: B
       <ul className="vv-tiles">
         {BUILDING_KEYS.map((k) => (
           <li key={k}>
-            <button className={`vv-tile ${selected === k ? 'on' : ''}`} onClick={() => onPick(k)}>
+            <button className={`vv-tile ${selected === k ? 'on' : ''}`} onClick={() => onPick(k)} title={effect(k, v.buildings[k], world.speed)}>
               <img src={buildingImg(k, v.buildings[k])} alt="" width={48} height={48} />
               <span className="vv-tile-name">{BUILDINGS[k].name}</span>
               <span className="vv-tile-lvl">
                 {v.buildings[k]}
                 {levels[k] > v.buildings[k] && <em> → {levels[k]}</em>}
               </span>
+              <span className="vv-tile-fx">{effect(k, v.buildings[k], world.speed)}</span>
             </button>
           </li>
         ))}
@@ -290,38 +261,14 @@ function BuildingTiles({ v, onPick, selected }: { v: VillageState; onPick: (k: B
   );
 }
 
-/** Sélecteur provisoire des propositions (retiré une fois le style choisi). */
-function StylePicker({ value, onChange }: { value: VillageStyle; onChange: (s: VillageStyle) => void }) {
-  return (
-    <div className="vv-picker" role="radiogroup" aria-label="Style de la vue du village (essai)">
-      <span>Style (essai)</span>
-      {STYLES.map((s) => (
-        <button key={s.key} role="radio" aria-checked={value === s.key} className={value === s.key ? 'on' : ''} onClick={() => onChange(s.key)}>
-          {s.name}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export default function VillageView() {
-  const { village: v, world, me, run, refreshMe, setVillage } = useGame();
+  const { village: v, world, me, run, refreshMe } = useGame();
   const [, go] = useRoute();
   const now = useNow();
   const [selected, setSelected] = useState<BuildingKey | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
-  const [style, setStyleState] = useState<VillageStyle>(readStyle);
   if (!v) return <p className="muted">Chargement du village…</p>;
-  const setStyle = (s: VillageStyle) => {
-    setStyleState(s);
-    try {
-      localStorage.setItem(STYLE_KEY, s);
-    } catch {
-      /* stockage indisponible : le choix vaut pour la session */
-    }
-  };
-  const levels = effectiveLevels(v);
   const protectedUntil = me.player.protectionUntil && Date.parse(me.player.protectionUntil) > Date.now() ? me.player.protectionUntil : null;
   const enemyIncoming = v.incoming.filter((c) => c.type === 'attack');
   const pick = (k: BuildingKey) => (k === 'townhall' ? go('hotel') : setSelected(selected === k ? null : k));
@@ -330,262 +277,77 @@ export default function VillageView() {
   v.buildQueue.forEach((q, i) => {
     if (!(q.building in progress)) progress[q.building] = qp[i];
   });
-
-  const renameForm = (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        run(async () => {
-          await api(`/api/villages/${v.id}/rename`, { body: { name } });
-          setRenaming(false);
-          await refreshMe();
-        });
-      }}
-    >
-      <input id="village-name" value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={32} autoFocus />
-      <button className="btn small">Valider</button>
-    </form>
-  );
-  const renameBtn = (
-    <button className="link" onClick={() => (setName(v.name), setRenaming(true))}>
-      renommer
-    </button>
-  );
-  const alert = enemyIncoming.length > 0 && (
-    <div className="alert">
-      ⚠ {enemyIncoming.length} attaque{enemyIncoming.length > 1 ? 's' : ''} en approche. Prochaine arrivée dans <Countdown to={enemyIncoming[0].arriveAt} />.
-    </div>
-  );
-  const panel = selected && <BuildingPanel v={v} k={selected} onClose={() => setSelected(null)} />;
-  const picker = <StylePicker value={style} onChange={setStyle} />;
-
-  if (style === 'actuel')
-    return (
-      <div className="village">
-        <div className="village-title">
-          {renaming ? (
-            renameForm
-          ) : (
-            <h1>
-              {v.name} <span className="muted">({v.x}|{v.y})</span>
-              {renameBtn}
-            </h1>
-          )}
-          <div className="chips">
-            <span className="chip">{fmt(v.points)} points</span>
-            <span className={`chip ${v.loyalty < 100 ? 'chip-warn' : ''}`}>Loyauté {v.loyalty}</span>
-            <span className="chip">Vitesse x{world.speed}</span>
-            {protectedUntil && <span className="chip chip-ok">Protégé jusqu'au {clockTime(protectedUntil)}</span>}
-          </div>
-        </div>
-
-        {alert}
-        <IncomingDetail incoming={v.incoming} />
-
-        <Scene v={v} selected={selected} onPick={pick} progress={progress} fancy={false} />
-
-        {panel}
-
-        <Quests />
-
-        <Panel title={`Constructions en cours (${v.buildQueue.length}/${BUILD_QUEUE_LIMIT})`}>
-          {v.buildQueue.length === 0 ? (
-            <p className="muted">Aucune construction. Touchez un bâtiment pour l'améliorer.</p>
-          ) : (
-            <ul className="queue">
-              {v.buildQueue.map((q, i) => (
-                <li key={q.id}>
-                  <img src={buildingImg(q.building, q.level)} alt="" width={36} height={36} />
-                  <span>
-                    {BUILDINGS[q.building].name} → niveau {q.level}
-                  </span>
-                  <Countdown to={q.finishAt} />
-                  {i === v.buildQueue.length - 1 && (
-                    <CancelButton
-                      since={q.queuedAt}
-                      onCancel={() => run(async () => setVillage(await api(`/api/villages/${v.id}/build/${q.id}`, { method: 'DELETE' })))}
-                    />
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-
-        <Panel title="Bâtiments">
-          <ul className="building-list">
-            {BUILDING_KEYS.map((k) => (
-              <li key={k}>
-                <button className="link-row" onClick={() => setSelected(k)}>
-                  <img src={buildingImg(k, v.buildings[k])} alt="" width={40} height={40} />
-                  <span>{BUILDINGS[k].name}</span>
-                  <span className="lvl">niv. {v.buildings[k]}</span>
-                  <span className="muted small">{effect(k, v.buildings[k], world.speed)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-        {picker}
-      </div>
-    );
-
   const tribe = me.player.tribe;
-  const crest = tribe ? (
-    <TribeCrest id={tribe.id} tag={tribe.tag} size={style === 'etatmajor' ? 52 : 72} />
-  ) : (
-    <span className="vv-crest-plain">
-      <NavIcon name="village" size={30} />
-    </span>
-  );
-  const kicker = (
-    <span className="vv-kicker">
-      Village de {me.player.username}
-      {tribe && (
-        <>
-          {' '}
-          · <span className="vv-tag">[{tribe.tag}]</span> {tribe.name}
-        </>
-      )}
-    </span>
-  );
-  const title = renaming ? (
-    renameForm
-  ) : (
-    <h1 className="vv-name">
-      {v.name} <span className="vv-coords">({v.x}|{v.y})</span>
-      {renameBtn}
-    </h1>
-  );
-  const stats = (
-    <div className="vv-stats">
-      <div className="vv-stat">
-        <b>{fmt(v.points)}</b>
-        <span>points</span>
-      </div>
-      <div className={`vv-stat ${v.loyalty < 100 ? 'warn' : ''}`}>
-        <b>{Math.round(v.loyalty)}</b>
-        <span>loyauté</span>
-      </div>
-      <div className="vv-stat">
-        <b>
-          {v.buildQueue.length}/{BUILD_QUEUE_LIMIT}
-        </b>
-        <span>constructions</span>
-      </div>
-      <div className="vv-stat">
-        <b>x{world.speed}</b>
-        <span>vitesse</span>
-      </div>
-      {protectedUntil && (
-        <div className="vv-stat ok">
-          <b>{clockTime(protectedUntil)}</b>
-          <span>protégé jusqu'à</span>
-        </div>
-      )}
-    </div>
-  );
-  const warBanner = enemyIncoming.length > 0 && (
-    <div className="vv-war" role="alert">
-      <span className="vv-war-icon">
-        <NavIcon name="guerres" size={18} />
-      </span>
-      <span>
-        <b>
-          {enemyIncoming.length} attaque{enemyIncoming.length > 1 ? 's' : ''} en approche
-        </b>
-        <span className="vv-war-sub">
-          Prochaine arrivée dans <Countdown to={enemyIncoming[0].arriveAt} />
-        </span>
-      </span>
-    </div>
-  );
-
-  if (style === 'blason')
-    return (
-      <div className="village vv vv-blason">
-        <header className="vv-banner">
-          <div className="vv-banner-top">
-            {crest}
-            <div className="vv-title">
-              {kicker}
-              {title}
-            </div>
-            {warBanner}
-          </div>
-          {stats}
-        </header>
-        <IncomingDetail incoming={v.incoming} />
-        <div className="vv-frame">
-          <Scene v={v} selected={selected} onPick={pick} progress={progress} fancy />
-        </div>
-        {panel}
-        <Quests />
-        <div className="vv-grid2">
-          <QueueCard v={v} progress={qp} />
-          <BuildingTiles v={v} onPick={setSelected} selected={selected} />
-        </div>
-        {picker}
-      </div>
-    );
-
-  if (style === 'doree')
-    return (
-      <div className="village vv vv-doree">
-        <div className="vv-stage">
-          <Scene v={v} selected={selected} onPick={pick} progress={progress} fancy>
-            <span className="vv-light" aria-hidden />
-            <span className="vv-clouds" aria-hidden />
-          </Scene>
-          <div className="vv-hud">
-            <div className="vv-plaque">
-              {kicker}
-              {title}
-              <div className="vv-pills">
-                <span className="vv-pill">{fmt(v.points)} points</span>
-                <span className={`vv-pill ${v.loyalty < 100 ? 'warn' : ''}`}>Loyauté {Math.round(v.loyalty)}</span>
-                <span className="vv-pill">Vitesse x{world.speed}</span>
-                {protectedUntil && <span className="vv-pill ok">Protégé jusqu'au {clockTime(protectedUntil)}</span>}
-              </div>
-            </div>
-            {warBanner}
-          </div>
-          <QueueCard v={v} progress={qp} className="vv-hud-queue" />
-        </div>
-        <IncomingDetail incoming={v.incoming} />
-        {panel}
-        <Quests />
-        <BuildingTiles v={v} onPick={setSelected} selected={selected} />
-        {picker}
-      </div>
-    );
 
   return (
-    <div className="village vv vv-etatmajor">
-      <div className="vv-cols">
-        <div className="vv-main">
-          <header className="vv-head">
-            {crest}
-            <div className="vv-title">
-              {kicker}
-              {title}
+    <div className="village vv">
+      <div className="vv-stage">
+        <Scene v={v} selected={selected} onPick={pick} progress={progress}>
+          <span className="vv-light" aria-hidden />
+          <span className="vv-clouds" aria-hidden />
+        </Scene>
+        <div className="vv-hud">
+          <div className="vv-plaque">
+            <span className="vv-kicker">
+              Village de {me.player.username}
+              {tribe && (
+                <>
+                  {' '}
+                  · <span className="vv-tag">[{tribe.tag}]</span> {tribe.name}
+                </>
+              )}
+            </span>
+            {renaming ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  run(async () => {
+                    await api(`/api/villages/${v.id}/rename`, { body: { name } });
+                    setRenaming(false);
+                    await refreshMe();
+                  });
+                }}
+              >
+                <input id="village-name" value={name} onChange={(e) => setName(e.target.value)} minLength={2} maxLength={32} autoFocus />
+                <button className="btn small">Valider</button>
+              </form>
+            ) : (
+              <h1 className="vv-name">
+                {v.name} <span className="vv-coords">({v.x}|{v.y})</span>
+                <button className="link" onClick={() => (setName(v.name), setRenaming(true))}>
+                  renommer
+                </button>
+              </h1>
+            )}
+            <div className="vv-pills">
+              <span className="vv-pill">{fmt(v.points)} points</span>
+              <span className={`vv-pill ${v.loyalty < 100 ? 'warn' : ''}`}>Loyauté {Math.round(v.loyalty)}</span>
+              <span className="vv-pill">Vitesse x{world.speed}</span>
+              {protectedUntil && <span className="vv-pill ok">Protégé jusqu'au {clockTime(protectedUntil)}</span>}
             </div>
-            {stats}
-          </header>
-          {warBanner}
-          <IncomingDetail incoming={v.incoming} />
-          <div className="vv-map-frame">
-            <Scene v={v} selected={selected} onPick={pick} progress={progress} fancy />
           </div>
-          <Quests />
+          {enemyIncoming.length > 0 && (
+            <div className="vv-war" role="alert">
+              <span className="vv-war-icon">
+                <NavIcon name="guerres" size={18} />
+              </span>
+              <span>
+                <b>
+                  {enemyIncoming.length} attaque{enemyIncoming.length > 1 ? 's' : ''} en approche
+                </b>
+                <span className="vv-war-sub">
+                  Prochaine arrivée dans <Countdown to={enemyIncoming[0].arriveAt} />
+                </span>
+              </span>
+            </div>
+          )}
         </div>
-        <aside className="vv-side">
-          {panel}
-          <QueueCard v={v} progress={qp} />
-          <BuildingTiles v={v} onPick={setSelected} selected={selected} />
-        </aside>
+        <QueueCard v={v} progress={qp} className="vv-hud-queue" />
       </div>
-      {picker}
+      <IncomingDetail incoming={v.incoming} />
+      {selected && <BuildingPanel v={v} k={selected} onClose={() => setSelected(null)} />}
+      <Quests />
+      <BuildingTiles v={v} onPick={setSelected} selected={selected} />
     </div>
   );
 }

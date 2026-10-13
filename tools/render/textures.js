@@ -354,7 +354,7 @@ const GEN = {
     for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++) {
         const x = c * w + (r % 2 ? w / 2 : 0);
-        const base = mix(hex('#8e3b24'), hex('#b5583a'), rand());
+        const base = mix(hex('#86361f'), hex('#a94f34'), rand());
         wrapDraw(s, (dx) => {
           const g = ctx.createLinearGradient(x + dx, 0, x + dx + w, 0);
           g.addColorStop(0, rgb(base, 0.55));
