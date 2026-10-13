@@ -275,7 +275,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
 
 /** Population (places d'armée) offerte par la ferme : base au niveau 1, puis croissance par niveau. */
 export const POPULATION_BASE = 240;
-export const POPULATION_GROWTH = 1.17;
+export const POPULATION_GROWTH = 1.262;
 
 /** Défense de base d'un village, même vide. */
 export const BASE_VILLAGE_DEFENSE = 20;
