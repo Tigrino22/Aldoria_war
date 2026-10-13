@@ -189,7 +189,7 @@ Les ressources offertes sont retirées du village à la publication et rendues �
 
 ## Administration
 
-Page `#/admin` (menu « Aide » > « Administration »), en lecture seule : activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, offres du marché, totaux et paramètres du monde.
+Page `#/admin` (menu « Aide » > « Administration »), en lecture seule : activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
 
 Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).
 

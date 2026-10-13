@@ -68,7 +68,7 @@ describe('administration', () => {
     expect((await app.inject({ method: 'GET', url: '/api/me', headers: boss })).json().isAdmin).toBe(true);
 
     await tx((c) => createNpc(c, new Date(), 'raider'));
-    for (const url of ['/api/admin/npc?hours=24', '/api/admin/players', '/api/admin/market', '/api/admin/stats', '/api/admin/world']) {
+    for (const url of ['/api/admin/npc?hours=24', '/api/admin/players', '/api/admin/stats', '/api/admin/world']) {
       const res = await app.inject({ method: 'GET', url, headers: boss });
       expect(res.statusCode, url).toBe(200);
     }
