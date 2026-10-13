@@ -173,3 +173,7 @@
 .app .pg .movements .movement.type-attack, .app .pg .movements .movement.hostile { border-left-color: var(--danger); }
 .app .pg .movements .movement.type-support { border-left-color: var(--ok); }
 .app .pg .movements .movement .mv-time .countdown { color: var(--gold); }
+
+/* Titre de section entre deux séries de cartes. */
+.app .pg .pg-section { display: flex; align-items: center; gap: 8px; margin: 6px 0 -4px; font: 700 13px var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); }
+.app .pg .pg-section .pg-count { color: var(--ink); }
