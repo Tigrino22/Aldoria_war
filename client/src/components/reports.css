@@ -1,0 +1,22 @@
+/* Rapports, thème « Heure dorée ». */
+.app .pg.reports .report-legend { margin: 0; color: var(--muted); }
+.app .pg.reports .report-toolbar { margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.app .pg.reports .report-list { gap: 6px; }
+.app .pg.reports .report-list li { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 0 6px 0 12px; transition: border-color 0.15s; }
+.app .pg.reports .report-list li:last-child { border-bottom: 1px solid var(--line); }
+.app .pg.reports .report-list li:hover { border-color: rgb(224 178 60 / 0.5); }
+.app .pg.reports .report-list a { color: var(--ink); text-decoration: none; padding: 10px 6px; }
+.app .pg.reports .report-list a:hover { background: transparent; }
+.app .pg.reports .report-list a.unread { box-shadow: none; }
+.app .pg.reports .report-list a.unread > span:nth-child(2)::after { content: 'nouveau'; margin-left: 8px; font: 700 10px var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: #2b2018; background: var(--gold); border-radius: 999px; padding: 1px 7px; vertical-align: 2px; }
+.app .pg.reports .dot { box-shadow: 0 0 0 2px rgb(0 0 0 / 0.2); }
+.app .pg.reports .dot.tone-scout { background: #7aa7c7; }
+
+/* Détail d'un rapport. */
+.app .pg.reports .rp-body h3 { font: 700 15px var(--display); letter-spacing: 0.01em; text-transform: none; color: var(--ink); margin: 6px 0 0; }
+.app .pg.reports .rp-body h3 a { color: var(--pg-link); }
+.app .pg.reports .verdict { font-size: 22px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); text-align: center; }
+.app .pg.reports .verdict.win { color: var(--gold); border-color: rgb(224 178 60 / 0.55); }
+.app .pg.reports .verdict.loss { color: #ff8a7a; border-color: rgb(224 72 72 / 0.55); }
+.app .pg.reports .rp-body .cost { padding: 8px 12px; border-radius: 10px; background: var(--panel-2); }
+.app .pg.reports .rp-body .troop-table { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
