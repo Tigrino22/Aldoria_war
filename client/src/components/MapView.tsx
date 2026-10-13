@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Application, Assets, BitmapText, Container, Graphics, GraphicsContext, Sprite, Texture, TilingSprite } from 'pixi.js';
+import { Application, Assets, BitmapText, Container, Graphics, GraphicsContext, Sprite, TextStyle, Texture, TilingSprite } from 'pixi.js';
 import type { MapMovement, MapRelations, MapVillage } from '@aldoria/shared';
 import { api } from '../api';
 import { MAP_IMG } from '../assets';
@@ -264,9 +264,11 @@ export default function MapView({ focus }: { focus?: string }) {
       }
       lines.stroke({ width: 2, color: 0x1c140c, alpha: 0.35 });
       strongGrid.addChild(lines);
+      // Un seul style partagé : avec un contour, Pixi crée une police bitmap par objet TextStyle (une centaine sinon).
+      const coordStyle = new TextStyle({ fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: '700', fill: 0xf3e9d2, stroke: { color: 0x1c140c, width: 3 } });
       for (let gx = 0; gx < size; gx += 10) {
         for (let gy = 0; gy < size; gy += 10) {
-          const t = new BitmapText({ text: `${gx}|${gy}`, style: { fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: '700', fill: 0xf3e9d2, stroke: { color: 0x1c140c, width: 3 } } });
+          const t = new BitmapText({ text: `${gx}|${gy}`, style: coordStyle });
           t.alpha = 0.8;
           t.position.set(gx * TILE + 6, gy * TILE + 4);
           strongGrid.addChild(t);

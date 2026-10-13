@@ -92,7 +92,16 @@ export default async function statsRoutes(app: FastifyInstance) {
                 (SELECT count(*)::int FROM commands WHERE type = 'attack' AND processed AND arrive_at > now() - interval '24 hours') AS "attacks24h",
                 (SELECT count(*)::int FROM conquest_log WHERE at > now() - interval '24 hours') AS "conquests24h",
                 (SELECT count(*)::int FROM conquest_log WHERE at > now() - interval '7 days') AS "conquests7d",
-                (SELECT count(*)::int FROM tribe_wars WHERE ended_at IS NULL AND until > now()) AS "tribeWars"`,
+                (SELECT count(*)::int FROM (
+                   SELECT least(declarer_id, target_id), greatest(declarer_id, target_id)
+                   FROM tribe_wars WHERE ended_at IS NULL AND until > now()
+                   UNION
+                   SELECT least(t.id, e.id), greatest(t.id, e.id)
+                   FROM tribes t JOIN tribes e ON e.id = (t.npc_state->'war'->>'enemyId')::int
+                   WHERE $1 AND t.is_npc AND (t.npc_state->'war'->>'until')::timestamptz > now()
+                 ) w) AS "tribeWars"`,
+        // Même décompte que la page Guerres du monde : guerres déclarées entre joueurs et guerres des tribus de PNJ, chaque paire une fois.
+        [!!env.npcWars],
       ),
       pool.query(
         `SELECT width_bucket(points, ARRAY[100, 250, 500, 1000, 2000]) AS bucket, count(*)::int AS n
