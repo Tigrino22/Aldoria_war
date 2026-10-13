@@ -146,7 +146,7 @@
   .app .pg-banner-top { gap: 12px; flex-wrap: nowrap; align-items: center; }
   .app .pg-banner-top:has(.pg-banner-actions) { flex-wrap: wrap; }
   .app .pg-banner-actions { margin-left: 0; width: 100%; }
-  .app .pg-banner-actions .btn { flex: 1; }
+  .app .pg-banner-actions .btn { flex: 1; justify-content: center; text-align: center; }
   .app .pg-medal { width: 48px; height: 48px; }
   .app .pg-medal svg { width: 24px; height: 24px; }
   .app .pg-media img { width: 64px; height: 64px; }
