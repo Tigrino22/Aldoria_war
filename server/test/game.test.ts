@@ -260,6 +260,24 @@ describe('jeu', () => {
     const mine = (await app.inject({ method: 'GET', url: '/api/map', headers: auth(a.token) })).json().find((v: { ownerName: string }) => v.ownerName === 'Gauvain');
     expect(mine.protected).toBe(true);
 
+    // Icônes de mouvement : Yvain attaque Gauvain et soutient un tiers ; chacun ne voit que ce qui le concerne.
+    const [ga, yv] = (await pool.query("SELECT v.id FROM villages v JOIN players p ON p.id = v.owner_id WHERE p.username IN ('Gauvain', 'Yvain') ORDER BY p.username")).rows.map((r) => r.id);
+    const third = (await pool.query('SELECT id FROM villages WHERE id NOT IN ($1, $2) LIMIT 1', [ga, yv])).rows[0].id;
+    const yvainId = (await pool.query("SELECT id FROM players WHERE username = 'Yvain'")).rows[0].id;
+    for (const [type, target] of [['attack', ga], ['support', ga], ['support', third]] as const) {
+      await pool.query(
+        `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, loot, sent_at, arrive_at)
+         VALUES ($1, $2, $3, $2, $4, '{}', '{}', now(), now() + interval '1 hour')`,
+        [type, yv, target, yvainId],
+      );
+    }
+    const moves = (who: string) => app.inject({ method: 'GET', url: '/api/map/movements', headers: auth(who) }).then((r) => r.json());
+    expect(await moves(a.token)).toEqual([{ villageId: ga, attack: true, support: true, threat: true }]);
+    const seenByB = await moves(b.token);
+    expect(seenByB).toHaveLength(2);
+    expect(seenByB).toContainEqual({ villageId: ga, attack: true, support: true, threat: false });
+    expect(seenByB).toContainEqual({ villageId: third, attack: false, support: true, threat: false });
+
     const msg = await app.inject({ method: 'POST', url: '/api/messages', headers: auth(b.token), payload: { to: 'gauvain', subject: 'Salut', body: 'On attaque ce soir ?' } });
     expect(msg.statusCode).toBe(200);
     const inbox = (await app.inject({ method: 'GET', url: '/api/messages', headers: auth(a.token) })).json();

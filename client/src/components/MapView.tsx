@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Application, Assets, BitmapText, Container, Graphics, GraphicsContext, Sprite, Texture, TilingSprite } from 'pixi.js';
-import type { MapRelations, MapVillage } from '@aldoria/shared';
+import type { MapMovement, MapRelations, MapVillage } from '@aldoria/shared';
 import { api } from '../api';
 import { MAP_IMG } from '../assets';
 import { useGame } from '../game';
@@ -22,7 +22,7 @@ const NAME_ZOOM = 0.6;
 const NO_RELATIONS: MapRelations = { warTribeIds: [], allyTribeIds: [] };
 
 /** Dernière carte reçue : la rouvrir s'affiche tout de suite, la mise à jour arrive ensuite. */
-let cache: { villages: MapVillage[]; relations: MapRelations } | null = null;
+let cache: { villages: MapVillage[]; relations: MapRelations; movements: MapMovement[] } | null = null;
 
 /** Préférences d'affichage de la carte, gardées dans le navigateur. */
 function readPref(key: string, fallback: boolean): boolean {
@@ -51,7 +51,7 @@ interface Scene {
   strongGrid: Container;
   overlay: Graphics;
   textures: Record<string, Texture>;
-  shapes: { ring: GraphicsContext; shadow: GraphicsContext };
+  shapes: { ring: GraphicsContext; shadow: GraphicsContext; attack: GraphicsContext; threat: GraphicsContext; support: GraphicsContext };
   /** Sprites de décor par case, masqués sous les villages. */
   decoAt: Map<string, Sprite[]>;
   /** Villages déjà dessinés, avec la signature de leur apparence pour ne redessiner que ce qui change. */
@@ -72,6 +72,7 @@ export default function MapView({ focus }: { focus?: string }) {
   const miniRef = useRef<HTMLCanvasElement>(null);
   const [villages, setVillages] = useState<MapVillage[]>(cache?.villages ?? []);
   const [relations, setRelations] = useState<MapRelations>(cache?.relations ?? NO_RELATIONS);
+  const [movements, setMovements] = useState<MapMovement[]>(cache?.movements ?? []);
   const [marks, setMarks] = useState<Mark[]>(() => readMarks(me.player.id));
   const [selected, setSelected] = useState<MapVillage | null>(null);
   const [hovered, setHovered] = useState<MapVillage | null>(null);
@@ -105,10 +106,15 @@ export default function MapView({ focus }: { focus?: string }) {
   const load = useCallback(
     () =>
       run(async () => {
-        const [list, rel] = await Promise.all([api<MapVillage[]>('/api/map'), api<MapRelations>('/api/map/relations').catch(() => NO_RELATIONS)]);
-        cache = { villages: list, relations: rel };
+        const [list, rel, moves] = await Promise.all([
+          api<MapVillage[]>('/api/map'),
+          api<MapRelations>('/api/map/relations').catch(() => NO_RELATIONS),
+          api<MapMovement[]>('/api/map/movements').catch(() => []),
+        ]);
+        cache = { villages: list, relations: rel, movements: moves };
         setVillages(list);
         setRelations(rel);
+        setMovements(moves);
       }),
     [run],
   );
@@ -290,6 +296,9 @@ export default function MapView({ focus }: { focus?: string }) {
           .ellipse(TILE / 2, TILE * 0.74, TILE * 0.47, TILE * 0.2)
           .stroke({ width: 2.5, color: 0xffffff, alpha: 0.95 }),
         shadow: new GraphicsContext().ellipse(TILE / 2, TILE * 0.76, TILE * 0.38, TILE * 0.14).fill({ color: 0x000000, alpha: 0.3 }),
+        attack: swordsBadge(false),
+        threat: swordsBadge(true),
+        support: shieldBadge(),
       };
 
       // Dessin à la demande : une image seulement quand quelque chose change.
@@ -539,16 +548,18 @@ export default function MapView({ focus }: { focus?: string }) {
     const n = Math.ceil(world.mapSize / CHUNK);
     const seen = new Set<number>();
     for (const d of s.decoAt.values()) for (const sp of d) sp.visible = true;
+    const moves = new Map(movements.map((m) => [m.villageId, m]));
     for (const v of villages) {
       seen.add(v.id);
+      const mv = moves.get(v.id);
       s.decoAt.get(`${v.x},${v.y}`)?.forEach((sp) => (sp.visible = false));
       const st = styleOf(v, colors);
       const chunk = Math.floor(v.y / CHUNK) * n + Math.floor(v.x / CHUNK);
-      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${st.color}|${st.rel}`;
+      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${st.color}|${st.rel}|${mv ? `${+mv.attack}${+mv.support}${+mv.threat}` : ''}`;
       const prev = s.drawn.get(v.id);
       if (prev && prev.sig === sig && prev.chunk === chunk) continue;
       if (prev) prev.node.destroy({ children: true });
-      const node = drawVillage(s, v, st.color, st.rel === 'active' || st.rel === 'own');
+      const node = drawVillage(s, v, st.color, st.rel === 'active' || st.rel === 'own', mv);
       s.villageChunks[chunk].addChild(node);
       s.drawn.set(v.id, { node, sig, chunk });
     }
@@ -596,7 +607,7 @@ export default function MapView({ focus }: { focus?: string }) {
     }
     miniBase.current = base;
     s.request();
-  }, [villages, colors, world.mapSize, miniTerrain, ready]);
+  }, [villages, movements, colors, world.mapSize, miniTerrain, ready]);
 
   // Village choisi et case survolée : un simple calque par-dessus.
   useEffect(() => {
@@ -766,7 +777,14 @@ export default function MapView({ focus }: { focus?: string }) {
               <p className="muted small">C'est votre village actif.</p>
             ) : (
               <>
-                <SendTroops target={selected} protectedTarget={selected.protected} onSent={() => setSelected(null)} />
+                <SendTroops
+                  target={selected}
+                  protectedTarget={selected.protected}
+                  onSent={() => {
+                    setSelected(null);
+                    load();
+                  }}
+                />
                 <div className="row wrap">
                   <a className="btn ghost small" href={`#/ralliement/${selected.x},${selected.y}`}>
                     Point de ralliement
@@ -792,7 +810,7 @@ function rank(rel: string) {
 }
 
 /** Un village : ombre, socle à la couleur de la relation, bâtiments, bannière et nom. */
-function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean): Container {
+function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?: MapMovement): Container {
   const c = new Container();
   c.position.set(v.x * TILE, v.y * TILE);
   const tint = hexToNum(color);
@@ -816,6 +834,18 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean): Con
     f.tint = tint;
     c.addChild(f);
   }
+  // Mouvements en route vers ce village : petits médaillons empilés en haut à droite (attaque au-dessus, soutien en dessous).
+  if (mv && (mv.attack || mv.support)) {
+    const badges: GraphicsContext[] = [];
+    if (mv.attack) badges.push(mv.threat ? s.shapes.threat : s.shapes.attack);
+    if (mv.support) badges.push(s.shapes.support);
+    badges.forEach((ctx, i) => {
+      const b = new Graphics(ctx);
+      // À droite du drapeau d'un village de joueur ; plus près du toit d'un village barbare, plus petit et sans drapeau.
+      b.position.set(TILE * (v.ownerId ? 1.1 : 0.9), TILE * ((v.ownerId ? 0.08 : 0.18) + i * 0.32));
+      c.addChild(b);
+    });
+  }
   // Étiquette : pastille sombre, point de couleur et nom (texte bitmap partagé, bien plus léger qu'un texte par village).
   const label = new Container();
   label.label = 'name';
@@ -837,4 +867,45 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean): Con
   label.visible = s.world.scale.x >= NAME_ZOOM;
   c.addChild(label);
   return c;
+}
+
+/** Médaillon des icônes de mouvement (charte : disque de bois sombre cerclé d'or), centré sur l'origine. */
+function medallion(g: GraphicsContext, danger: boolean) {
+  return g
+    .circle(0, 0, 10)
+    .fill({ color: 0x000000, alpha: 0.35 })
+    .circle(0, 0, 9)
+    .fill({ color: danger ? 0x5a1512 : 0x2a1f15, alpha: 0.94 })
+    .circle(0, 0, 9)
+    .stroke({ width: 1.2, color: danger ? 0xe04848 : 0xe0b23c, alpha: 0.9 });
+}
+
+/** Deux épées croisées, fines : or pour vos attaques, ivoire sur fond rouge pour une attaque qui vise l'un de vos villages. */
+function swordsBadge(danger: boolean) {
+  const ink = danger ? 0xffd9cf : 0xf1cc63;
+  const g = medallion(new GraphicsContext(), danger);
+  for (const d of [1, -1]) {
+    g.moveTo(-4.6 * d, 4.6).lineTo(4.4 * d, -4.4).stroke({ width: 1.5, color: ink, cap: 'round' });
+    g.moveTo(-4.4 * d, 1.6).lineTo(-1.6 * d, 4.4).stroke({ width: 1.3, color: ink, cap: 'round' });
+    g.circle(-5.4 * d, 5.4, 0.9).fill({ color: ink });
+  }
+  return g;
+}
+
+/** Écu à pointe, or, partagé d'un filet sombre. */
+function shieldBadge() {
+  return medallion(new GraphicsContext(), false)
+    .moveTo(-4.6, -5)
+    .lineTo(4.6, -5)
+    .lineTo(4.6, -0.4)
+    .quadraticCurveTo(4.4, 3.6, 0, 5.8)
+    .quadraticCurveTo(-4.4, 3.6, -4.6, -0.4)
+    .closePath()
+    .fill({ color: 0xf1cc63 })
+    .moveTo(0, -4.4)
+    .lineTo(0, 5)
+    .stroke({ width: 1, color: 0x2b2018, alpha: 0.55 })
+    .moveTo(-3.9, -1.2)
+    .lineTo(3.9, -1.2)
+    .stroke({ width: 1, color: 0x2b2018, alpha: 0.55 });
 }
