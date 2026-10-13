@@ -69,3 +69,18 @@
 .war-warriors { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 .war-warriors li { padding-right: 2px; }
 .war-warrior-score { float: right; color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Classement, thème « Heure dorée » : rangs en médaillons, les trois premiers en or, argent et bronze. */
+.app .pg.ranking .rk-sub { align-self: flex-start; }
+.app .pg.ranking .rk-sub button { min-height: 32px; font-size: 12px; padding: 4px 14px; }
+.app .pg .rk-rank {
+  display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; font: 700 13px var(--display); font-variant-numeric: tabular-nums;
+  color: var(--muted); background: var(--panel-2); border: 1px solid var(--line);
+}
+.app .pg .rk-rank.r1 { color: #2b2018; border-color: #f6dc8c; background: radial-gradient(circle at 35% 30%, #f1cc63, #a77a14 75%); }
+.app .pg .rk-rank.r2 { color: #23262b; border-color: #d9dde2; background: radial-gradient(circle at 35% 30%, #e4e7ea, #8a939d 75%); }
+.app .pg .rk-rank.r3 { color: #fff3e0; border-color: #d9a070; background: radial-gradient(circle at 35% 30%, #d08a55, #7c4722 75%); }
+.app .pg.ranking .rank-table td:nth-child(2) a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.app .pg.ranking .rank-table td:nth-child(2) a:hover { color: var(--gold); }
+.app .pg.ranking .rank-table td:last-child { font-weight: 700; }
+.app .pg .wr-card.me { outline-color: var(--gold); }

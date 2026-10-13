@@ -5,7 +5,10 @@ import { fmt } from '../format';
 import { useGame, useNow } from '../game';
 import IncomingDetail from './IncomingDetail';
 import { ManagerSwitch, useManager } from './Manager';
-import { Countdown, Panel, ResIcon, UnitList, liveResources } from '../ui';
+import { buildingImg } from '../assets';
+import { Countdown, ResIcon, UnitList, liveResources } from '../ui';
+import { PageBanner } from './PageBanner';
+import './overview.css';
 
 export default function Overview() {
   const { me, run, setVillageId, villageId } = useGame();
@@ -28,39 +31,56 @@ export default function Overview() {
   };
 
   return (
-    <div className="stack">
-      <Panel title={`Vue d'ensemble (${villages.length} village${villages.length > 1 ? 's' : ''})`}>
-        <p className="muted small">
-          Total en stock :{' '}
-          {RESOURCES.map((r, i) => (
-            <span key={r} className="inline-res">
-              <ResIcon r={r} size={16} /> {fmt(Math.floor(total[i]))}{' '}
-            </span>
-          ))}
-        </p>
-        <p className="row">
-          <button className="btn small" onClick={() => (location.hash = '#/gestionnaire')}>Gestionnaire de compte</button>
-          <span className="muted small">Construction et recrutement automatiques, par modèle (offensif, défensif…)</span>
-        </p>
-      </Panel>
+    <div className="pg overview">
+      <PageBanner
+        icon="apercu"
+        kicker="Village"
+        title="Mes villages"
+        lead="Tous vos villages d'un coup d'œil : ressources, constructions, recrutements et troupes."
+        actions={
+          <button className="btn small" onClick={() => (location.hash = '#/gestionnaire')}>
+            Gestionnaire de compte
+          </button>
+        }
+        stats={[
+          { value: villages.length, label: villages.length > 1 ? 'villages' : 'village', tone: 'gold' },
+          ...RESOURCES.map((r, i) => ({
+            value: (
+              <span className="ov-res">
+                <ResIcon r={r} size={18} /> {fmt(Math.floor(total[i]))}
+              </span>
+            ),
+            label: `${RESOURCE_NAMES[r]} en stock`,
+          })),
+        ]}
+      />
+      <p className="muted small ov-hint">Le gestionnaire de compte construit et recrute automatiquement, par modèle (offensif, défensif…).</p>
       {villages.map((v) => {
         const res = liveResources(v, now);
         const attacks = v.incoming.filter((c) => c.type === 'attack');
         const next = v.buildQueue[0];
         return (
-          <Panel
-            key={v.id}
-            title={`${v.name} (${v.x}|${v.y})${v.id === villageId ? ' · actif' : ''}`}
-            actions={
-              <div className="row">
+          <section key={v.id} className={`pg-card ov-village ${v.id === villageId ? 'active' : ''} ${attacks.length ? 'threat' : ''}`}>
+            <header className="ov-head">
+              <img src={buildingImg('townhall', Math.max(v.buildings.townhall, 1))} alt="" width={56} height={56} />
+              <div className="ov-title">
+                <h2>
+                  {v.name} <em>({v.x}|{v.y})</em>
+                </h2>
+                <span className="muted small">
+                  {fmt(v.points)} points · loyauté {v.loyalty} %
+                  {v.market.merchants > 0 && ` · marchands ${v.market.available}/${v.market.merchants}`}
+                </span>
+              </div>
+              {v.id === villageId && <span className="pg-pill gold">Village actif</span>}
+              <div className="row ov-actions">
                 <button className="btn small" onClick={() => open(v.id, 'village')}>Village</button>
                 <button className="btn small" onClick={() => open(v.id, 'caserne')}>Caserne</button>
                 <button className="btn small" onClick={() => open(v.id, 'troupes')}>Troupes</button>
               </div>
-            }
-          >
+            </header>
             {attacks.length > 0 && (
-              <p className="warn">
+              <p className="ov-war">
                 {attacks.length} attaque{attacks.length > 1 ? 's' : ''} en approche : la première arrive dans <Countdown to={attacks[0].arriveAt} />
               </p>
             )}
@@ -77,42 +97,53 @@ export default function Overview() {
                 </div>
               );
             })()}
-            <p>
+            <div className="ov-res-grid">
               {RESOURCES.map((r) => (
-                <span key={r} className={`inline-res ${res[r] >= v.capacity ? 'full' : ''}`} title={RESOURCE_NAMES[r]}>
-                  <ResIcon r={r} size={16} /> {fmt(Math.floor(res[r]))}/{fmt(v.capacity)}{' '}
+                <span key={r} className={`ov-res-tile ${res[r] >= v.capacity ? 'full' : ''}`} title={RESOURCE_NAMES[r]}>
+                  <span className="ov-res">
+                    <ResIcon r={r} size={18} /> <b>{fmt(Math.floor(res[r]))}</b>
+                    <span className="muted small">/{fmt(v.capacity)}</span>
+                  </span>
+                  <span className="pg-progress">
+                    <i style={{ width: `${Math.min(100, Math.round((res[r] / Math.max(1, v.capacity)) * 100))}%` }} />
+                  </span>
                 </span>
               ))}
-            </p>
-            <p className="muted small">
-              {fmt(v.points)} points · loyauté {v.loyalty} %
-              {v.market.merchants > 0 && ` · marchands ${v.market.available}/${v.market.merchants}`}
-            </p>
-            <p>
-              <b>Construction :</b>{' '}
-              {next ? (
-                <>
-                  {BUILDINGS[next.building].name} → niveau {next.level} <Countdown to={next.finishAt} />
-                  {v.buildQueue.length > 1 && <span className="muted"> (+{v.buildQueue.length - 1} en file)</span>}
-                </>
-              ) : (
-                <span className="muted">file vide</span>
-              )}
-            </p>
-            <p>
-              <b>Recrutement :</b>{' '}
-              {v.recruitQueue.length ? (
-                <>
-                  {v.recruitQueue.length} commande{v.recruitQueue.length > 1 ? 's' : ''} en cours
-                </>
-              ) : (
-                <span className="muted">aucun</span>
-              )}
-            </p>
-            <p>
-              <b>Troupes ({fmt(totalUnits(v.troopsHome))}) :</b> <UnitList units={v.troopsHome} />
-            </p>
-          </Panel>
+            </div>
+            <dl className="ov-facts">
+              <div>
+                <dt>Construction</dt>
+                <dd>
+                  {next ? (
+                    <>
+                      {BUILDINGS[next.building].name} → niveau {next.level} <Countdown to={next.finishAt} />
+                      {v.buildQueue.length > 1 && <span className="muted"> (+{v.buildQueue.length - 1} en file)</span>}
+                    </>
+                  ) : (
+                    <span className="muted">file vide</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Recrutement</dt>
+                <dd>
+                  {v.recruitQueue.length ? (
+                    <>
+                      {v.recruitQueue.length} commande{v.recruitQueue.length > 1 ? 's' : ''} en cours
+                    </>
+                  ) : (
+                    <span className="muted">aucun</span>
+                  )}
+                </dd>
+              </div>
+              <div className="wide">
+                <dt>Troupes ({fmt(totalUnits(v.troopsHome))})</dt>
+                <dd>
+                  <UnitList units={v.troopsHome} />
+                </dd>
+              </div>
+            </dl>
+          </section>
         );
       })}
     </div>

@@ -3,7 +3,9 @@ import { BUILDINGS, BUILDING_KEYS, RESOURCES, UNIT_KEYS, type AttackReportData, 
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame, useRoute } from '../game';
-import { Panel, PlayerLink, ResIcon, UnitIcon, UnitList } from '../ui';
+import { PlayerLink, ResIcon, UnitIcon, UnitList } from '../ui';
+import { PageBanner } from './PageBanner';
+import './reports.css';
 
 function TroopTable({ units, losses }: { units: UnitCounts | null; losses: UnitCounts | null }) {
   if (!units) return <p className="muted small">Aucun survivant n'a pu observer les défenseurs.</p>;
@@ -159,34 +161,38 @@ export default function Reports({ id }: { id?: number }) {
 
   if (id && report) {
     return (
-      <Panel
-        title={report.title}
-        actions={
-          <div className="row">
-            <button className="btn small ghost" onClick={() => go('rapports')}>Retour</button>
-            <button
-              className="btn small"
-              onClick={() => run(async () => { await api(`/api/reports/${id}`, { method: 'DELETE' }); go('rapports'); })}
-            >
-              Supprimer
-            </button>
-          </div>
-        }
-      >
-        <p className="muted small">{clockTime(report.createdAt)}</p>
-        {report.type === 'scout' ? (
-          <ScoutReport d={report.data} />
-        ) : report.type === 'trade' ? (
-          <TradeReport d={report.data} />
-        ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
-          <AttackReport d={report.data} />
-        ) : (
-          <div className="stack">
-            {report.data.units && <UnitList units={report.data.units} />}
-            {report.data.from && <p>Depuis {report.data.from}</p>}
-          </div>
-        )}
-      </Panel>
+      <div className="pg reports">
+        <PageBanner
+          icon="rapports"
+          kicker={`Rapport · ${clockTime(report.createdAt)}`}
+          title={report.title}
+          actions={
+            <>
+              <button className="btn small" onClick={() => go('rapports')}>← Retour</button>
+              <button
+                className="btn small danger"
+                onClick={() => run(async () => { await api(`/api/reports/${id}`, { method: 'DELETE' }); go('rapports'); })}
+              >
+                Supprimer
+              </button>
+            </>
+          }
+        />
+        <section className="pg-card rp-body">
+          {report.type === 'scout' ? (
+            <ScoutReport d={report.data} />
+          ) : report.type === 'trade' ? (
+            <TradeReport d={report.data} />
+          ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
+            <AttackReport d={report.data} />
+          ) : (
+            <div className="stack">
+              {report.data.units && <UnitList units={report.data.units} />}
+              {report.data.from && <p>Depuis {report.data.from}</p>}
+            </div>
+          )}
+        </section>
+      </div>
     );
   }
 
@@ -236,10 +242,20 @@ function ReportList() {
     });
 
   return (
-    <Panel
-      title={archives ? 'Rapports archivés' : 'Rapports'}
-      actions={<button className="btn small ghost" onClick={() => setArchives(!archives)}>{archives ? 'Retour aux rapports' : 'Archives'}</button>}
-    >
+    <div className="pg reports">
+      <PageBanner
+        icon="rapports"
+        kicker="Social"
+        title={archives ? 'Rapports archivés' : 'Rapports'}
+        lead="Combats, espionnages, livraisons et renforts : tout ce qui s'est passé autour de vos villages."
+        actions={<button className="btn small" onClick={() => setArchives(!archives)}>{archives ? 'Retour aux rapports' : 'Archives'}</button>}
+        stats={[
+          { value: list.length, label: archives ? 'archivés' : 'rapports', tone: 'gold' },
+          { value: list.filter((r) => !r.read).length, label: 'non lus' },
+          { value: list.filter((r) => r.tone === 'loss').length, label: 'défaites', tone: list.some((r) => r.tone === 'loss') ? 'red' : '' },
+        ]}
+      />
+      <section className="pg-card">
       <ul className="report-legend row small">
         {LEGEND.map((l) => (
           <li key={l.tone}><span className={`dot tone-${l.tone}`} /> {l.label}</li>
@@ -293,6 +309,7 @@ function ReportList() {
           ))}
         </ul>
       )}
-    </Panel>
+      </section>
+    </div>
   );
 }

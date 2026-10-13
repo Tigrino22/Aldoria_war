@@ -45,7 +45,9 @@ import { buildingImg } from '../assets';
 import { duration, fmt } from '../format';
 import { useGame, useRoute } from '../game';
 import { Cost, Panel, ResIcon, UnitIcon } from '../ui';
+import { PageBanner } from './PageBanner';
 import WikiGuide from './WikiGuide';
+import './wiki.css';
 
 // Toutes les valeurs affichées ici sont calculées à partir de @aldoria/shared, exactement comme sur le serveur :
 // modifier l'équilibrage dans shared/src/config.ts met le wiki à jour automatiquement.
@@ -141,9 +143,19 @@ function unitNote(key: UnitKey): string | null {
 
 export default function Wiki({ section, item }: { section?: string; item?: string }) {
   const [, go] = useRoute();
+  const { world } = useGame();
   const current = SECTIONS.find((s) => s.id === section)?.id;
+  const sectionTitle = SECTIONS.find((s) => s.id === current)?.title;
 
   return (
+    <div className="pg wiki-pg">
+      <PageBanner
+        icon="wiki"
+        kicker={current ? `Wiki · ${sectionTitle}` : "Aide de jeu"}
+        title={<>Wiki d'<em>Aldoria War</em></>}
+        lead={!current ? 'Les règles du jeu, les fiches des bâtiments et des troupes, calculées directement à partir des règles du serveur.' : undefined}
+        chips={<span className="pg-pill gold">Vitesse x{world.speed}</span>}
+      />
     <div className="wiki">
       <nav className="wiki-toc" aria-label="Sommaire du wiki">
         <a href="#/wiki" className={!current ? 'active' : ''}>Sommaire</a>
@@ -168,13 +180,14 @@ export default function Wiki({ section, item }: { section?: string; item?: strin
         )}
       </div>
     </div>
+    </div>
   );
 }
 
 function Home() {
   const { world } = useGame();
   return (
-    <Panel title="Wiki d'Aldoria War">
+    <Panel title="Sommaire">
       <p>
         Tout ce qu'il faut savoir pour faire grandir votre village. Les chiffres de ce wiki sont calculés directement à partir des règles du jeu, ils sont donc
         toujours à jour. Ce monde tourne en <b>vitesse x{world.speed}</b> : les productions sont multipliées par {world.speed} et les durées divisées par {world.speed}.

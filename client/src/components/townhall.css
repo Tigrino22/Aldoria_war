@@ -1,0 +1,46 @@
+/* Hôtel de ville, thème « Heure dorée » : bannière du village, file de construction et fiches de bâtiments. */
+.app .pg .th-res { display: inline-flex; align-items: center; gap: 6px; }
+.app .pg .th-res img { flex: none; }
+.app .pg .th-res.full { color: #ff8a7a; }
+
+.app .pg .th-queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.app .pg .th-queue li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.app .pg .th-queue img { flex: none; }
+.app .pg .th-q-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.app .pg .th-q-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-weight: 600; }
+.app .pg .th-q-top b { font-variant-numeric: tabular-nums; color: var(--gold); }
+
+.app .pg .th-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.app .pg .th-card {
+  display: flex; gap: 12px; padding: 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line);
+  transition: border-color 0.15s;
+}
+.app .pg .th-card:hover { border-color: rgb(224 178 60 / 0.5); }
+.app .pg .th-card.building { border-color: var(--gold); box-shadow: inset 0 0 0 1px rgb(224 178 60 / 0.45); }
+.app .pg .th-card-media { position: relative; flex: none; align-self: flex-start; }
+.app .pg .th-card-media img { display: block; filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.35)); }
+/* Sceau de cire : niveau du bâtiment. */
+.app .pg .th-seal {
+  position: absolute; left: -4px; bottom: -2px; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
+  font: 700 12px var(--body); color: #fff3e0; font-variant-numeric: tabular-nums;
+  background: radial-gradient(circle at 35% 30%, #c4413a, #6e1414 80%); box-shadow: 0 0 0 2px rgb(0 0 0 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+.app .pg .th-card.maxed .th-seal { background: radial-gradient(circle at 35% 30%, #f1cc63, #a77a14 75%); color: #2b2018; }
+.app .pg .th-card-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.app .pg .th-card-body h4 { margin: 0; font: 700 16px var(--display); }
+.app .pg .th-up { color: var(--gold); font: 700 13px var(--body); }
+.app .pg .th-next { padding-top: 4px; border-top: 1px dashed var(--line); }
+.app .pg .th-max { color: var(--gold); font-weight: 600; }
+.app .pg .th-card-body .btn { align-self: flex-start; margin-top: 4px; }
+
+@media (max-width: 640px) {
+  .app .pg .th-grid { grid-template-columns: minmax(0, 1fr); }
+  .app .pg .th-card-media img { width: 60px; height: 60px; }
+  .app .pg .th-card-body .btn { align-self: stretch; }
+  .app .pg .th-queue li { flex-wrap: wrap; }
+  .app .pg .th-q-body { flex: 1 1 calc(100% - 60px); }
+  .app .pg .th-queue li > .btn { margin-left: auto; }
+  /* Les ressources sont déjà dans la barre du haut : seul l'entrepôt reste. */
+  .app .pg .th-stats { grid-template-columns: minmax(0, 1fr); }
+  .app .pg .th-stats .th-res-tile { display: none; }
+}

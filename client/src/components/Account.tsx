@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { api } from '../api';
 import { useGame } from '../game';
 import { Panel } from '../ui';
+import { PageBanner } from './PageBanner';
+import './account.css';
 
 /** Compte : déconnexion, données personnelles et suppression définitive du compte. */
 export default function Account() {
@@ -16,16 +18,18 @@ export default function Account() {
     });
 
   return (
-    <div className="stack">
-      <Panel title="Mon compte">
-        <p>
-          Connecté en tant que <b>{me.player.username}</b>
-          {me.player.tribe && <> · tribu [{me.player.tribe.tag}] {me.player.tribe.name}</>}
-        </p>
-        <div className="row">
-          <button className="btn" onClick={logout}>Se déconnecter</button>
-        </div>
-      </Panel>
+    <div className="pg account">
+      <PageBanner
+        icon="compte"
+        kicker="Mon compte"
+        title={me.player.username}
+        lead={me.player.tribe ? <>Membre de la tribu <b>[{me.player.tribe.tag}] {me.player.tribe.name}</b></> : 'Sans tribu pour le moment'}
+        actions={<button className="btn" onClick={logout}>Se déconnecter</button>}
+        stats={[
+          { value: me.player.points, label: 'Points', tone: 'gold' },
+          { value: me.villages.length, label: me.villages.length > 1 ? 'Villages' : 'Village' },
+        ]}
+      />
 
       <Panel title="Vos données">
         <p className="small">

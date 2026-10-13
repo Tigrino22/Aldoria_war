@@ -1,0 +1,5 @@
+/* Mon compte et profil d'un joueur, thème « Heure dorée » (docs/CHARTE-GRAPHIQUE.md). */
+.app .pg.account > .panel:last-child { border-left: 4px solid var(--danger); }
+.app .pg.account > .panel:last-child .panel-head h2 { color: var(--danger); }
+.app .pg.account .market-form { max-width: 420px; }
+.app .pg .pf-villages td:first-child { text-align: left; font-weight: 600; }

@@ -15,7 +15,9 @@ import {
 import { api } from '../api';
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
+import { buildingImg } from '../assets';
 import { Countdown, liveResources, Panel, ResIcon } from '../ui';
+import { PageBanner } from './PageBanner';
 import './offers.css';
 
 const OFFERS_PAGE = 50;
@@ -101,6 +103,29 @@ export default function Market({ focus }: { focus?: string }) {
     ...v.incoming.filter((c) => c.type === 'trade' || c.type === 'trade_return').map((c) => ({ c, dir: 'in' as const })),
   ].sort((a, b) => Date.parse(a.c.arriveAt) - Date.parse(b.c.arriveAt));
 
+  const banner = (
+    <PageBanner
+      media={hasMarket ? <img src={buildingImg('market', v.buildings.market)} alt="" width={96} height={96} /> : undefined}
+      icon="marche"
+      kicker={hasMarket ? `Marché · niveau ${v.buildings.market}` : 'Marché'}
+      title={tab === 'offers' ? 'Offres du marché' : 'Marché'}
+      lead={
+        tab === 'offers'
+          ? 'Échangez vos ressources avec les villages voisins : publiez une offre ou acceptez celle d’un autre joueur.'
+          : 'Envoyez des ressources à un autre village de joueur et suivez vos convois.'
+      }
+      stats={
+        hasMarket
+          ? [
+              { value: `${v.market.available} / ${v.market.merchants}`, label: 'marchands libres', tone: 'gold' },
+              { value: MERCHANT_CAPACITY, label: 'par marchand' },
+              { value: convoys.length, label: convoys.length > 1 ? 'convois en route' : 'convoi en route' },
+            ]
+          : undefined
+      }
+    />
+  );
+
   const tabs = (
     <div className="tabs" role="tablist">
       <button role="tab" aria-selected={tab === 'send'} onClick={() => setTab('send')}>
@@ -115,7 +140,8 @@ export default function Market({ focus }: { focus?: string }) {
   const noMarket = v.buildings.market === 0;
   if (noMarket && tab === 'send') {
     return (
-      <div className="stack">
+      <div className="pg market">
+        {banner}
         {tabs}
         <Panel title="Marché">
           <p className="muted">Construisez d'abord un marché dans votre village (hôtel de ville niveau 3 et entrepôt niveau 2). Vous pouvez déjà consulter les offres en cours dans l'onglet « Offres ».</p>
@@ -182,7 +208,8 @@ export default function Market({ focus }: { focus?: string }) {
     );
     const left = (iso: string) => duration(Math.max(0, (Date.parse(iso) - now) / 1000));
     return (
-      <div className="stack">
+      <div className="pg market">
+        {banner}
         {tabs}
         <Panel title="Offres près de chez vous" actions={<span className="muted small">Marchands : {v.market.available} / {v.market.merchants}</span>}>
           <p className="muted small">Chaque offre se lit « il donne ⇄ il veut ». En acceptant, vous payez ce qu'il veut et vos marchands partent à sa rencontre.</p>
@@ -289,13 +316,10 @@ export default function Market({ focus }: { focus?: string }) {
   }
 
   return (
-    <div className="stack">
+    <div className="pg market">
+      {banner}
       {tabs}
-      <Panel title={`Marché niveau ${v.buildings.market}`}>
-        <p>
-          Marchands disponibles : <b>{v.market.available}</b> / {v.market.merchants}{' '}
-          <span className="muted small">· chacun porte {fmt(MERCHANT_CAPACITY)} ressources</span>
-        </p>
+      <Panel title="Envoyer des ressources">
         <div className="market-form">
           <label htmlFor="trade-target">Village de destination (x|y)</label>
           <div className="row">

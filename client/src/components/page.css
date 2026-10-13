@@ -1,0 +1,184 @@
+/* Pages du jeu, thème « Heure dorée » (docs/CHARTE-GRAPHIQUE.md) : bannière en bois sombre, cartes, onglets en bois, bouton or. */
+/* Tout passe par .app .pg : les pages déjà à la charte (menu, carte, Tribu, village) ne sont pas touchées. */
+/* La texture du sol de la carte est écrite dans chaque règle : une url() dans une variable CSS n'est pas réécrite au build. */
+.app .pg {
+  --pg-gold: #e0b23c;
+  --pg-glass: rgb(26 19 12 / 0.8);
+  --pg-line: rgb(243 226 179 / 0.18);
+  --pg-ink: #f3e9d2;
+  --pg-muted: #c9b995;
+  --pg-sky: #62c8ff;
+  --pg-war: #e04848;
+  --pg-link: #8a6410;
+  display: flex; flex-direction: column; gap: 14px; min-width: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .app .pg { --pg-link: #e9c25a; }
+}
+
+/* ---------- Bannière ---------- */
+.app .pg-banner {
+  position: relative; overflow: hidden; border-radius: 16px; color: var(--pg-ink); padding: 18px 22px 16px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgb(201 154 30 / 0.22), transparent 55%),
+    linear-gradient(180deg, rgb(20 14 9 / 0.55), rgb(20 14 9 / 0.92)),
+    url('../assets/map/ground.jpg') center / 420px;
+  border: 1px solid #1a130c; box-shadow: 0 10px 30px rgb(0 0 0 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+.app .pg-banner::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px rgb(10 7 3 / 0.55); border-radius: inherit; }
+.app .pg-banner > * { position: relative; z-index: 1; }
+.app .pg-banner-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.app .pg-medal {
+  flex: none; display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; color: var(--pg-gold);
+  background: radial-gradient(circle at 35% 30%, #4a3826, #1c140d 70%);
+  box-shadow: inset 0 0 0 1px rgb(224 178 60 / 0.55), 0 0 0 4px rgb(0 0 0 / 0.18), 0 6px 14px rgb(0 0 0 / 0.45);
+}
+.app .pg-media { flex: none; display: grid; place-items: center; filter: drop-shadow(0 6px 12px rgb(0 0 0 / 0.5)); }
+.app .pg-media img { display: block; }
+.app .pg-title { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 260px; }
+.app .pg-kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pg-gold); }
+.app .pg-title h1 { font-size: clamp(22px, 3vw, 30px); letter-spacing: 0.02em; color: #fbf3df; text-shadow: 0 2px 8px rgb(0 0 0 / 0.5); }
+.app .pg-title h1 em { font-style: normal; color: var(--pg-gold); }
+.app .pg-lead { color: var(--pg-muted); max-width: 72ch; font-size: 14px; }
+.app .pg-lead b { color: var(--pg-ink); }
+.app .pg-lead a, .app .pg-banner a:not(.btn) { color: #fbf3df; }
+.app .pg a.btn { text-decoration: none; }
+.app .pg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.app .pg-banner-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.app .pg-banner .btn:not(.primary):not(.gold):not(.danger) { background: rgb(0 0 0 / 0.3); border-color: var(--pg-line); color: var(--pg-ink); }
+.app .pg-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.app .pg-stats.cols-1 { grid-template-columns: minmax(0, 220px); }
+.app .pg-stats.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.app .pg-stats.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.app .pg-stats.cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.app .pg-stats.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.app .pg-stat {
+  display: flex; flex-direction: column; gap: 1px; padding: 9px 12px; border-radius: 12px; min-width: 0;
+  background: var(--pg-glass); border: 1px solid var(--pg-line); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.app .pg-stat b { font: 700 20px var(--display); font-variant-numeric: tabular-nums; color: #fbf3df; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app .pg-stat > span { font-size: 11px; color: var(--pg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app .pg-stat.gold b { color: var(--pg-gold); }
+.app .pg-stat.sky b { color: var(--pg-sky); }
+.app .pg-stat.red b { color: #ff8a7a; }
+.app .pg-stat.ok b { color: #9bd37f; }
+
+/* Pastilles. */
+.app .pg-pill, .app .pg .chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; margin: 0;
+  background: rgb(0 0 0 / 0.3); border: 1px solid var(--pg-line); color: var(--pg-ink);
+}
+.app .pg :not(.pg-banner) .chip { background: var(--panel-2); border-color: var(--line); color: var(--ink); }
+.app .pg .chip-ok { color: var(--ok); border-color: var(--ok); }
+.app .pg .chip-warn { color: var(--warn); border-color: var(--warn); }
+.app .pg-pill.ally { background: rgb(98 200 255 / 0.16); border-color: var(--pg-sky); color: #bfe9ff; }
+.app .pg-pill.war { background: rgb(224 72 72 / 0.18); border-color: var(--pg-war); color: #ffc1b8; }
+.app .pg-pill.gold { border-color: var(--pg-gold); color: #f3d88c; }
+
+/* ---------- Cartes ---------- */
+.app .pg .panel, .app .pg .pg-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 4px 14px rgb(43 32 24 / 0.06);
+}
+.app .pg .panel-head, .app .pg .pg-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.app .pg .panel-head h2, .app .pg .pg-h {
+  font: 700 13px var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0; display: flex; align-items: center; gap: 8px;
+}
+.app .pg .pg-h svg { color: var(--gold); flex: none; }
+.app .pg .pg-count { font: 700 12px var(--body); letter-spacing: 0; padding: 1px 8px; border-radius: 999px; background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); text-transform: none; }
+.app .pg .panel h3, .app .pg .pg-sub { font: 700 12px var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 4px 0 0; }
+.app .pg .pg-callout { border-left: 4px solid var(--gold); background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 8%, var(--panel)), var(--panel)); }
+.app .pg .pg-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 18px 10px; border-radius: 12px; border: 1px dashed var(--line); color: var(--muted); }
+.app .pg .pg-empty svg { color: var(--gold); opacity: 0.8; }
+.app .pg-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
+.app .pg-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+/* Liens et boutons. */
+.app .pg a:not(.btn) { color: var(--pg-link); text-underline-offset: 3px; }
+.app .pg .link { color: var(--pg-link); }
+.app .pg .btn.primary, .app .pg .btn.gold {
+  background: linear-gradient(180deg, #e2b43a, #b8871a); border-color: #8a6410; color: #2b2018; font-weight: 700; text-shadow: 0 1px 0 rgb(255 240 200 / 0.35);
+}
+.app .pg .btn.primary:disabled, .app .pg .btn.gold:disabled { filter: grayscale(0.6); }
+.app .pg .btn.ally { background: var(--pg-sky); border-color: var(--pg-sky); color: #0b2a3d; font-weight: 700; }
+.app .pg .btn.danger.ghost { background: transparent; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+.app .pg input:focus-visible, .app .pg select:focus-visible, .app .pg textarea:focus-visible, .app .pg button:focus-visible { outline-color: var(--gold); }
+.app .pg progress { accent-color: var(--gold); }
+.app .pg input[type='checkbox'], .app .pg input[type='radio'], .app .pg input[type='range'] { accent-color: var(--gold); }
+
+/* Onglets : barre en bois avec soulignement or, comme la page Tribu. */
+.app .pg .tabs { gap: 4px; padding: 4px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); margin: 0; }
+.app .pg .tabs button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; border-radius: 9px;
+  color: var(--muted); font: 700 13px var(--body); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.app .pg .tabs button:hover { color: var(--ink); }
+.app .pg .tabs button[aria-selected='true'] { background: var(--wood); color: var(--wood-ink); box-shadow: 0 2px 8px rgb(0 0 0 / 0.2), inset 0 -2px 0 var(--gold); }
+
+/* Tableaux. */
+.app .pg .table-wrap { border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
+.app .pg .troop-table th, .app .pg .rank-table th, .app .pg .wiki-table th {
+  font: 700 11px var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--panel-2); padding: 8px; white-space: nowrap;
+}
+.app .pg .troop-table td, .app .pg .rank-table td { padding: 7px 8px; }
+.app .pg .troop-table tbody tr:hover, .app .pg .rank-table tbody tr:hover { background: color-mix(in srgb, var(--gold) 7%, transparent); }
+.app .pg .rank-table tr.me { background: color-mix(in srgb, var(--gold) 14%, transparent); box-shadow: inset 3px 0 0 var(--gold); }
+.app .pg .troop-table tr:last-child td, .app .pg .rank-table tr:last-child td { border-bottom: 0; }
+
+/* Barre d'avancement. */
+.app .pg-progress { display: block; height: 6px; border-radius: 999px; background: rgb(0 0 0 / 0.25); overflow: hidden; }
+.app .pg-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a77a14, #f1cc63); box-shadow: 0 0 8px rgb(241 204 99 / 0.5); }
+
+@media (prefers-color-scheme: dark) {
+  .app .pg .panel, .app .pg .pg-card { box-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 6px 18px rgb(0 0 0 / 0.25); }
+}
+
+@media (max-width: 1000px) {
+  .app .pg-grid { grid-template-columns: minmax(0, 1fr); }
+  .app .pg-stats.cols-5, .app .pg-stats.cols-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Téléphone : bannière collée aux bords, médaillon plus petit, chiffres en 2 ou 3 colonnes. */
+@media (max-width: 640px) {
+  .app .content > .pg { margin-inline: 0; }
+  .app .pg > :not(.pg-banner) { margin-inline: 12px; }
+  .app .pg-banner { border-radius: 0; border-inline: 0; padding: 14px 14px 12px; }
+  .app .pg-banner-top { gap: 12px; flex-wrap: nowrap; align-items: center; }
+  .app .pg-banner-top:has(.pg-banner-actions) { flex-wrap: wrap; }
+  .app .pg-banner-actions { margin-left: 0; width: 100%; }
+  .app .pg-banner-actions .btn { flex: 1; justify-content: center; text-align: center; }
+  .app .pg-medal { width: 48px; height: 48px; }
+  .app .pg-medal svg { width: 24px; height: 24px; }
+  .app .pg-media img { width: 64px; height: 64px; }
+  .app .pg-title { flex-basis: 0; }
+  .app .pg-title h1 { font-size: 21px; }
+  .app .pg-lead { font-size: 13px; }
+  .app .pg-stats { gap: 6px; margin-top: 12px; }
+  .app .pg-stats.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app .pg-stats.cols-1 { grid-template-columns: minmax(0, 1fr); }
+  .app .pg-stat { padding: 7px 9px; }
+  .app .pg-stat b { font-size: 17px; }
+  .app .pg-stat > span { font-size: 10px; }
+  .app .pg .tabs button { font-size: 12px; letter-spacing: 0.03em; min-height: 44px; }
+  .app .pg .panel, .app .pg .pg-card { padding: 14px 12px; }
+}
+
+/* Lignes de mouvement (convois, ordres) : bandeau coloré à gauche, comme les mouvements de la page Troupes. */
+.app .pg .movements { gap: 8px; }
+.app .pg .movements .movement {
+  padding: 9px 12px; border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: 10px; background: var(--panel-2);
+}
+.app .pg .movements .movement.type-trade, .app .pg .movements .movement.type-trade_return { border-left-color: var(--gold); }
+.app .pg .movements .movement.type-trade .mv-type { color: var(--gold); }
+.app .pg .movements .movement.type-attack, .app .pg .movements .movement.hostile { border-left-color: var(--danger); }
+.app .pg .movements .movement.type-support { border-left-color: var(--ok); }
+.app .pg .movements .movement .mv-time .countdown { color: var(--gold); }
+
+/* Titre de section entre deux séries de cartes. */
+.app .pg .pg-section { display: flex; align-items: center; gap: 8px; margin: 6px 0 -4px; font: 700 13px var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); }
+.app .pg .pg-section .pg-count { color: var(--ink); }
+
+/* Pastilles cliquables (filtres, périodes) : la pastille choisie passe en or. */
+.app .pg .chip-btn { cursor: pointer; font: 600 12px var(--body); }
+.app .pg .chip-btn.chip-ok, .app .pg .chip-btn.on { background: linear-gradient(180deg, #e2b43a, #b8871a); border-color: #8a6410; color: #2b2018; box-shadow: none; }
+.app .pg-chip-label { font-size: 12px; color: var(--pg-muted); align-self: center; }

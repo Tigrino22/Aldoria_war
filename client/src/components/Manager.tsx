@@ -3,6 +3,8 @@ import { BUILDINGS, BUILDING_KEYS, UNITS, UNIT_KEYS, type BuildingKey, type Unit
 import { api } from '../api';
 import { useGame } from '../game';
 import { Panel } from '../ui';
+import { NavIcon } from './NavIcon';
+import { PageBanner } from './PageBanner';
 import './admin.css';
 import './manager.css';
 
@@ -219,18 +221,28 @@ export default function Manager() {
   const { run, toast } = useGame();
   if (!data) return <p className="muted">Chargement…</p>;
   return (
-    <div className="stack">
-      <Panel title="Gestionnaire de compte">
-        <p className="muted small">
-          Un pilote automatique pour vos villages : il monte les bâtiments dans l'ordre que vous fixez et recrute les troupes voulues, dès que les ressources le permettent, même quand vous n'êtes pas connecté. Il passe par les mêmes règles que vous : mêmes coûts, mêmes prérequis, même file de construction.
-        </p>
-        {!data.available && <p className="warn">Le gestionnaire est désactivé sur ce monde par l'administrateur : rien ne s'exécute pour le moment. Vos réglages sont conservés.</p>}
-      </Panel>
-      <h3>Mes villages</h3>
+    <div className="pg manager">
+      <PageBanner
+        icon="gestionnaire"
+        kicker="Village · pilote automatique"
+        title="Gestionnaire de compte"
+        lead="Un pilote automatique pour vos villages : il monte les bâtiments dans l'ordre que vous fixez et recrute les troupes voulues, dès que les ressources le permettent, même quand vous n'êtes pas connecté. Il passe par les mêmes règles que vous : mêmes coûts, mêmes prérequis, même file de construction."
+        chips={!data.available ? <span className="pg-pill war">Désactivé sur ce monde</span> : <span className="pg-pill gold">Disponible sur ce monde</span>}
+        stats={[
+          { value: `${data.villages.filter((v) => v.enabled).length} / ${data.villages.length}`, label: 'villages pilotés', tone: 'gold' },
+          { value: `${data.templates.length} / ${data.maxTemplates}`, label: 'modèles' },
+        ]}
+      />
+      {!data.available && <p className="warn">Le gestionnaire est désactivé sur ce monde par l'administrateur : rien ne s'exécute pour le moment. Vos réglages sont conservés.</p>}
+      <h3 className="pg-section">
+        <NavIcon name="apercu" size={16} /> Mes villages
+      </h3>
       {data.villages.map((v) => <VillageCard key={v.id} v={v} data={data} reload={reload} />)}
-      <h3>Modèles ({data.templates.length}/{data.maxTemplates})</h3>
+      <h3 className="pg-section">
+        <NavIcon name="gestionnaire" size={16} /> Modèles <span className="pg-count">{data.templates.length}/{data.maxTemplates}</span>
+      </h3>
       {data.templates.map((t) => <TemplateCard key={t.id} t={t} reload={reload} />)}
-      <button className="btn" disabled={data.templates.length >= data.maxTemplates} onClick={() => run(async () => {
+      <button className="btn mgr-new" disabled={data.templates.length >= data.maxTemplates} onClick={() => run(async () => {
         await api('/api/manager/templates', { method: 'POST', body: { name: `Modèle ${data.templates.length + 1}`, plan: { buildings: [{ building: 'farm', level: 10 }], troops: {}, troopsShare: 0 } } });
         toast('Modèle créé');
         await reload();
