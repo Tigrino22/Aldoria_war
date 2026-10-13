@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type TouchEvent } from 'react';
 import { RESOURCES } from '@aldoria/shared';
 import { logo, RESOURCE_IMG } from '../assets';
 import { NavIcon, type NavIconName } from './NavIcon';
@@ -136,11 +136,59 @@ function TopResources() {
   );
 }
 
+
+/**
+ * Glisser le tiroir vers le bas pour le fermer : il suit le doigt tant que sa liste est tout en haut,
+ * puis se ferme au-delà d'un quart de sa hauteur (ou d'un geste rapide), sinon il remonte.
+ */
+function useSwipeToClose(onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ y: number; t: number; dy: number; active: boolean } | null>(null);
+  const setOffset = (dy: number, animate: boolean) => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transition = animate ? 'transform 0.2s ease-out' : 'none';
+    el.style.transform = dy > 0 ? `translateY(${dy}px)` : '';
+  };
+  return {
+    ref,
+    onTouchStart: (e: TouchEvent) => {
+      drag.current = { y: e.touches[0].clientY, t: Date.now(), dy: 0, active: (ref.current?.scrollTop ?? 0) <= 0 };
+    },
+    onTouchMove: (e: TouchEvent) => {
+      const d = drag.current;
+      if (!d) return;
+      const dy = e.touches[0].clientY - d.y;
+      // On ne tire le tiroir que s'il est déjà tout en haut de sa liste et que le doigt descend.
+      if (!d.active || dy <= 0) {
+        if (d.dy) setOffset(0, false);
+        d.dy = 0;
+        if (dy < 0) d.active = false;
+        return;
+      }
+      d.dy = dy;
+      setOffset(dy, false);
+    },
+    onTouchEnd: () => {
+      const d = drag.current;
+      drag.current = null;
+      if (!d || d.dy <= 0) return;
+      const height = ref.current?.offsetHeight ?? 600;
+      const fast = d.dy / Math.max(1, Date.now() - d.t) > 0.6;
+      if (d.dy > height / 4 || (fast && d.dy > 40)) {
+        setOffset(height, true);
+        window.setTimeout(onClose, 180);
+      } else setOffset(0, true);
+    },
+  };
+}
+
 export default function Layout() {
   const { me, village, villageId, setVillageId, logout, run, refreshMe } = useGame();
   const [route, go] = useRoute();
   const page = route[0] ?? 'village';
   const [drawer, setDrawer] = useState(false);
+  const swipe = useSwipeToClose(() => setDrawer(false));
   useEffect(() => setDrawer(false), [route.join('/')]);
   // Le tiroir se ferme aussi avec la touche Échap.
   useEffect(() => {
@@ -286,7 +334,7 @@ export default function Layout() {
       </nav>
       {drawer && (
         <div className="sheet-backdrop" onClick={() => setDrawer(false)}>
-          <div className="sheet" role="dialog" aria-modal="true" aria-label="Menu" onClick={(e) => e.stopPropagation()}>
+          <div className="sheet" role="dialog" aria-modal="true" aria-label="Menu" onClick={(e) => e.stopPropagation()} {...swipe}>
             <div className="sheet-head">
               <div className="sheet-grip" />
               <button className="sheet-close" aria-label="Fermer le menu" onClick={() => setDrawer(false)}>
