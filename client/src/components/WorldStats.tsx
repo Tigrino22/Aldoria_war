@@ -4,6 +4,7 @@ import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
 import { Panel, ResIcon, UnitIcon } from '../ui';
+import { PageBanner } from './PageBanner';
 import './world.css';
 
 interface WorldStatsData {
@@ -67,21 +68,21 @@ export default function WorldStats() {
   const maxSize = Math.max(1, ...(s?.distribution.map((d) => d.villages) ?? []));
 
   return (
-    <div className="stack">
-      <Panel title="Statistiques du monde" actions={<span className="muted small">actualisé chaque minute</span>}>
-        <p className="muted small">
-          Des totaux et des moyennes pour toute la carte, joueurs et PNJ confondus. Aucune information sur un joueur ou un village en particulier.
-          {s && ` Monde en vitesse ×${s.world.speed}, carte de ${s.world.mapSize} × ${s.world.mapSize} cases.`}
-        </p>
-        <div className="ws-kpis">
-          <Kpi label="Joueurs" value={t ? fmt(t.players) : undefined} hint={t ? `+ ${fmt(t.npcs)} PNJ` : undefined} />
-          <Kpi label="Tribus" value={t ? fmt(t.tribes) : undefined} />
-          <Kpi label="Villages occupés" value={t ? fmt(t.villages) : undefined} hint={t ? `${fmt(t.barbarians)} barbares` : undefined} />
-          <Kpi label="Villages par habitant" value={t && dec(t.villagesPerOwner)} />
-          <Kpi label="Points par village" value={t ? fmt(t.pointsPerVillage) : undefined} hint={t ? `${fmt(t.points)} au total` : undefined} />
-          <Kpi label="Troupes au total" value={troopTotal !== undefined ? fmt(troopTotal) : undefined} hint={t && t.villages ? `${fmt((troopTotal ?? 0) / t.villages)} par village` : undefined} />
-        </div>
-      </Panel>
+    <div className="pg worldstats">
+      <PageBanner
+        icon="monde"
+        kicker={s ? `Monde en vitesse ×${s.world.speed} · carte de ${s.world.mapSize} × ${s.world.mapSize} cases` : 'Monde'}
+        title="Statistiques du monde"
+        lead="Des totaux et des moyennes pour toute la carte, joueurs et PNJ confondus. Aucune information sur un joueur ou un village en particulier. Actualisé chaque minute."
+        stats={[
+          { value: t ? fmt(t.players) : '…', label: t ? `joueurs · + ${fmt(t.npcs)} PNJ` : 'joueurs', tone: 'gold' },
+          { value: t ? fmt(t.tribes) : '…', label: 'tribus' },
+          { value: t ? fmt(t.villages) : '…', label: t ? `villages · ${fmt(t.barbarians)} barbares` : 'villages occupés' },
+          { value: t ? dec(t.villagesPerOwner) : '…', label: 'villages par habitant' },
+          { value: t ? fmt(t.pointsPerVillage) : '…', label: t ? `points par village` : 'points par village' },
+          { value: troopTotal !== undefined ? fmt(troopTotal) : '…', label: t && t.villages ? `troupes · ${fmt((troopTotal ?? 0) / t.villages)} par village` : 'troupes au total' },
+        ]}
+      />
 
       <Panel title="Activité">
         <div className="ws-kpis">
