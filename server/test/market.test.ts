@@ -84,7 +84,7 @@ describe('offres de marché', () => {
 
   it("accepter une offre fait partir deux convois, un dans chaque sens, et livre chacun ce qu'il attend", async () => {
     const a = await player('Vendeuse');
-    const b = await player('Acheteur');
+    const b = await player('Marchand du coin');
     const va = await village(a, 'Vendeuse', 310, 300);
     const vb = await village(b, 'Acheteur', 313, 300);
     const out = new Outbox();
@@ -139,5 +139,47 @@ describe('offres de marché', () => {
     await tx((c) => npcThink(c, new Outbox(), npc, new Date(T0.getTime() + 20 * 60_000)));
     expect((await pool.query("SELECT status FROM market_offers WHERE player_id = $1", [p])).rows[0].status).toBe('accepted');
     expect((await pool.query("SELECT count(*)::int AS n FROM commands WHERE type = 'trade' AND home_village_id = ANY($1)", [[home.id, pv]])).rows[0].n).toBe(2);
+  });
+
+  it("un PNJ ne publie pas plus d'offres que ses marchands ne peuvent en livrer, et retire celles qu'il ne peut plus honorer", async () => {
+    let seed = 0;
+    setNpcRandom(() => ((seed = (seed * 9301 + 49297) % 233280) / 233280));
+    const npc = await tx((c) => createNpc(c, T0, 'raider'));
+    const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
+    const reserved = async () =>
+      (await pool.query("SELECT COALESCE(SUM(CEIL(give_amount / 1000.0)), 0)::int AS n FROM market_offers WHERE player_id = $1 AND status = 'open'", [npc])).rows[0].n as number;
+    // Marché niveau 5 : 8 marchands. Un gros excédent de bois l'inciterait à publier offre sur offre.
+    const fill = () =>
+      pool.query(
+        "UPDATE villages SET buildings = buildings || '{\"market\": 5, \"warehouse\": 20}'::jsonb, wood = 60000, clay = 500, iron = 30000, wheat = 30000, resources_at = $2 WHERE id = $1",
+        [home.id, T0],
+      );
+    await fill();
+    for (let k = 0; k < 3; k++) {
+      await tx((c) => npcThink(c, new Outbox(), npc, new Date(T0.getTime() + k * 60_000)));
+      await fill();
+    }
+    expect(await reserved()).toBeGreaterThan(0);
+    expect(await reserved()).toBeLessThanOrEqual(8);
+
+    // Chacune de ses offres reste acceptable par un joueur : le vendeur a toujours ses marchands.
+    const p = await player('Négociant');
+    const pv = await village(p, 'Comptoir', home.x + 1, home.y + 1, R(5000, 20000, 5000, 5000), 20);
+    await pool.query("UPDATE villages SET buildings = buildings || '{\"warehouse\": 20}'::jsonb WHERE id = $1", [pv]);
+    const open = (await pool.query("SELECT id FROM market_offers WHERE player_id = $1 AND status = 'open' ORDER BY id", [npc])).rows;
+    for (const o of open) await tx((c) => acceptOffer(c, new Outbox(), p, pv, o.id, new Date(T0.getTime() + 5 * 60_000)));
+
+    // Des offres en trop (héritées d'avant la réservation) sont retirées, ressources rendues, à la réflexion suivante.
+    await pool.query('UPDATE commands SET processed = true WHERE home_village_id = $1', [home.id]);
+    await fill();
+    for (let k = 0; k < 6; k++) {
+      await pool.query(
+        "INSERT INTO market_offers (village_id, player_id, give_resource, give_amount, want_resource, want_amount, expires_at) VALUES ($1, $2, 'wood', 3000, 'clay', 3000, $3)",
+        [home.id, npc, new Date(T0.getTime() + 24 * HOUR)],
+      );
+    }
+    await tx((c) => npcThink(c, new Outbox(), npc, new Date(T0.getTime() + 10 * 60_000)));
+    expect(await reserved()).toBeLessThanOrEqual(8);
+    expect((await pool.query("SELECT count(*)::int AS n FROM market_offers WHERE player_id = $1 AND status = 'cancelled'", [npc])).rows[0].n).toBeGreaterThan(0);
   });
 });
