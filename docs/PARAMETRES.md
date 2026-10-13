@@ -157,7 +157,7 @@ Chaque niveau d'hôtel de ville réduit toutes les durées de 5 % (niveau 20 : d
 
 Chaque niveau de caserne réduit le temps de recrutement de 6 %.
 
-**Population** : chaque unité occupe des places de population (colonne ci-dessus), recrues et troupes parties au combat comprises. La ferme en offre 240 au niveau 1, +17 % par niveau (environ 4 800 au niveau 20). Le blé ne nourrit plus l'armée : c'est une ressource comme les autres.
+**Population** : chaque unité occupe des places de population (colonne ci-dessus), recrues et troupes parties au combat comprises. La ferme en offre 240 au niveau 1, +26,2 % par niveau (environ 20 000 au niveau 20). Le blé ne nourrit plus l'armée : c'est une ressource comme les autres.
 
 **Béliers** : abaissement progressif de la muraille, le niveau N demande N béliers en partant du niveau le plus haut. Abattre une muraille de niveau N demande N × (N + 1) / 2 béliers (niveau 10 : 55, niveau 20 : 210). La règle vaut pendant le combat et, avec les survivants, après une victoire.
 
@@ -260,7 +260,7 @@ Réglages à chaud (Administration > Monde) : « Pillage intensif des PNJ » (`N
 
 ## Recrutement des PNJ : villages offensifs et défensifs
 
-Rythme : le niveau visé par les PNJ gagne 1 par jour de monde (`NPC_LEVELS_PER_DAY`, 20 au bout de 18 jours à difficulté ×1). La ferme, qui loge l'armée, monte `FARM_LEAD` = 3 niveaux plus haut que le reste et pèse davantage (poids 1,6 à 1,7). L'armée visée de chaque village remplit toute la ferme visée (niveau de ferme = plafond + 3, 20 au plus, soit jusqu'à 4 740 habitants), éclaireurs et nobles compris (`armyTarget` dans `npc-roles.ts`) ; les proportions ci-dessous se répartissent le reste. Une difficulté inférieure à 1 ne remplit qu'une part de la ferme. Un lot de recrutement peut aller jusqu'à 40 unités, réduit de moitié tant qu'il est trop cher ou trop lourd pour la ferme.
+Rythme : le niveau visé par les PNJ gagne 1 par jour de monde (`NPC_LEVELS_PER_DAY`, 20 au bout de 18 jours à difficulté ×1). La ferme, qui loge l'armée, monte `FARM_LEAD` = 3 niveaux plus haut que le reste et pèse davantage (poids 1,6 à 1,7). L'armée visée de chaque village remplit toute la ferme visée (niveau de ferme = plafond + 3, 20 au plus) selon l'ancienne courbe de la ferme, +17 % par niveau soit jusqu'à 4 740 habitants (`npcArmySize`), même si la ferme des joueurs offre désormais près de 20 000 places, éclaireurs et nobles compris (`armyTarget` dans `npc-roles.ts`) ; les proportions ci-dessous se répartissent le reste. Une difficulté inférieure à 1 ne remplit qu'une part de la ferme. Un lot de recrutement peut aller jusqu'à 40 unités, réduit de moitié tant qu'il est trop cher ou trop lourd pour la ferme.
 
 Chaque village d'un PNJ a un rôle (code : `server/src/game/npc-roles.ts`), qui fixe les seules unités qu'on y recrute.
 

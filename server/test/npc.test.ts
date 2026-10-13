@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { STARTING_BUILDINGS, emptyUnits, populationCapacity, populationOf } from '@aldoria/shared';
+import { STARTING_BUILDINGS, emptyUnits, populationOf } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
 import { env } from '../src/env';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents } from '../src/game/commands';
 import { createNpc, ensureNpcs, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
-import { FARM_LEAD, armyTarget, villageRoles } from '../src/game/npc-roles';
+import { FARM_LEAD, armyTarget, npcArmySize, villageRoles } from '../src/game/npc-roles';
 import { chooseBuilding, isQuiet, nextRecruit, npcCap, pickWinningUnits } from '../src/game/npc-rules';
 import { createVillage, getTroops, setTroops } from '../src/game/village';
 
@@ -106,7 +106,7 @@ describe('règles des PNJ', () => {
 
   it('l\'armée visée remplit la ferme visée, à tous les niveaux et dans tous les rôles', () => {
     for (const cap of [2, 5, 10, 17, 20]) {
-      const room = populationCapacity(Math.min(20, cap + FARM_LEAD));
+      const room = npcArmySize(Math.min(20, cap + FARM_LEAD));
       for (const profile of ['builder', 'raider', 'conqueror'] as const) {
         for (const role of ['offense', 'defense'] as const) {
           const pop = populationOf(armyTarget(profile, role, cap, 1));
@@ -116,7 +116,7 @@ describe('règles des PNJ', () => {
       }
     }
     // Une difficulté de 0,5 ne remplit que la moitié.
-    expect(populationOf(armyTarget('raider', 'defense', 10, 0.5))).toBeLessThan(populationCapacity(13) * 0.55);
+    expect(populationOf(armyTarget('raider', 'defense', 10, 0.5))).toBeLessThan(npcArmySize(13) * 0.55);
   });
 
   it('le recrutement suit le rôle du village', () => {

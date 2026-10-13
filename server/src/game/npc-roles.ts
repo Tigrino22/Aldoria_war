@@ -1,4 +1,4 @@
-import { type UnitCounts, UNITS, emptyUnits, populationCapacity, populationOf } from '@aldoria/shared';
+import { type UnitCounts, UNITS, POPULATION_BASE, emptyUnits, populationOf } from '@aldoria/shared';
 import type { NpcProfile } from './npc-rules';
 
 /** Nobles envoyés avec chaque assaut d'un conquérant. */
@@ -37,6 +37,12 @@ export const FARM_LEAD = 3;
 /** Niveau de ferme visé selon le plafond de niveau : la population de ce niveau est l'effectif à atteindre. */
 export const farmTarget = (cap: number) => Math.min(20, cap + FARM_LEAD);
 
+/**
+ * Effectif visé pour un niveau de ferme : l'ancienne courbe de la ferme (+17 % par niveau, 4 740 au niveau 20). Depuis que la ferme des
+ * joueurs monte à 20 000 places, les PNJ gardent cette cible pour ne pas changer leur équilibre entre armée et construction.
+ */
+export const npcArmySize = (farmLevel: number) => (farmLevel <= 0 ? 0 : Math.round(POPULATION_BASE * Math.pow(1.17, farmLevel - 1)));
+
 /** Éclaireurs d'un village offensif : de plus en plus nombreux avec le niveau et la difficulté (11 au départ, 60 au plus), pour passer les éclaireurs d'un défenseur. */
 export const offenseScouts = (cap: number, difficulty: number) => Math.min(60, Math.round((6 + cap * 2.5) * Math.max(1, difficulty)));
 /** Éclaireurs d'un village défensif : un tiers de ceux d'un village offensif, jamais moins de 5 (une mission d'espionnage crédible). */
@@ -59,7 +65,7 @@ export function armyTarget(profile: NpcProfile, role: VillageRole, cap: number, 
   } else {
     t.scout = defenseScouts(cap, difficulty);
   }
-  const budget = populationCapacity(farmTarget(cap)) * Math.min(1, Math.max(0, difficulty)) - populationOf(t);
+  const budget = npcArmySize(farmTarget(cap)) * Math.min(1, Math.max(0, difficulty)) - populationOf(t);
   const perShare = (Object.entries(shares) as [keyof UnitCounts, number][]).reduce((sum, [k, n]) => sum + n * UNITS[k].population, 0);
   const parts = Math.max(0, budget) / perShare;
   for (const [k, n] of Object.entries(shares) as [keyof UnitCounts, number][]) t[k] = Math.floor(n * parts);

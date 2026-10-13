@@ -30,7 +30,8 @@ describe('formules', () => {
   it("la troupe n'entame pas la production de blé : la ferme limite la population", () => {
     expect(productionRates(STARTING_BUILDINGS, 1).wheat).toBe(30);
     expect(populationCapacity(1)).toBe(240);
-    expect(populationCapacity(20)).toBeGreaterThan(4500);
+    expect(populationCapacity(20)).toBeGreaterThan(19_500);
+    expect(populationCapacity(20)).toBeLessThan(20_500);
     expect(populationCapacity(0)).toBe(0);
   });
 
