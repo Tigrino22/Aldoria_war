@@ -415,7 +415,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           n'importe quel joueur peut accepter.
         </p>
         <ul>
-          <li>Les ressources que vous donnez sont retirées de votre entrepôt dès la publication (il faut aussi assez de marchands libres pour les livrer) ; elles vous reviennent si l'offre est annulée ou expire.</li>
+          <li>Les ressources que vous donnez sont retirées de votre entrepôt dès la publication (il faut aussi assez de marchands libres pour les livrer) ; elles vous reviennent si l'offre est annulée ou expire. Ces marchands restent réservés tant que l'offre est ouverte : vous ne pouvez pas les utiliser pour une autre offre ou un envoi.</li>
           <li>Le taux (ce que vous demandez ÷ ce que vous donnez) doit rester entre {MIN_RATE} et {MAX_RATE}, et chaque quantité fait au moins {MIN_OFFER_AMOUNT}. Une pastille « 1 : x » indique le taux de chaque offre.</li>
           <li>Une offre dure {duration((OFFER_LIFETIME_HOURS * 3600) / s)} ; passé ce délai elle expire et vos ressources reviennent.</li>
           <li>Vous pouvez avoir {MAX_PLAYER_OFFERS} offres ouvertes en même temps et les retirer à tout moment depuis « Mes offres ».</li>

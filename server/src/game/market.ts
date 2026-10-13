@@ -25,7 +25,10 @@ export async function freeMerchants(c: Db, villageId: number, marketLevel: numbe
   return merchantCount(marketLevel) - (await busyMerchants(c, villageId));
 }
 
-/** Publie une offre : les ressources offertes sont retirées du village et gardées jusqu'à l'acceptation, l'annulation ou l'expiration. */
+/**
+ * Publie une offre : les ressources offertes sont retirées du village et gardées jusqu'à l'acceptation, l'annulation ou l'expiration,
+ * et les marchands qui la livreront restent réservés pendant ce temps.
+ */
 export async function createOffer(
   c: Db,
   outbox: Outbox,
@@ -105,7 +108,8 @@ export async function acceptOffer(c: Db, outbox: Outbox, playerId: number, villa
   const buyerNeed = merchantsNeeded({ ...emptyResources(), [pay]: offer.want_amount });
   if (buyerNeed > (await freeMerchants(c, buyer.id, buyer.buildings.market))) throw new GameError('Pas assez de marchands libres');
   const sellerNeed = merchantsNeeded({ ...emptyResources(), [get]: offer.give_amount });
-  if (sellerNeed > (await freeMerchants(c, seller.id, seller.buildings.market))) throw new GameError("Le vendeur n'a pas assez de marchands libres pour le moment");
+  // Les marchands du vendeur sont déjà réservés pour cette offre : il suffit qu'aucun autre usage n'empiète sur eux.
+  if ((await freeMerchants(c, seller.id, seller.buildings.market)) < 0) throw new GameError("Le vendeur n'a pas assez de marchands libres pour le moment");
 
   buyer[pay] -= offer.want_amount;
   await saveVillage(c, buyer);

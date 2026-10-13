@@ -185,7 +185,7 @@ Valeurs dans `server/src/game/market-rules.ts`, à ajuster librement.
 | PNJ : rayon pour accepter | aucun (tout le monde) |
 | PNJ : échanges par réflexion | jusqu'à 10 par village, tant qu'il reste des marchands libres |
 
-Les ressources offertes sont retirées du village à la publication et rendues à l'annulation ou à l'expiration. À l'acceptation, deux convois de marchands partent, un dans chaque sens ; chaque côté doit avoir assez de marchands libres.
+Les ressources offertes sont retirées du village à la publication et rendues à l'annulation ou à l'expiration. Une offre ouverte réserve les marchands qui la livreront (ils ne comptent plus comme libres pour une autre offre ou un envoi). À l'acceptation, deux convois de marchands partent, un dans chaque sens ; l'acceptant doit avoir assez de marchands libres, le vendeur a déjà les siens. Un PNJ retire en plus ses offres les plus récentes si ses convois ne lui laissent plus de quoi les livrer.
 
 ## Administration
 

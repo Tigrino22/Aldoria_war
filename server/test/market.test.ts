@@ -3,11 +3,11 @@ import { STARTING_BUILDINGS, emptyUnits } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
-import { processDueEvents } from '../src/game/commands';
+import { processDueEvents, sendTrade } from '../src/game/commands';
 import { acceptOffer, cancelOffer, createOffer, expireOffers, listOffers } from '../src/game/market';
 import { marketNeeds, npcAccepts, planOffer, rateOk } from '../src/game/market-rules';
 import { createNpc, npcThink, setNpcRandom } from '../src/game/npc';
-import { createVillage } from '../src/game/village';
+import { busyMerchants, createVillage } from '../src/game/village';
 
 const HOUR = 3_600_000;
 const T0 = new Date('2030-01-15T12:00:00Z');
@@ -110,6 +110,27 @@ describe('offres de marché', () => {
     expect(Math.round(after.wood)).toBeGreaterThanOrEqual(5800);
     const sellerAfter = await stock(va);
     expect(Math.round(sellerAfter.iron)).toBeGreaterThanOrEqual(5700);
+  });
+
+  it("une offre ouverte réserve les marchands qui la livreront : impossible de les promettre deux fois", async () => {
+    // Marché niveau 5 : 8 marchands de 1000 ressources.
+    const a = await player('Prudente');
+    const av = await village(a, 'Prudente', 40, 40, R(15000, 5000, 5000, 5000));
+    const b = await player('Client');
+    const bv = await village(b, 'Client', 42, 41);
+    const first = await tx((c) => createOffer(c, new Outbox(), a, av, { give: 'wood', giveAmount: 4500, want: 'clay', wantAmount: 4500 }, T0));
+    expect(await tx((c) => busyMerchants(c, av))).toBe(5);
+    // Une deuxième offre ou un envoi qui demanderait les marchands réservés est refusé.
+    await expect(tx((c) => createOffer(c, new Outbox(), a, av, { give: 'wood', giveAmount: 4000, want: 'iron', wantAmount: 4000 }, T0))).rejects.toThrow(/marchands/);
+    await expect(tx((c) => sendTrade(c, new Outbox(), a, av, { targetId: bv, resources: R(4000, 0, 0, 0) }, T0))).rejects.toThrow(/marchand/);
+    // Ce qui reste libre peut servir.
+    await tx((c) => createOffer(c, new Outbox(), a, av, { give: 'wood', giveAmount: 3000, want: 'iron', wantAmount: 3000 }, T0));
+    expect(await tx((c) => busyMerchants(c, av))).toBe(8);
+    // L'offre reste livrable : l'accepter fait partir les marchands qui l'attendaient.
+    await tx((c) => acceptOffer(c, new Outbox(), b, bv, first, T0));
+    expect(await tx((c) => busyMerchants(c, av))).toBe(8);
+    const convoy = (await pool.query("SELECT merchants FROM commands WHERE type = 'trade' AND home_village_id = $1", [av])).rows;
+    expect(convoy).toEqual([{ merchants: 5 }]);
   });
 
   it("un PNJ publie une offre quand une ressource déborde et qu'une autre manque, puis accepte l'offre d'un joueur qui l'arrange", async () => {
