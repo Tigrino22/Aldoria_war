@@ -131,6 +131,17 @@ export interface MapVillage {
   protected: boolean;
 }
 
+/** Mouvements de troupes connus du joueur vers un village : les siens, et ceux qui visent ses villages (icônes de la carte). */
+export interface MapMovement {
+  villageId: number;
+  /** Une attaque (ou un espionnage) est en route vers ce village. */
+  attack: boolean;
+  /** Un soutien est en route vers ce village. */
+  support: boolean;
+  /** L'attaque vient d'un autre joueur et vise l'un de vos villages. */
+  threat: boolean;
+}
+
 /** Tribus liées à celle du joueur, pour colorer la carte. */
 export interface MapRelations {
   /** Tribus en guerre déclarée avec la sienne (dans un sens ou dans l'autre). */

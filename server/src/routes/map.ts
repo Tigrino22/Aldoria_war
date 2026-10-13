@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { RESOURCES, UNIT_KEYS, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
+import { RESOURCES, UNIT_KEYS, type MapMovement, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { forbidden } from '../errors';
@@ -39,6 +39,25 @@ export default async function mapRoutes(app: FastifyInstance) {
         protected: r.protected === true,
       }),
     );
+  });
+
+  /**
+   * Attaques et soutiens en route que le joueur connaît : ceux qu'il a envoyés (sur le village visé) et ceux qui visent
+   * ses villages (sur son village), comme dans la liste des mouvements de son village.
+   */
+  app.get('/api/map/movements', async (req): Promise<MapMovement[]> => {
+    const playerId = await requirePlayer(req);
+    const { rows } = await pool.query(
+      `SELECT c.target_village_id AS id,
+              bool_or(c.type = 'attack') AS attack,
+              bool_or(c.type = 'support') AS support,
+              bool_or(c.type = 'attack' AND c.player_id <> $1) AS threat
+       FROM commands c JOIN villages t ON t.id = c.target_village_id
+       WHERE NOT c.processed AND c.type IN ('attack', 'support') AND (c.player_id = $1 OR t.owner_id = $1)
+       GROUP BY c.target_village_id`,
+      [playerId],
+    );
+    return rows.map((r) => ({ villageId: r.id, attack: r.attack, support: r.support, threat: r.threat }));
   });
 
   /** Tribus en guerre avec celle du joueur et tribus alliées, pour les couleurs de la carte. */

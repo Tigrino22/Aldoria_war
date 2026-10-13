@@ -444,6 +444,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           s'affiche, avec le temps de trajet de chaque unité depuis votre village actif. Le pseudo d'un joueur ouvre son profil et la liste de ses villages.
         </p>
         <p>
+          De petits médaillons en haut à droite d'un village signalent les mouvements en route vers lui : deux épées croisées pour une attaque, un écu pour un soutien. Vous voyez
+          ceux que vous avez envoyés et ceux qui visent vos villages ; une attaque ennemie qui arrive chez vous a son médaillon en rouge.
+        </p>
+        <p>
           <b>Couleurs :</b> jaune pour vos villages, blanc pour votre village actif, bleu pour votre tribu, bleu ciel pour les tribus alliées, rouge vif pour les tribus en guerre déclarée avec la
           vôtre, rouge foncé pour les autres joueurs et gris pour les barbares. Ces couleurs sont fixes. Le bouton « Couleurs » permet d'ajouter des repères : un joueur ou une tribu précise prend la
           couleur de votre choix sur la carte et la mini-map (les couleurs fixes restent prioritaires). Les repères sont gardés sur votre appareil.
