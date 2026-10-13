@@ -7,7 +7,7 @@ import { Panel } from '../ui';
 import AdminWars from './AdminWars';
 import './admin.css';
 
-type Tab = 'npc' | 'wars' | 'players' | 'market' | 'stats' | 'world';
+type Tab = 'npc' | 'wars' | 'players' | 'stats' | 'world';
 type Kind = 'all' | 'attack' | 'scout' | 'market' | 'quiet';
 
 interface NpcEvent {
@@ -35,16 +35,6 @@ interface AdminPlayer {
   points: number;
   createdAt: string;
   lastSeen: string | null;
-}
-interface AdminOffer {
-  id: number;
-  owner: string;
-  isNpc: boolean;
-  status: string;
-  give: { resource: string; amount: number };
-  want: { resource: string; amount: number };
-  createdAt: string;
-  expiresAt: string;
 }
 interface AdminStats {
   villages: number;
@@ -97,7 +87,6 @@ const SETTING_LABEL: Record<string, string> = {
   npcTimezone: 'Fuseau des heures calmes',
   quietHours: 'Heures calmes',
 };
-const STATUS_LABEL: Record<string, string> = { open: 'Ouverte', accepted: 'Acceptée', cancelled: 'Annulée', expired: 'Expirée' };
 
 /** Page d'administration (lecture seule), réservée aux pseudos de ADMIN_USERNAMES. */
 export default function Admin() {
@@ -107,7 +96,6 @@ export default function Admin() {
   const [kind, setKind] = useState<Kind>('all');
   const [log, setLog] = useState<NpcLog | null>(null);
   const [players, setPlayers] = useState<AdminPlayer[] | null>(null);
-  const [offers, setOffers] = useState<AdminOffer[] | null>(null);
   const [world, setWorld] = useState<AdminWorld | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [settings, setSettings] = useState<AdminSetting[] | null>(null);
@@ -120,7 +108,6 @@ export default function Admin() {
       run(async () => {
         if (tab === 'npc') setLog(await api<NpcLog>(`/api/admin/npc?hours=${hours}`));
         if (tab === 'players') setPlayers(await api<AdminPlayer[]>('/api/admin/players'));
-        if (tab === 'market') setOffers(await api<AdminOffer[]>(`/api/admin/market?hours=${hours}`));
         if (tab === 'stats') setStats(await api<AdminStats>('/api/admin/stats'));
         if (tab === 'world') setWorld(await api<AdminWorld>('/api/admin/world'));
       }),
@@ -154,7 +141,6 @@ export default function Admin() {
     ['npc', 'PNJ'],
     ['wars', 'Guerres'],
     ['players', 'Joueurs'],
-    ['market', 'Marché'],
     ['stats', 'Statistiques'],
     ['world', 'Monde'],
   ];
@@ -177,7 +163,7 @@ export default function Admin() {
             </button>
           ))}
         </div>
-        {(tab === 'npc' || tab === 'market' || tab === 'wars') && (
+        {(tab === 'npc' || tab === 'wars') && (
           <div className="row admin-chips">
             <span className="muted small">Période :</span>
             {[1, 6, 24, 72].map((h) => (
@@ -297,44 +283,6 @@ export default function Admin() {
                         <td className="t hide-m">{p.isNpc ? '—' : p.lastSeen ? clockTime(p.lastSeen) : 'jamais'}</td>
                       </tr>
                     ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Panel>
-      )}
-
-      {tab === 'market' && (
-        <Panel title="Offres du marché">
-          {!offers ? (
-            <p className="muted">Chargement…</p>
-          ) : offers.length === 0 ? (
-            <p className="muted">Aucune offre sur cette période.</p>
-          ) : (
-            <div className="admin-scroll">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Publiée</th>
-                    <th>Auteur</th>
-                    <th>Offre</th>
-                    <th>Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {offers.map((o) => (
-                    <tr key={o.id}>
-                      <td className="t">{clockTime(o.createdAt)}</td>
-                      <td>
-                        {o.owner}
-                        {o.isNpc && <span className="chip">PNJ</span>}
-                      </td>
-                      <td>
-                        {fmt(o.give.amount)} {o.give.resource} ⇄ {fmt(o.want.amount)} {o.want.resource}
-                      </td>
-                      <td>{STATUS_LABEL[o.status] ?? o.status}</td>
-                    </tr>
-                  ))}
                 </tbody>
               </table>
             </div>

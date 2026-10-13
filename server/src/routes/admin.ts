@@ -122,28 +122,6 @@ export default async function adminRoutes(app: FastifyInstance) {
     }));
   });
 
-  /** Marché : offres ouvertes et échanges récents. */
-  app.get('/api/admin/market', async (req) => {
-    await requireAdmin(req);
-    const { hours } = hoursQuery.parse(req.query);
-    const { rows } = await pool.query(
-      `SELECT o.id, o.created_at, o.expires_at, o.status, o.give_resource, o.give_amount, o.want_resource, o.want_amount, p.username, p.is_npc
-       FROM market_offers o JOIN players p ON p.id = o.player_id
-       WHERE o.status = 'open' OR o.created_at >= $1 ORDER BY o.created_at DESC LIMIT 200`,
-      [sinceOf(hours)],
-    );
-    return rows.map((o) => ({
-      id: o.id,
-      owner: o.username,
-      isNpc: o.is_npc,
-      status: o.status,
-      give: { resource: o.give_resource, amount: o.give_amount },
-      want: { resource: o.want_resource, amount: o.want_amount },
-      createdAt: o.created_at,
-      expiresAt: o.expires_at,
-    }));
-  });
-
   /** Statistiques anonymes : troupes, ressources, bâtiments et activité, sans aucun nom de joueur. */
   app.get('/api/admin/stats', async (req) => {
     await requireAdmin(req);
