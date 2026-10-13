@@ -6,6 +6,7 @@ import {
   type TargetIntel,
   type UnitCounts,
   type UnitKey,
+  attackWheatCost,
   distance,
   normalizeUnits,
   resolveCombat,
@@ -15,8 +16,8 @@ import {
 } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, duration, fmt } from '../format';
+import { liveResources, ResIcon, UnitIcon } from '../ui';
 import { useGame, useNow } from '../game';
-import { UnitIcon } from '../ui';
 
 const TEMPLATES_KEY = 'aldoria.templates';
 interface Template {
@@ -82,6 +83,8 @@ export default function SendTroops({ target, protectedTarget, onSent }: { target
   const valid = total > 0 && UNIT_KEYS.every((k) => units[k] <= v.troopsHome[k]);
   const travel = total > 0 ? travelTime(units, v, target, world.speed) : 0;
   const ownTarget = target.ownerId === me.player.id;
+  const wheat = attackWheatCost(units);
+  const wheatHave = Math.floor(liveResources(v, now).wheat);
 
   const saveTemplate = () => {
     if (total === 0) return;
@@ -140,11 +143,16 @@ export default function SendTroops({ target, protectedTarget, onSent }: { target
           Trajet : <b>{duration(travel)}</b>, arrivée {clockTime(new Date(now + travel * 1000))}
         </p>
       )}
+      {!ownTarget && total > 0 && (
+        <p className={`small${wheat > wheatHave ? ' warn' : ''}`}>
+          <ResIcon r="wheat" /> Rations pour l’attaque : <b>{fmt(wheat)}</b> blé ({fmt(wheatHave)} au village). Un renfort ne coûte rien.
+        </p>
+      )}
       {!ownTarget && total > 0 && units.scout !== total && (intel ? <Simulation units={units} intel={intel} /> : <p className="muted small">Aucun renseignement sur cette cible : envoyez d'abord des éclaireurs pour estimer le combat.</p>)}
       {totalUnits(v.troopsHome) === 0 && <p className="muted small">Aucune troupe disponible dans ce village.</p>}
       <div className="row">
         {!ownTarget && (
-          <button className="btn danger" disabled={!valid || protectedTarget} onClick={() => send('attack')}>
+          <button className="btn danger" disabled={!valid || protectedTarget || wheat > wheatHave} onClick={() => send('attack')}>
             Attaquer
           </button>
         )}

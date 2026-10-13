@@ -19,7 +19,7 @@ import { tx, type Db } from '../db';
 import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
-import { assertCanAttack, dispatchCommand } from './commands';
+import { assertCanAttack, chargeAttackWheat, dispatchCommand, refundAttackWheat } from './commands';
 import { addTroops, getTroops, loadVillage, setTroops, syncVillage } from './village';
 
 /**
@@ -86,6 +86,8 @@ export async function placeOrder(c: Db, outbox: Outbox, playerId: number, origin
     travelMs: (u) => travelTime(u, origin, target, env.worldSpeed) * 1000,
   });
 
+  // Le blé de toute l'attaque est payé à la commande, comme les troupes sont réservées ; il est rendu si l'ordre est annulé.
+  if (input.type === 'attack') await chargeAttackWheat(c, playerId, origin, units);
   await setTroops(c, origin.id, origin.id, subtractUnits(available, units));
   const group = randomUUID();
   for (const part of parts) {
@@ -108,12 +110,14 @@ export async function placeOrder(c: Db, outbox: Outbox, playerId: number, origin
 export async function cancelOrder(c: Db, outbox: Outbox, playerId: number, groupId: string) {
   const { rows } = await c.query('SELECT * FROM planned_commands WHERE group_id = $1 AND player_id = $2 FOR UPDATE', [groupId, playerId]);
   if (rows.length === 0) throw new GameError('Cet ordre est déjà parti ou annulé');
-  for (const row of rows) await refund(c, outbox, row);
+  for (const row of rows) await refund(c, outbox, row, new Date());
   await c.query('DELETE FROM planned_commands WHERE group_id = $1 AND player_id = $2', [groupId, playerId]);
 }
 
-async function refund(c: Db, outbox: Outbox, row: { player_id: number; origin_village_id: number; units: unknown }) {
-  await addTroops(c, row.origin_village_id, row.origin_village_id, normalizeUnits(row.units as Partial<UnitCounts>));
+async function refund(c: Db, outbox: Outbox, row: { player_id: number; origin_village_id: number; type: string; units: unknown }, now: Date) {
+  const units = normalizeUnits(row.units as Partial<UnitCounts>);
+  await addTroops(c, row.origin_village_id, row.origin_village_id, units);
+  if (row.type === 'attack') await refundAttackWheat(c, row.player_id, row.origin_village_id, units, now);
   outbox.push(row.player_id, { type: 'village', villageId: row.origin_village_id });
 }
 
@@ -193,6 +197,6 @@ async function launch(
   } catch (err) {
     if (!(err instanceof GameError)) throw err;
     // La cible n'est plus attaquable (protection, village devenu le nôtre) : les troupes rentrent.
-    await refund(c, outbox, row);
+    await refund(c, outbox, row, now);
   }
 }

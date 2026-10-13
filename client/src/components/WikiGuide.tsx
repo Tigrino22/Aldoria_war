@@ -18,6 +18,7 @@ import {
   emptyResources,
   hiddenResources,
   populationCapacity,
+  ATTACK_WHEAT_PER_POPULATION,
   resourceProduction,
   wallBonus,
   warehouseCapacity,
@@ -204,7 +205,7 @@ export default function WikiGuide() {
           </li>
           <li>
             <b>La ferme loge l'armée.</b> Le blé est une ressource comme les autres, mais la {B('farm')} limite le nombre de soldats : {fmt(populationCapacity(1))} places au niveau 1,{' '}
-            {fmt(populationCapacity(10))} au niveau 10. Un lancier prend 1 place, un cavalier {UNITS.cavalry.population}, un noble {noble.population}. Si la caserne refuse de recruter, c'est souvent la ferme.
+            {fmt(populationCapacity(10))} au niveau 10. Un lancier prend 1 place, un cavalier {UNITS.cavalry.population}, un noble {noble.population}. Si la caserne refuse de recruter, c'est souvent la ferme. Gardez aussi du blé pour vos attaques : chacune emporte {ATTACK_WHEAT_PER_POPULATION} blé par place de population envoyée.
           </li>
           <li>
             <b>La cachette protège une réserve.</b> {fmt(HIDDEN_SHARE * 100)} % de la capacité de l'entrepôt est invisible pour les pillards ({fmt(hiddenResources(5))} par ressource au niveau 5). Tout le reste

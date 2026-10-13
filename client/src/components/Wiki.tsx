@@ -31,6 +31,7 @@ import {
   merchantCount,
   recruitTime,
   populationCapacity,
+  ATTACK_WHEAT_PER_POPULATION,
   resourceProduction,
   villagePoints,
   wallBonus,
@@ -115,7 +116,7 @@ function bonusSummary(key: BuildingKey, speed: number): string {
   if (RESOURCE_BUILDING[key]) {
     const extra =
       key === 'farm'
-        ? ` La ferme loge aussi votre armée : chaque soldat occupe des places de population (1 pour un lancier, 4 pour un cavalier). Elle en offre ${fmt(populationCapacity(1))} au niveau 1, soit ${fmt(populationCapacity(1))} lanciers, et ${fmt(populationCapacity(20))} au niveau 20.`
+        ? ` La ferme loge aussi votre armée : chaque soldat occupe des places de population (1 pour un lancier, 4 pour un cavalier). Elle en offre ${fmt(populationCapacity(1))} au niveau 1, soit ${fmt(populationCapacity(1))} lanciers, et ${fmt(populationCapacity(20))} au niveau 20. Chaque attaque emporte aussi ses rations : ${ATTACK_WHEAT_PER_POPULATION} blé par place de population envoyée, rendu si vous annulez.`
         : '';
     return `Produit ${fmt(resourceProduction(1) * speed)} ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} par heure au niveau 1, ${fmt(resourceProduction(20) * speed)} au niveau 20 (sans bâtiment : ${fmt(resourceProduction(0) * speed)} par heure).${extra}`;
   }

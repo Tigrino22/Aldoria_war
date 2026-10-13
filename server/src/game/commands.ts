@@ -11,6 +11,7 @@ import {
   TradeReportData,
   UnitCounts,
   UnitKey,
+  attackWheatCost,
   carryCapacity,
   emptyResources,
   emptyUnits,
@@ -126,6 +127,31 @@ export async function dispatchCommand(
   return { id, arriveAt };
 }
 
+/** Les PNJ ne paient pas le blé des attaques : leur économie est réglée à part (voir docs/PARAMETRES.md). */
+async function paysWheat(c: Db, playerId: number): Promise<boolean> {
+  const { rows } = await c.query('SELECT is_npc FROM players WHERE id = $1', [playerId]);
+  return rows[0]?.is_npc !== true;
+}
+
+/** Retire du village (déjà synchronisé) le blé d'une attaque. À appeler avant `saveVillage` ou `dispatchCommand`. */
+export async function chargeAttackWheat(c: Db, playerId: number, origin: VillageRow, units: UnitCounts) {
+  if (!(await paysWheat(c, playerId))) return;
+  const cost = attackWheatCost(units);
+  if (cost > Math.floor(origin.wheat)) throw new GameError(`Il faut ${cost} blé pour nourrir ces troupes en campagne, vous en avez ${Math.floor(origin.wheat)}`);
+  origin.wheat -= cost;
+  await saveVillage(c, origin);
+}
+
+/** Rend le blé d'une attaque qui ne part pas (annulation), sans dépasser l'entrepôt. */
+export async function refundAttackWheat(c: Db, playerId: number, villageId: number, units: UnitCounts, now: Date) {
+  if (!(await paysWheat(c, playerId))) return;
+  const v = await syncVillage(c, villageId, now);
+  if (v.owner_id !== playerId) return;
+  const cap = warehouseCapacity(v.buildings.warehouse);
+  v.wheat = Math.max(v.wheat, Math.min(cap, v.wheat + attackWheatCost(units)));
+  await saveVillage(c, v);
+}
+
 export async function sendCommand(
   c: Db,
   outbox: Outbox,
@@ -144,7 +170,10 @@ export async function sendCommand(
   const available = await getTroops(c, origin.id, origin.id);
   if (!hasUnits(available, units)) throw new GameError("Vous n'avez pas assez de troupes au village");
 
-  if (input.type === 'attack') await assertCanAttack(c, playerId, target, now);
+  if (input.type === 'attack') {
+    await assertCanAttack(c, playerId, target, now);
+    await chargeAttackWheat(c, playerId, origin, units);
+  }
 
   await setTroops(c, origin.id, origin.id, subtractUnits(available, units));
   return dispatchCommand(c, outbox, { type: input.type, playerId, origin, target, units, sentAt: now });
@@ -202,6 +231,7 @@ export async function cancelCommand(c: Db, outbox: Outbox, playerId: number, com
   const elapsed = (now.getTime() - new Date(cmd.sent_at).getTime()) / 1000;
   if (elapsed > CANCEL_GRACE_SECONDS) throw new GameError(`On ne peut annuler un mouvement que dans les ${CANCEL_GRACE_SECONDS} premières secondes`);
   await c.query('UPDATE commands SET processed = true WHERE id = $1', [commandId]);
+  if (cmd.type === 'attack') await refundAttackWheat(c, playerId, cmd.origin_village_id, normalizeUnits(cmd.units), now);
   await insertCommand(c, {
     type: 'return',
     originId: cmd.target_village_id,
