@@ -15,6 +15,7 @@ import {
 import { tx, pool, type Db } from '../db';
 import { env } from '../env';
 import { GameError } from '../errors';
+import { unlocked, type Locker } from '../lock';
 import { computePopulation, enqueueBuild, enqueueRecruit, getTroops, resourcesOf, syncVillage } from '../game/village';
 import { costOf, nextBuilding, nextTroopLot, parsePlan, reserveFor, troopBudget, type Plan } from './rules';
 
@@ -109,31 +110,35 @@ export async function runVillage(c: Db, villageId: number, plan: Plan, now: Date
   return done;
 }
 
-/** Passe de tout le monde : à appeler sous le verrou du jeu. Ne fait rien si l'administrateur a coupé le gestionnaire. */
-export async function processManager(now: Date): Promise<number> {
+/**
+ * Passe de tout le monde, village par village sous `lock` (le verrou du jeu en production, pour laisser passer les joueurs
+ * entre deux villages, `clock` donnant alors l'heure réelle de chaque village). Ne fait rien si l'administrateur a coupé le gestionnaire.
+ */
+export async function processManager(now: Date, opts: { lock?: Locker; clock?: () => Date } = {}): Promise<number> {
+  const lock = opts.lock ?? unlocked;
   if (!env.accountManager) return 0;
   const { rows } = await pool.query(
-    `SELECT mv.village_id, mv.owner_id, mv.custom, v.owner_id AS real_owner,
+    `SELECT mv.village_id, mv.owner_id, mv.custom,
             t.buildings AS t_buildings, t.troops AS t_troops, t.troops_share AS t_share
      FROM manager_villages mv
-     JOIN villages v ON v.id = mv.village_id
      LEFT JOIN manager_templates t ON t.id = mv.template_id
      WHERE mv.enabled ORDER BY mv.village_id`,
   );
   let runs = 0;
   for (const row of rows) {
     try {
-      await tx(async (c) => {
-        // Village conquis par un autre joueur : ses réglages disparaissent.
-        if (row.real_owner !== row.owner_id) {
+      await lock(() => tx(async (c) => {
+        // Village conquis par un autre joueur (relu sous le verrou, il a pu tomber depuis la liste) : ses réglages disparaissent.
+        const owner = (await c.query('SELECT owner_id FROM villages WHERE id = $1', [row.village_id])).rows[0]?.owner_id ?? null;
+        if (owner !== row.owner_id) {
           await c.query('DELETE FROM manager_villages WHERE village_id = $1', [row.village_id]);
           return;
         }
         const plan = planOf(row);
         if (!plan) return;
-        await runVillage(c, row.village_id, plan, now);
+        await runVillage(c, row.village_id, plan, opts.clock?.() ?? now);
         runs++;
-      });
+      }));
     } catch (err) {
       console.error(`Gestionnaire : village ${row.village_id} en échec`, err);
     }

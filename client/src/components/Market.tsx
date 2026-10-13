@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   MERCHANT_CAPACITY,
   RESOURCES,
@@ -39,9 +39,25 @@ export default function Market({ focus }: { focus?: string }) {
     if (tab === 'offers' && villageId) loadOffers();
   }, [tab, villageId, loadOffers]);
 
+  // La liste des villages ne sert qu'à l'onglet « Envoyer » : elle n'est chargée qu'une fois, et seulement là.
+  const needVillages = tab === 'send';
+  const villagesLoaded = useRef(false);
   useEffect(() => {
+    if (!needVillages || villagesLoaded.current) return;
+    villagesLoaded.current = true;
     run(async () => setVillages(await api<MapVillage[]>('/api/map')));
-  }, [run]);
+  }, [needVillages, run]);
+  // Une seule action à la fois : le bouton ne relance pas une requête déjà partie.
+  const [busy, setBusy] = useState(false);
+  const once = (fn: () => Promise<unknown>) => async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const target = useMemo(() => {
     const m = coords.trim().match(/^(\d+)\s*[|,; ]\s*(\d+)$/);
@@ -67,12 +83,13 @@ export default function Market({ focus }: { focus?: string }) {
   const valid = target && !targetError && needed > 0 && needed <= v.market.available && enough;
   const travel = target ? merchantTravelTime(v, target, world.speed) : 0;
 
-  const send = () =>
+  const send = once(() =>
     run(async () => {
       setVillage(await api(`/api/villages/${v.id}/trade`, { body: { targetId: target!.id, resources: cargo } }));
       toast(`Vos marchands partent vers ${target!.name}`);
       setAmounts({});
-    });
+    }),
+  );
 
   const convoys = [
     ...v.outgoing.filter((c) => c.type === 'trade').map((c) => ({ c, dir: 'out' as const })),
@@ -118,26 +135,35 @@ export default function Market({ focus }: { focus?: string }) {
             : giveAmount > Math.floor(res[form.give])
               ? "Vous n'avez pas assez de ressources"
               : null;
-    const publish = () =>
+    const publish = once(() =>
       run(async () => {
         setVillage(await api<VillageState>(`/api/villages/${v.id}/market/offers`, { body: { give: form.give, giveAmount, want: form.want, wantAmount } }));
         toast('Offre publiée');
         setForm((f) => ({ ...f, giveAmount: '', wantAmount: '' }));
-        await loadOffers();
-      });
+        void loadOffers();
+      }),
+    );
+    // L'offre acceptée ou annulée disparaît tout de suite ; la liste se recharge ensuite sans bloquer.
+    const drop = (id: number) => setOffers((o) => (o ? { offers: o.offers.filter((x) => x.id !== id), mine: o.mine.filter((x) => x.id !== id) } : o));
     const accept = (o: MarketOfferView) =>
-      run(async () => {
-        setVillage(await api<VillageState>(`/api/market/offers/${o.id}/accept`, { body: { villageId: v.id } }));
-        toast(`Échange accepté avec ${o.ownerName}`);
-        await loadOffers();
-      });
+      once(() =>
+        run(async () => {
+          setVillage(await api<VillageState>(`/api/market/offers/${o.id}/accept`, { body: { villageId: v.id } }));
+          toast(`Échange accepté avec ${o.ownerName}`);
+          drop(o.id);
+          void loadOffers();
+        }),
+      )();
     const cancel = (o: MarketOfferView) =>
-      run(async () => {
-        await api(`/api/market/offers/${o.id}`, { method: 'DELETE' });
-        toast('Offre annulée, ressources rendues');
-        await refreshVillage();
-        await loadOffers();
-      });
+      once(() =>
+        run(async () => {
+          await api(`/api/market/offers/${o.id}`, { method: 'DELETE' });
+          toast('Offre annulée, ressources rendues');
+          drop(o.id);
+          void refreshVillage();
+          void loadOffers();
+        }),
+      )();
     // Taux affiché sur la même ligne : combien l'acheteur doit rendre pour 1 unité reçue.
     const ratio = (o: MarketOfferView) => (o.want.amount / o.give.amount).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
     const Deal = ({ o }: { o: MarketOfferView }) => (
@@ -190,7 +216,7 @@ export default function Market({ focus }: { focus?: string }) {
                       <span className="muted small">{o.villageName} · {o.distance} cases · expire dans {left(o.expiresAt)}</span>
                     </span>
                     <Deal o={o} />
-                    <button className="btn primary small" disabled={!can || noMarket} title={noMarket ? "Construisez d'abord un marché" : can ? undefined : "Vous n'avez pas assez de ressources"} onClick={() => accept(o)}>
+                    <button className="btn primary small" disabled={busy || !can || noMarket} title={noMarket ? "Construisez d'abord un marché" : can ? undefined : "Vous n'avez pas assez de ressources"} onClick={() => accept(o)}>
                       Accepter
                     </button>
                   </li>
@@ -220,7 +246,7 @@ export default function Market({ focus }: { focus?: string }) {
                 <input type="number" min={0} inputMode="numeric" value={form.wantAmount} onChange={(e) => setForm({ ...form, wantAmount: e.target.value })} />
               </span>
             </label>
-            <button className="btn primary" disabled={!!formError || noMarket} title={noMarket ? "Construisez d'abord un marché" : undefined} onClick={publish}>
+            <button className="btn primary" disabled={busy || !!formError || noMarket} title={noMarket ? "Construisez d'abord un marché" : undefined} onClick={publish}>
               Publier l'offre
             </button>
           </div>
@@ -239,7 +265,7 @@ export default function Market({ focus }: { focus?: string }) {
                     <span className="muted small">expire dans {left(o.expiresAt)}</span>
                   </span>
                   <Deal o={o} />
-                  <button className="btn ghost small" onClick={() => cancel(o)}>
+                  <button className="btn ghost small" disabled={busy} onClick={() => cancel(o)}>
                     Annuler
                   </button>
                 </li>
@@ -308,7 +334,7 @@ export default function Market({ focus }: { focus?: string }) {
           )}
           {!enough && <p className="warn small">Vous n'avez pas assez de ressources.</p>}
           <div className="row">
-            <button className="btn primary" disabled={!valid} onClick={send}>
+            <button className="btn primary" disabled={busy || !valid} onClick={send}>
               Envoyer les marchands
             </button>
           </div>

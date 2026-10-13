@@ -156,6 +156,35 @@ export default async function villageRoutes(app: FastifyInstance) {
     });
   });
 
+  /**
+   * Assistant de pillage : la même troupe vers plusieurs villages en une seule requête. Les envois s'enchaînent dans l'ordre
+   * et s'arrêtent à la première erreur (troupes épuisées…) ; ceux déjà partis restent partis.
+   */
+  app.post('/api/villages/:id/commands/batch', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const body = z.object({ targetIds: z.array(z.number().int().positive()).min(1).max(100), units: unitsSchema }).parse(req.body);
+    return act(async (c, outbox, now) => {
+      let sent = 0;
+      let error: string | null = null;
+      for (const targetId of body.targetIds) {
+        await c.query('SAVEPOINT envoi');
+        try {
+          await sendCommand(c, outbox, playerId, id, { type: 'attack', targetId, units: body.units }, now);
+          await c.query('RELEASE SAVEPOINT envoi');
+          sent++;
+        } catch (err) {
+          await c.query('ROLLBACK TO SAVEPOINT envoi');
+          // Rien n'est parti : l'erreur est renvoyée telle quelle, comme pour un envoi simple.
+          if (sent === 0) throw err;
+          error = err instanceof Error ? err.message : 'Erreur inconnue';
+          break;
+        }
+      }
+      return { sent, error, village: await villageState(c, await syncVillage(c, id, now), playerId) };
+    });
+  });
+
   // Point de ralliement : ordre à heure d'arrivée précise et/ou train de nobles.
   app.post('/api/villages/:id/orders', async (req) => {
     const playerId = await requirePlayer(req);

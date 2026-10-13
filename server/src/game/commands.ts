@@ -554,10 +554,13 @@ async function handleReturn(c: Db, outbox: Outbox, cmd: any) {
   outbox.push(home.owner_id, { type: 'village', villageId: home.id });
 }
 
-/** Traite, dans l'ordre chronologique exact, tous les mouvements arrivés à destination. */
-export async function processDueEvents(now: Date): Promise<number> {
+/**
+ * Traite, dans l'ordre chronologique exact, les mouvements arrivés à destination (au plus `max`,
+ * pour que le minuteur puisse rendre la main entre deux lots).
+ */
+export async function processDueEvents(now: Date, max = Infinity): Promise<number> {
   let processed = await launchDueOrders(now);
-  for (;;) {
+  for (let n = 0; n < max; n++) {
     const outbox = new Outbox();
     const handled = await tx(async (c) => {
       const { rows } = await c.query(
@@ -578,4 +581,5 @@ export async function processDueEvents(now: Date): Promise<number> {
     outbox.flush();
     processed++;
   }
+  return processed;
 }

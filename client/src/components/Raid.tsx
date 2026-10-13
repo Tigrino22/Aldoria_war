@@ -78,6 +78,7 @@ export default function Raid() {
   const [sort, setSort] = useState<Sort>('distance');
   const [targets, setTargets] = useState<RaidTarget[] | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [sending, setSending] = useState(false);
 
   const villageId = v?.id;
   const load = useCallback(() => {
@@ -125,20 +126,19 @@ export default function Raid() {
   const sendTo = async (slot: Slot, ids: number[]) => {
     const model = models[slot];
     if (!unitsOf(model).length) return toast(`Enregistrez d’abord le modèle ${slot}`);
-    let sent = 0;
-    await run(async () => {
-      for (const id of ids) {
-        try {
-          setVillage(await api(`/api/villages/${v.id}/commands`, { body: { type: 'attack', targetId: id, units: model } }));
-          sent++;
-        } catch (err) {
-          if (sent === 0) throw err;
-          toast(`${sent} envoi${sent > 1 ? 's' : ''} parti${sent > 1 ? 's' : ''}, les troupes manquent pour les suivants`);
-          return;
-        }
-      }
-    });
-    if (sent > 0) toast(`${sent} attaque${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''} avec le modèle ${slot}`);
+    if (sending) return;
+    setSending(true);
+    // Tous les envois partent en une seule requête : le serveur les enchaîne et s'arrête quand les troupes manquent.
+    const res = await run(() => api<{ sent: number; error: string | null; village: VillageState }>(`/api/villages/${v.id}/commands/batch`, { body: { targetIds: ids, units: model } }));
+    setSending(false);
+    if (!res) return;
+    setVillage(res.village);
+    const sent = res.sent;
+    if (res.error) toast(`${sent} envoi${sent > 1 ? 's' : ''} parti${sent > 1 ? 's' : ''}, les troupes manquent pour les suivants`);
+    else toast(`${sent} attaque${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''} avec le modèle ${slot}`);
+    // Les villages visés disparaissent tout de suite de la liste (attaque en route), sans attendre le rechargement.
+    const gone = new Set(ids.slice(0, sent));
+    setTargets((t) => t?.map((x) => (gone.has(x.id) ? { ...x, underAttack: true } : x)) ?? t);
     setSelected(new Set());
     load();
   };
@@ -201,7 +201,7 @@ export default function Raid() {
                       <button
                         key={slot}
                         className={`btn small raid-slot-btn slot-${slot} ${danger.includes(slot) ? 'danger' : ''}`}
-                        disabled={possible[slot] < 1}
+                        disabled={sending || possible[slot] < 1}
                         title={unitsOf(models[slot]).length ? `Envoyer le modèle ${slot} (butin max. ${fmt(capacityOf(models[slot]))})` : `Modèle ${slot} vide`}
                         onClick={() => sendTo(slot, [t.id])}
                       >
@@ -220,7 +220,7 @@ export default function Raid() {
             {SLOTS.map((slot) => {
               const n = Math.min(picked.length, possible[slot]);
               return (
-                <button key={slot} className="btn gold" disabled={n < 1} title={picked.length > possible[slot] ? `Troupes pour ${possible[slot]} envoi${possible[slot] > 1 ? 's' : ''} seulement` : undefined} onClick={() => sendTo(slot, picked.slice(0, n).map((t) => t.id))}>
+                <button key={slot} className="btn gold" disabled={sending || n < 1} title={picked.length > possible[slot] ? `Troupes pour ${possible[slot]} envoi${possible[slot] > 1 ? 's' : ''} seulement` : undefined} onClick={() => sendTo(slot, picked.slice(0, n).map((t) => t.id))}>
                   Envoyer {slot} à {n} village{n > 1 ? 's' : ''}
                 </button>
               );

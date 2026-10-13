@@ -15,7 +15,8 @@ import { pool, tx, type Db } from '../db';
 import { env } from '../env';
 import { GameError } from '../errors';
 import { Outbox } from '../notify';
-import { sendCommand } from './commands';
+import { unlocked, type Locker } from '../lock';
+import { processDueEvents, sendCommand } from './commands';
 import { pickNpcName } from './npc-names';
 import {
   NOBLES_PER_CONQUEST,
@@ -671,10 +672,12 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
     const angryHere = (await grudgesOf(c, npcId, tribe, now)).length > 0;
     angry ||= angryHere;
     for (let k = 0; k < (angryHere ? 3 : 1); k++) {
-      const before = (await c.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'attack'", [npcId])).rows[0].n as number;
+      // Attaques en route avant et après l'étape (aucune ne peut arriver pendant) : si rien n'est parti, inutile d'insister.
+      const openAttacks = async () =>
+        (await c.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'attack' AND NOT processed", [npcId])).rows[0].n as number;
+      const before = await openAttacks();
       await attackStep(c, outbox, npcId, profile, v.id, cap, tribe, now);
-      const after = (await c.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'attack'", [npcId])).rows[0].n as number;
-      if (after === before) break;
+      if ((await openAttacks()) === before) break;
     }
   }
   // Pillage intensif : chaque village (pas seulement les trois premiers) envoie ses pillages vers les villages sans défense qu'il connaît.
@@ -685,32 +688,42 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   return angry;
 }
 
-/** Fait réfléchir tous les PNJ dont l'heure est venue. À appeler sous le verrou du jeu. */
-export async function processNpcs(now: Date, limit = 25): Promise<number> {
-  await alertTribes(now);
-  await alertAttackedNpcs(now);
-  await refreshWars(now);
-  await refreshTribeWars(now);
-  await tx((c) => ensureDailyNpc(c, now));
-  {
+/**
+ * Fait réfléchir tous les PNJ dont l'heure est venue. Chaque étape (alertes, guerres, puis chaque PNJ) passe par `lock` :
+ * en production, le verrou du jeu est pris étape par étape pour que les joueurs n'attendent pas la fin de toute la passe,
+ * et `clock` donne l'heure réelle de chaque étape. Sans ces options (tests), tout se fait à l'instant `now`.
+ */
+export async function processNpcs(now: Date, limit = 25, opts: { lock?: Locker; clock?: () => Date } = {}): Promise<number> {
+  const lock = opts.lock ?? unlocked;
+  const at = () => opts.clock?.() ?? now;
+  await lock(() => alertTribes(at()));
+  await lock(() => alertAttackedNpcs(at()));
+  await lock(() => refreshWars(at()));
+  await lock(() => refreshTribeWars(at()));
+  await lock(() => tx((c) => ensureDailyNpc(c, at())));
+  await lock(async () => {
     const outbox = new Outbox();
-    await tx((c) => expireOffers(c, outbox, now));
+    await tx((c) => expireOffers(c, outbox, at()));
     outbox.flush();
-  }
+  });
   const due = (
     await pool.query('SELECT id FROM players WHERE is_npc AND npc_next_action_at <= $1 ORDER BY npc_next_action_at LIMIT $2', [now, limit])
   ).rows;
   for (const { id } of due) {
-    const outbox = new Outbox();
-    let angry = false;
-    try {
-      angry = await tx((c) => npcThink(c, outbox, id, now));
-      outbox.flush();
-    } catch (err) {
-      console.error(`PNJ ${id} : réflexion échouée`, err);
-    }
-    await pool.query('UPDATE players SET npc_next_action_at = $2 WHERE id = $1', [id, new Date(now.getTime() + (angry ? Math.max(30_000, delayMs() / 4) : delayMs()))]);
+    await lock(async () => {
+      const t = at();
+      // Entre deux PNJ, des joueurs ont pu agir : les mouvements arrivés entre-temps sont traités avant la réflexion.
+      if (opts.clock) await processDueEvents(t);
+      const outbox = new Outbox();
+      let angry = false;
+      try {
+        angry = await tx((c) => npcThink(c, outbox, id, t));
+        outbox.flush();
+      } catch (err) {
+        console.error(`PNJ ${id} : réflexion échouée`, err);
+      }
+      await pool.query('UPDATE players SET npc_next_action_at = $2 WHERE id = $1', [id, new Date(t.getTime() + (angry ? Math.max(30_000, delayMs() / 4) : delayMs()))]);
+    });
   }
   return due.length;
 }
-
