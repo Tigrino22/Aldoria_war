@@ -68,12 +68,30 @@ function coalesce(fn: () => Promise<void>): () => Promise<void> {
 
 /** Heure du serveur, rafraîchie chaque seconde. */
 let serverOffset = 0;
+
+// Une seule horloge par intervalle pour toute la page, au lieu d'un minuteur par compte à rebours affiché :
+// tous les composants abonnés se mettent à jour dans le même rendu.
+const clocks = new Map<number, { listeners: Set<() => void>; timer: ReturnType<typeof setInterval> }>();
+function subscribeClock(intervalMs: number, fn: () => void) {
+  let clock = clocks.get(intervalMs);
+  if (!clock) {
+    const listeners = new Set<() => void>();
+    clock = { listeners, timer: setInterval(() => listeners.forEach((l) => l()), intervalMs) };
+    clocks.set(intervalMs, clock);
+  }
+  clock.listeners.add(fn);
+  return () => {
+    clock!.listeners.delete(fn);
+    if (clock!.listeners.size === 0) {
+      clearInterval(clock!.timer);
+      clocks.delete(intervalMs);
+    }
+  };
+}
+
 export function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => Date.now() + serverOffset);
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now() + serverOffset), intervalMs);
-    return () => clearInterval(t);
-  }, [intervalMs]);
+  useEffect(() => subscribeClock(intervalMs, () => setNow(Date.now() + serverOffset)), [intervalMs]);
   return now;
 }
 

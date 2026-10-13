@@ -9,3 +9,4 @@
 .offer-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
 .offer-form input { width: 100px; }
 .offer-rate { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.offers-more { display: block; margin: 10px auto 0; }

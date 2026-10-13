@@ -1,41 +1,58 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { RESOURCES } from '@aldoria/shared';
-import { logo, RESOURCE_IMG } from '../assets';
-import { NavIcon, type NavIconName } from './NavIcon';
-import './nav.css';
+import { buildingImg, logo, MAP_IMG, NAV_IMG, RESOURCE_IMG, UNIT_IMG } from '../assets';
 import { fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { liveResources } from '../ui';
 import Barracks from './Barracks';
-import Messages from './Messages';
 import RallyPoint from './RallyPoint';
-import RallyPage from './RallyPage';
-import Ranking from './Ranking';
-import Reports from './Reports';
-import Market from './Market';
-import Account from './Account';
 import ResourceBar from './ResourceBar';
-import Tribe from './Tribe';
 import TownHall from './TownHall';
 import VillageView from './VillageView';
-import Manager from './Manager';
-import Overview from './Overview';
-import Profile from './Profile';
-import Wiki from './Wiki';
-import WorldStats from './WorldStats';
-import WorldWars from './WorldWars';
-import Admin from './Admin';
-import Raid from './Raid';
 import { api } from '../api';
 
 // La carte embarque PixiJS : elle n'alourdit pas le premier affichage, puis se précharge dès que le jeu est au repos.
 const loadMap = () => import('./MapView');
 const MapView = lazy(loadMap);
 
+// Pages secondaires : chargées à la première visite (puis préchargées au repos), pour que le jeu s'ouvre plus vite.
+const PAGES = {
+  Messages: () => import('./Messages'),
+  RallyPage: () => import('./RallyPage'),
+  Ranking: () => import('./Ranking'),
+  Reports: () => import('./Reports'),
+  Market: () => import('./Market'),
+  Account: () => import('./Account'),
+  Tribe: () => import('./Tribe'),
+  Manager: () => import('./Manager'),
+  Overview: () => import('./Overview'),
+  Profile: () => import('./Profile'),
+  Wiki: () => import('./Wiki'),
+  WorldStats: () => import('./WorldStats'),
+  WorldWars: () => import('./WorldWars'),
+  Admin: () => import('./Admin'),
+  Raid: () => import('./Raid'),
+};
+const Messages = lazy(PAGES.Messages);
+const RallyPage = lazy(PAGES.RallyPage);
+const Ranking = lazy(PAGES.Ranking);
+const Reports = lazy(PAGES.Reports);
+const Market = lazy(PAGES.Market);
+const Account = lazy(PAGES.Account);
+const Tribe = lazy(PAGES.Tribe);
+const Manager = lazy(PAGES.Manager);
+const Overview = lazy(PAGES.Overview);
+const Profile = lazy(PAGES.Profile);
+const Wiki = lazy(PAGES.Wiki);
+const WorldStats = lazy(PAGES.WorldStats);
+const WorldWars = lazy(PAGES.WorldWars);
+const Admin = lazy(PAGES.Admin);
+const Raid = lazy(PAGES.Raid);
+
 interface NavItem {
   path: string;
   label: string;
-  icon: NavIconName;
+  img: string;
 }
 
 // Menu complet, groupé : menu latéral sur ordinateur, tiroir « Menu » sur mobile.
@@ -43,44 +60,44 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Village',
     items: [
-      { path: 'village', label: 'Vue du village', icon: 'village' },
-      { path: 'hotel', label: 'Hôtel de ville', icon: 'hotel' },
-      { path: 'caserne', label: 'Caserne', icon: 'caserne' },
-      { path: 'marche', label: 'Marché', icon: 'marche' },
-      { path: 'marche/offres', label: 'Offres du marché', icon: 'offres' },
-      { path: 'apercu', label: 'Mes villages', icon: 'apercu' },
-      { path: 'gestionnaire', label: 'Gestionnaire de compte', icon: 'gestionnaire' },
+      { path: 'village', label: 'Vue du village', img: NAV_IMG.village },
+      { path: 'hotel', label: 'Hôtel de ville', img: buildingImg('townhall', 15) },
+      { path: 'caserne', label: 'Caserne', img: NAV_IMG.caserne },
+      { path: 'marche', label: 'Marché', img: buildingImg('market', 15) },
+      { path: 'marche/offres', label: 'Offres du marché', img: buildingImg('market', 15) },
+      { path: 'apercu', label: 'Mes villages', img: MAP_IMG.village3 },
+      { path: 'gestionnaire', label: 'Gestionnaire de compte', img: buildingImg('townhall', 15) },
     ],
   },
   {
     title: 'Armée',
     items: [
-      { path: 'troupes', label: 'Troupes', icon: 'troupes' },
-      { path: 'ralliement', label: 'Point de ralliement', icon: 'ralliement' },
-      { path: 'pillage', label: 'Assistant de pillage', icon: 'pillage' },
-      { path: 'carte', label: 'Carte', icon: 'carte' },
+      { path: 'troupes', label: 'Troupes', img: NAV_IMG.troupes },
+      { path: 'ralliement', label: 'Point de ralliement', img: NAV_IMG.troupes },
+      { path: 'pillage', label: 'Assistant de pillage', img: UNIT_IMG.cavalry },
+      { path: 'carte', label: 'Carte', img: NAV_IMG.carte },
     ],
   },
   {
     title: 'Social',
     items: [
-      { path: 'rapports', label: 'Rapports', icon: 'rapports' },
-      { path: 'messages', label: 'Messages', icon: 'messages' },
-      { path: 'tribu', label: 'Tribu', icon: 'tribu' },
-      { path: 'classement', label: 'Classement', icon: 'classement' },
-      { path: 'guerres', label: 'Guerres du monde', icon: 'guerres' },
-      { path: 'monde', label: 'Statistiques du monde', icon: 'monde' },
+      { path: 'rapports', label: 'Rapports', img: NAV_IMG.rapports },
+      { path: 'messages', label: 'Messages', img: NAV_IMG.messages },
+      { path: 'tribu', label: 'Tribu', img: NAV_IMG.tribu },
+      { path: 'classement', label: 'Classement', img: NAV_IMG.classement },
+      { path: 'guerres', label: 'Guerres du monde', img: NAV_IMG.classement },
+      { path: 'monde', label: 'Statistiques du monde', img: MAP_IMG.village3 },
     ],
   },
   {
     title: 'Aide',
     items: [
-      { path: 'wiki', label: 'Wiki', icon: 'wiki' },
-      { path: 'compte', label: 'Mon compte', icon: 'compte' },
+      { path: 'wiki', label: 'Wiki', img: NAV_IMG.rapports },
+      { path: 'compte', label: 'Mon compte', img: UNIT_IMG.noble },
     ],
   },
 ];
-const ADMIN_ITEM: NavItem = { path: 'admin', label: 'Administration', icon: 'admin' };
+const ADMIN_ITEM: NavItem = { path: 'admin', label: 'Administration', img: NAV_IMG.classement };
 const ALL_ITEMS = [...GROUPS.flatMap((g) => g.items), ADMIN_ITEM];
 /** Les quatre entrées toujours visibles en bas de l'écran sur mobile, le reste est dans « Menu ». */
 const TAB_PATHS = ['village', 'carte', 'troupes', 'rapports'];
@@ -132,7 +149,10 @@ export default function Layout() {
   }, [drawer]);
   useEffect(() => {
     const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 2000));
-    idle(() => void loadMap());
+    idle(() => {
+      void loadMap();
+      for (const load of Object.values(PAGES)) void load();
+    });
   }, []);
   const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : 0);
 
@@ -203,7 +223,7 @@ export default function Layout() {
               <h4>{g.title}</h4>
               {g.items.map((n) => (
                 <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''}>
-                  <span className="nav-medal"><NavIcon name={n.icon} /></span>
+                  <img src={n.img} alt="" width={28} height={28} />
                   <span>{n.label}</span>
                   {badge(n.path) > 0 && <span className="badge-pill">{badge(n.path)}</span>}
                 </a>
@@ -211,11 +231,11 @@ export default function Layout() {
             </nav>
           ))}
           <button className="side-quit" onClick={logout}>
-            <NavIcon name="quitter" size={18} />
             Se déconnecter
           </button>
         </aside>
         <main className="content">
+          <Suspense fallback={<p className="muted">Chargement…</p>}>
           {page === 'village' && route[1] !== 'hotel' && <VillageView />}
           {(page === 'hotel' || (page === 'village' && route[1] === 'hotel')) && (village ? <TownHall v={village} /> : <p className="muted">Chargement du village…</p>)}
           {page === 'caserne' && <Barracks />}
@@ -240,12 +260,13 @@ export default function Layout() {
           {page === 'gestionnaire' && <Manager />}
           {page === 'admin' && me.isAdmin && <Admin />}
           {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
+          </Suspense>
         </main>
       </div>
       <nav className="nav" aria-label="Navigation">
         {TAB_ITEMS.map((n) => (
           <button key={n.path} className={page === n.path && !drawer ? 'active' : ''} onClick={() => (setDrawer(false), go(n.path))}>
-            <span className="nav-icon"><NavIcon name={n.icon} size={24} /></span>
+            <img className="nav-icon" src={n.img} alt="" width={26} height={26} />
             <span className="nav-label">{n.path === 'village' ? 'Village' : n.label}</span>
             {badge(n.path) > 0 && <span className="badge">{badge(n.path)}</span>}
           </button>
@@ -275,7 +296,7 @@ export default function Layout() {
                 <div className="sheet-grid">
                   {g.items.map((n) => (
                     <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''} onClick={() => setDrawer(false)}>
-                      <span className="nav-medal"><NavIcon name={n.icon} size={26} /></span>
+                      <img src={n.img} alt="" width={38} height={38} />
                       <span>{n.label}</span>
                       {badge(n.path) > 0 && <span className="badge">{badge(n.path)}</span>}
                     </a>
@@ -284,7 +305,6 @@ export default function Layout() {
               </section>
             ))}
             <button className="btn ghost sheet-quit" onClick={logout}>
-              <NavIcon name="quitter" size={18} />
               Se déconnecter
             </button>
           </div>
