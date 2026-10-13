@@ -16,7 +16,7 @@ async function makePlayer(name: string) {
 }
 const mk = (owner: number, x: number, y: number, troops: any, at: Date) =>
   tx((c) =>
-    createVillage(c, { ownerId: owner, name: 'V', x, y, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at, troops: { ...emptyUnits(), ...troops } }),
+    createVillage(c, { ownerId: owner, name: 'V', x, y, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 500 }, at, troops: { ...emptyUnits(), ...troops } }),
   );
 const kills = async (id: number) => (await pool.query('SELECT kills_attack::int AS a, kills_defense::int AS d FROM players WHERE id = $1', [id])).rows[0];
 

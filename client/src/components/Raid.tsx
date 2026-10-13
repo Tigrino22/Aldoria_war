@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RESOURCES, RESOURCE_NAMES, UNITS, UNIT_KEYS, normalizeUnits, resolveCombat, wallDuringCombat, type RaidStatus, type RaidTarget, type UnitKey, type VillageState } from '@aldoria/shared';
+import { RESOURCES, RESOURCE_NAMES, UNITS, UNIT_KEYS, attackWheatCost, normalizeUnits, resolveCombat, wallDuringCombat, type RaidStatus, type RaidTarget, type UnitKey, type VillageState } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, coords, fmt } from '../format';
 import { useGame, useRoute } from '../game';
@@ -39,9 +39,14 @@ type Sort = 'distance' | 'points' | 'lootable' | 'loot';
 
 const unitsOf = (m: Model) => UNIT_KEYS.filter((k) => (m[k] ?? 0) > 0);
 const capacityOf = (m: Model) => unitsOf(m).reduce((n, k) => n + (m[k] ?? 0) * UNITS[k].carry, 0);
+const wheatOf = (m: Model) => attackWheatCost(normalizeUnits(m));
+/** Envois possibles d'un modèle : limités par les troupes au village et par le blé des rations. */
 const possibleOf = (m: Model, v: VillageState) => {
   const used = unitsOf(m);
-  return used.length ? Math.min(...used.map((k) => Math.floor(v.troopsHome[k] / m[k]!))) : 0;
+  if (!used.length) return 0;
+  const byTroops = Math.min(...used.map((k) => Math.floor(v.troopsHome[k] / m[k]!)));
+  const wheat = wheatOf(m);
+  return wheat > 0 ? Math.min(byTroops, Math.floor(v.resources.wheat / wheat)) : byTroops;
 };
 
 function ModelEditor({ slot, model, village, onSave }: { slot: Slot; model: Model; village: VillageState; onSave: (m: Model) => void }) {
@@ -64,6 +69,7 @@ function ModelEditor({ slot, model, village, onSave }: { slot: Slot; model: Mode
       </div>
       <p className="raid-sum">
         <span>Capacité de butin : <b>{fmt(capacityOf(model))}</b></span>
+        <span>Rations : <b>{fmt(wheatOf(model))}</b> blé par envoi</span>
         <span>Dans ce village : <b className={possible > 0 ? 'ok' : 'bad'}>{possible} envoi{possible > 1 ? 's' : ''} possible{possible > 1 ? 's' : ''}</b></span>
       </p>
     </div>
@@ -220,7 +226,7 @@ export default function Raid() {
             {SLOTS.map((slot) => {
               const n = Math.min(picked.length, possible[slot]);
               return (
-                <button key={slot} className="btn gold" disabled={sending || n < 1} title={picked.length > possible[slot] ? `Troupes pour ${possible[slot]} envoi${possible[slot] > 1 ? 's' : ''} seulement` : undefined} onClick={() => sendTo(slot, picked.slice(0, n).map((t) => t.id))}>
+                <button key={slot} className="btn gold" disabled={sending || n < 1} title={picked.length > possible[slot] ? `Troupes ou blé pour ${possible[slot]} envoi${possible[slot] > 1 ? 's' : ''} seulement` : undefined} onClick={() => sendTo(slot, picked.slice(0, n).map((t) => t.id))}>
                   Envoyer {slot} à {n} village{n > 1 ? 's' : ''}
                 </button>
               );

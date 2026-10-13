@@ -5,6 +5,7 @@ import {
   NOBLE_LOYALTY_MIN,
   UNITS,
   UNIT_KEYS,
+  attackWheatCost,
   distance,
   emptyUnits,
   normalizeUnits,
@@ -22,7 +23,7 @@ import {
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame, useNow } from '../game';
-import { Countdown, Panel, PlayerLink, UnitIcon, UnitList } from '../ui';
+import { Countdown, liveResources, Panel, PlayerLink, UnitIcon, UnitList } from '../ui';
 import './rally.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -68,6 +69,8 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
     train && attack ? { nobles: possibleNobles, escort: escortUnits, gapMs: Math.max(1, Math.min(10, Math.floor(Number(gap) || 1))) * 1000 } : null;
   const total = orderTotal(strike, trainSpec);
   const enough = UNIT_KEYS.every((k) => total[k] <= v.troopsHome[k]);
+  const wheat = attack ? attackWheatCost(total) : 0;
+  const wheatHave = Math.floor(liveResources(v, now).wheat);
   const travelMs = (u: typeof strike) => travelTime(u, v, target ?? v, world.speed) * 1000;
   const landAt = timing === 'at' && landInput ? new Date(landInput) : null;
   const plan = target && totalUnits(total) > 0 ? planOrderParts(strike, trainSpec, { landAt: timing === 'at' ? landAt : null, now: new Date(now), travelMs }) : null;
@@ -83,6 +86,8 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
           ? 'Sélectionnez des troupes.'
           : !enough
             ? 'Vous n’avez pas assez de troupes dans ce village.'
+            : wheat > wheatHave
+              ? `Il faut ${fmt(wheat)} blé pour nourrir ces troupes en campagne, vous en avez ${fmt(wheatHave)}.`
             : timing === 'at' && !landAt
               ? 'Indiquez l’heure d’arrivée.'
               : plan?.error ?? null;
@@ -234,6 +239,7 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
             ))}
           </ol>
         )}
+        {attack && wheat > 0 && !problem && <p className="small">Rations : <b>{fmt(wheat)}</b> blé, payées dès maintenant et rendues si vous annulez l’ordre.</p>}
         {problem && <p className="muted small">{problem}</p>}
         <div className="row">
           <button className={`btn ${attack ? 'danger' : ''}`} disabled={!!problem} onClick={send}>

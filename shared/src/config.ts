@@ -277,6 +277,9 @@ export const UNITS: Record<UnitKey, UnitDef> = {
 export const POPULATION_BASE = 240;
 export const POPULATION_GROWTH = 1.262;
 
+/** Blé emporté par une attaque, par place de population envoyée (rations de campagne). */
+export const ATTACK_WHEAT_PER_POPULATION = 1;
+
 /** Défense de base d'un village, même vide. */
 export const BASE_VILLAGE_DEFENSE = 20;
 /** Bonus de défense par niveau de muraille. */

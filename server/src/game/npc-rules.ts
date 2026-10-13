@@ -94,8 +94,8 @@ export function nextRecruit(
     .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(maxBatch, Math.ceil(deficit / 2))) }));
 }
 
-/** Éclaireurs envoyés selon le nombre d'échecs de suite : 10, puis 25, puis 60. */
-export const SCOUT_WAVES = [10, 25, 60] as const;
+/** Éclaireurs envoyés selon le nombre d'échecs de suite : 50 d'emblée, pour passer les éclaireurs d'un joueur, puis 100 et 200. */
+export const SCOUT_WAVES = [50, 100, 200] as const;
 /** Plus petite mission d'espionnage qu'un PNJ envoie chez un joueur ou un autre PNJ : avec moins, elle n'est pas crédible et il attend d'en avoir assez. */
 export const MIN_SCOUT_WAVE = 5;
 /** Part des éclaireurs du village engagée en temps de guerre (guerre de tribu, riposte, offensive). */
@@ -109,7 +109,7 @@ export interface ScoutWaveContext {
 }
 
 /**
- * Éclaireurs envoyés en mission, dans la limite de ceux dont le village dispose : 10 d'abord, puis 25 et 60 après chaque échec (tous les éclaireurs tués).
+ * Éclaireurs envoyés en mission, dans la limite de ceux dont le village dispose : 50 d'abord, puis 100 et 200 après chaque échec (tous les éclaireurs tués).
  * Une défense qui compte autant d'éclaireurs que l'attaque les tue tous : si le PNJ en a déjà vu chez la cible, il en envoie au moins le double (plus 5),
  * de quoi passer avec un tiers de pertes. En guerre, il double la vague et engage au moins les trois quarts de ses éclaireurs.
  * Renvoie 0 quand le village ne peut pas réunir `MIN_SCOUT_WAVE` éclaireurs : pas de mission à 1 ou 2 éclaireurs.
@@ -120,6 +120,37 @@ export function scoutWave(failures: number, available: number, ctx: ScoutWaveCon
   if (ctx.war) n = Math.max(n * 2, Math.ceil(available * WAR_SCOUT_SHARE));
   n = Math.min(Math.max(0, available), n);
   return n < MIN_SCOUT_WAVE ? 0 : n;
+}
+
+/**
+ * Réaction d'un PNJ dont l'espionnage a échoué : il attend, réessaie avec plus d'éclaireurs, envoie une petite troupe pour intimider
+ * le défenseur, ou frappe à l'aveugle avec une vraie attaque. Le tirage `roll` est entre 0 et 1.
+ */
+export type ScoutFailureMove = 'wait' | 'rescout' | 'harass' | 'strike';
+export const SCOUT_FAILURE_MOVES: readonly (readonly [ScoutFailureMove, number])[] = [
+  ['wait', 0.35],
+  ['rescout', 0.25],
+  ['harass', 0.25],
+  ['strike', 0.15],
+];
+export function afterScoutFailure(roll: number): ScoutFailureMove {
+  let acc = 0;
+  for (const [move, p] of SCOUT_FAILURE_MOVES) {
+    acc += p;
+    if (roll < acc) return move;
+  }
+  return SCOUT_FAILURE_MOVES[SCOUT_FAILURE_MOVES.length - 1][0];
+}
+
+/** Troupe d'intimidation : un dixième des épéistes et cavaliers du village, entre 10 et 40 unités. Null s'il y en a moins de 10. */
+export function harassUnits(available: UnitCounts): UnitCounts | null {
+  const pool = available.swordsman + available.cavalry;
+  if (pool < 10) return null;
+  const n = Math.min(40, Math.max(10, Math.round(pool / 10)));
+  const units = emptyUnits();
+  units.cavalry = Math.min(available.cavalry, Math.round((n * available.cavalry) / pool));
+  units.swordsman = Math.min(available.swordsman, n - units.cavalry);
+  return units;
 }
 
 /** Échecs d'espionnage consécutifs après lesquels un PNJ laisse une cible tranquille un temps. */

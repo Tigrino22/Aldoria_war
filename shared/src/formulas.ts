@@ -9,6 +9,7 @@ import {
   MERCHANT_SPEED,
   POPULATION_BASE,
   POPULATION_GROWTH,
+  ATTACK_WHEAT_PER_POPULATION,
   RESOURCES,
   Resources,
   UNITS,
@@ -79,6 +80,11 @@ export const hiddenResources = (warehouseLevel: number) => Math.round(warehouseC
 
 export function populationOf(units: UnitCounts): number {
   return UNIT_KEYS.reduce((sum, k) => sum + units[k] * UNITS[k].population, 0);
+}
+
+/** Blé consommé au départ d'une attaque : une ration par place de population envoyée. */
+export function attackWheatCost(units: UnitCounts): number {
+  return populationOf(units) * ATTACK_WHEAT_PER_POPULATION;
 }
 
 /** Population maximale (places d'armée) d'un village selon le niveau de sa ferme. */

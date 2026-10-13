@@ -35,6 +35,8 @@ import {
   SCOUT_MEMORY_GAME_HOURS,
   scoutPaused,
   scoutWave,
+  afterScoutFailure,
+  harassUnits,
   type ScoutFailures,
   tribeMemberProfiles,
   tribeRelations,
@@ -57,6 +59,9 @@ import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, re
 let rng: () => number = Math.random;
 /** Permet aux tests de rendre les décisions des PNJ déterministes. */
 export const setNpcRandom = (fn: () => number) => (rng = fn);
+let scoutFailureRoll: () => number = Math.random;
+/** Permet aux tests de choisir la réaction d'un PNJ à un espionnage raté. */
+export const setScoutFailureRandom = (fn: () => number) => (scoutFailureRoll = fn);
 
 /** Un PNJ agit en moyenne toutes les `npcThinkMinutes` minutes (de la moitié à une fois et demie), plus souvent quand le monde va vite. */
 const delayMs = () => Math.max(30_000, ((0.5 + rng()) * env.npcThinkMinutes * 60_000) / Math.sqrt(env.worldSpeed));
@@ -473,8 +478,23 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
         )
       ).rows[0].at;
       if (lastScout && now.getTime() - new Date(lastScout).getTime() < (cooldownHours * 3_600_000) / env.worldSpeed) return;
-      // Après un échec, on envoie bien plus d'éclaireurs : 10, puis 25, puis 60 (au moins le double de ceux déjà vus chez la cible).
       const failed = Math.max(failures.byVillage.get(target.id)?.count ?? 0, target.ownerId !== null ? (failures.byOwner.get(target.ownerId)?.count ?? 0) : 0);
+      if (failed > 0) {
+        // Espionnage raté : une seule réaction par délai d'espionnage, que ce soit une attaque ou un nouvel espionnage.
+        const lastMove = (await c.query("SELECT max(sent_at) AS at FROM commands WHERE player_id = $1 AND type = 'attack' AND target_village_id = $2", [npcId, target.id])).rows[0].at;
+        if (lastMove && now.getTime() - new Date(lastMove).getTime() < (cooldownHours * 3_600_000) / env.worldSpeed) return;
+        let move = afterScoutFailure(scoutFailureRoll());
+        // Un joueur déjà frappé par un PNJ pendant la période n'essuie pas de vraie attaque à l'aveugle : seulement de l'intimidation.
+        if (move === 'strike' && hostileToPlayer && (await recentlyHit(c, target.ownerId!, now))) move = 'harass';
+        if (move === 'wait') return;
+        if (move !== 'rescout') {
+          const units = move === 'harass' ? harassUnits(attackers) : pickOffensiveUnits(attackers);
+          if (!units || arrivesQuiet(units)) return;
+          await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units }, now);
+          return;
+        }
+      }
+      // Après un échec, on envoie bien plus d'éclaireurs : 50, puis 100, puis 200 (au moins le double de ceux déjà vus chez la cible).
       const count = scoutWave(failed, home.scout, { knownScouts: await knownScoutsAt(c, npcId, target.id), war });
       if (count === 0) return;
       const scouts = { ...emptyUnits(), scout: count };

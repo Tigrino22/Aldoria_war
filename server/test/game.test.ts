@@ -94,7 +94,7 @@ describe('jeu', () => {
     const t0 = new Date(Date.now() - 10 * HOUR);
     const big = { ...STARTING_BUILDINGS, warehouse: 10 };
     const home = await tx((c) =>
-      createVillage(c, { ownerId: attacker, name: 'Base', x: 10, y: 10, buildings: big, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), swordsman: 200, noble: 3 } }),
+      createVillage(c, { ownerId: attacker, name: 'Base', x: 10, y: 10, buildings: big, resources: { wood: 0, clay: 0, iron: 0, wheat: 1000 }, at: t0, troops: { ...emptyUnits(), swordsman: 200, noble: 3 } }),
     );
     const target = await tx((c) =>
       createVillage(c, { ownerId: defender, name: 'Cible', x: 12, y: 10, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 800, clay: 800, iron: 800, wheat: 800 }, at: t0, troops: { ...emptyUnits(), spearman: 10 } }),
@@ -156,7 +156,7 @@ describe('jeu', () => {
     const e = await makePlayer('Ennemi');
     const t0 = new Date(Date.now() - 10 * HOUR);
     const mk = (owner: number, x: number, troops: any) =>
-      tx((c) => createVillage(c, { ownerId: owner, name: 'V', x, y: 30, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), ...troops } }));
+      tx((c) => createVillage(c, { ownerId: owner, name: 'V', x, y: 30, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 200 }, at: t0, troops: { ...emptyUnits(), ...troops } }));
     const va = await mk(a, 30, { spearman: 300 });
     const vb = await mk(b, 32, {});
     const ve = await mk(e, 34, { swordsman: 100 });
@@ -197,7 +197,7 @@ describe('jeu', () => {
     const a = await makePlayer('Espion');
     const d = await makePlayer('Guetteur');
     const t0 = new Date(Date.now() - 10 * HOUR);
-    const va = await tx((c) => createVillage(c, { ownerId: a, name: 'Nid', x: 70, y: 70, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), scout: 10 } }));
+    const va = await tx((c) => createVillage(c, { ownerId: a, name: 'Nid', x: 70, y: 70, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 100 }, at: t0, troops: { ...emptyUnits(), scout: 10 } }));
     const vd = await tx((c) => createVillage(c, { ownerId: d, name: 'Tour', x: 72, y: 70, buildings: { ...STARTING_BUILDINGS, wall: 3 }, resources: { wood: 700, clay: 700, iron: 700, wheat: 700 }, at: t0, troops: { ...emptyUnits(), spearman: 50, scout: 4 } }));
     const s = await tx((c) => sendCommand(c, new Outbox(), a, va, { type: 'attack', targetId: vd, units: { scout: 10 } }, t0));
     await processDueEvents(new Date(s.arriveAt.getTime() + 1));
@@ -216,7 +216,7 @@ describe('jeu', () => {
   it('les béliers abaissent puis détruisent la muraille', async () => {
     const a = await makePlayer('Assiégeant');
     const t0 = new Date(Date.now() - 10 * HOUR);
-    const va = await tx((c) => createVillage(c, { ownerId: a, name: 'Camp', x: 80, y: 20, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), swordsman: 300, ram: 20 } }));
+    const va = await tx((c) => createVillage(c, { ownerId: a, name: 'Camp', x: 80, y: 20, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 1000 }, at: t0, troops: { ...emptyUnits(), swordsman: 300, ram: 20 } }));
     const vb = await tx((c) => createVillage(c, { ownerId: null, name: 'Fort', x: 81, y: 20, buildings: { ...STARTING_BUILDINGS, wall: 10 }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), spearman: 20 } }));
     const s = await tx((c) => sendCommand(c, new Outbox(), a, va, { type: 'attack', targetId: vb, units: { swordsman: 300, ram: 20 } }, t0));
     await processDueEvents(new Date(s.arriveAt.getTime() + 1));
@@ -349,7 +349,7 @@ describe('jeu', () => {
     const b = await makePlayer('Épargné');
     const t0 = new Date(Date.now() - HOUR);
     const home = await tx((c) =>
-      createVillage(c, { ownerId: a, name: 'Départ', x: 232, y: 230, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0, troops: { ...emptyUnits(), swordsman: 20 } }),
+      createVillage(c, { ownerId: a, name: 'Départ', x: 232, y: 230, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 100 }, at: t0, troops: { ...emptyUnits(), swordsman: 20 } }),
     );
     const target = await tx((c) =>
       createVillage(c, { ownerId: b, name: 'But', x: 236, y: 230, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 0, clay: 0, iron: 0, wheat: 0 }, at: t0 }),
