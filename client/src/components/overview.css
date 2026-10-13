@@ -1,0 +1,31 @@
+/* Mes villages, thème « Heure dorée » : une carte par village, ressources en barres dorées. */
+.app .pg .ov-res { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.app .pg .ov-hint { margin-top: -4px; }
+.app .pg .ov-village.active { border-color: rgb(224 178 60 / 0.6); box-shadow: inset 4px 0 0 var(--gold), 0 4px 14px rgb(0 0 0 / 0.12); }
+.app .pg .ov-village.threat { border-color: color-mix(in srgb, var(--danger) 55%, var(--line)); }
+.app .pg .ov-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.app .pg .ov-head img { flex: none; filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.35)); }
+.app .pg .ov-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 200px; }
+.app .pg .ov-title h2 { font: 700 18px var(--display); margin: 0; }
+.app .pg .ov-title h2 em { font-style: normal; color: var(--gold); }
+.app .pg .ov-actions { margin-left: auto; }
+.app .pg .ov-war {
+  padding: 8px 12px; border-radius: 10px; color: #ffe3dc; font-weight: 600;
+  background: linear-gradient(90deg, rgb(160 30 30 / 0.92), rgb(110 20 20 / 0.86)); border: 1px solid #ff8a7a;
+}
+.app .pg .ov-war .countdown { color: #fff; }
+.app .pg .ov-res-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.app .pg .ov-res-tile { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); min-width: 0; }
+.app .pg .ov-res-tile.full b { color: var(--danger); }
+.app .pg .ov-res-tile.full .pg-progress i { background: linear-gradient(90deg, #8c1c1c, #e04848); box-shadow: none; }
+.app .pg .ov-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 0; }
+.app .pg .ov-facts .wide { grid-column: 1 / -1; }
+.app .pg .ov-facts dt { font: 700 11px var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.app .pg .ov-facts dd { margin: 2px 0 0; }
+.app .pg .ov-facts .countdown { color: var(--gold); }
+@media (max-width: 640px) {
+  .app .pg .ov-res-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app .pg .ov-facts { grid-template-columns: minmax(0, 1fr); }
+  .app .pg .ov-actions { margin-left: 0; width: 100%; }
+  .app .pg .ov-actions .btn { flex: 1; }
+}
