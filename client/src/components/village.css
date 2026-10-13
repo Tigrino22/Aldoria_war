@@ -160,8 +160,18 @@
   .app .vv { gap: 12px; }
   .app .content > .village.vv > * { margin-inline: 12px; }
   .app .vv .vv-name { font-size: 21px; }
-  .app .vv .spot-labels .spot-label { font-size: 9px; padding: 1px 9px 1px 1px; gap: 3px; }
-  .app .vv .spot-label b { min-width: 15px; height: 15px; font-size: 9px; padding: 0 3px; }
+  /* Sur mobile, l'étiquette se réduit au sceau de cire (le niveau) pour laisser voir les bâtiments ;
+     le nom reste lu par les lecteurs d'écran et réapparaît sur le bâtiment sélectionné. */
+  .app .vv .spot-labels .spot-label { font-size: 9px; padding: 0; gap: 3px; background: none; box-shadow: none; clip-path: none; }
+  .app .vv .spot-labels .spot-label .spot-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .app .vv .spot-label b { min-width: 19px; height: 19px; font-size: 10px; padding: 0 4px; box-shadow: inset 0 0 0 1px #e07a6a, 0 1px 4px rgb(0 0 0 / 0.6); }
+  .app .vv .spot-labels .spot-label .spot-bar { position: absolute; left: 1px; right: 1px; bottom: -5px; height: 3px; margin: 0; background: rgb(0 0 0 / 0.55); }
+  .app .vv .spot-labels .spot-label:hover, .app .vv .spot-labels .spot-label.selected { background: none; }
+  .app .vv .spot-labels .spot-label.selected {
+    padding: 1px 9px 1px 1px; background: linear-gradient(180deg, #f7ecd0, #e2cf9f); box-shadow: 0 2px 5px rgb(0 0 0 / 0.5), inset 0 0 0 1px rgb(120 86 40 / 0.45);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%, 0 50%);
+  }
+  .app .vv .spot-labels .spot-label.selected .spot-name { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
   .app .vv .vv-tiles { grid-template-columns: 1fr 1fr; }
   .app .vv .vv-tile { grid-template-columns: 38px 1fr; }
   .app .vv .vv-tile img { width: 38px; height: 38px; }

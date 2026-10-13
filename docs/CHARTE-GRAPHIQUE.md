@@ -57,7 +57,7 @@ votre tribu `#2f6fdc`, alliés `#62c8ff`, guerre déclarée `#ff2b2b`, autres jo
 ## 5. Mise en page
 
 - Ordinateur : décor ou carte en grand, panneaux en verre posés dessus (coins), contenu secondaire en cartes dessous ou en colonne de 320 à 340 px.
-- Mobile (≤ 640 px) : décor bord à bord, panneaux en verre qui passent au-dessus ou au-dessous du décor, cibles de 44 px, tiroir et barre du bas en bois sombre avec liseré or.
+- Mobile (≤ 640 px) : décor bord à bord, panneaux en verre qui passent au-dessus ou au-dessous du décor, étiquettes du décor réduites au sceau de cire (le nom réapparaît sur le bâtiment sélectionné), cibles de 44 px, tiroir et barre du bas en bois sombre avec liseré or.
 
 ## 6. Images 3D (bâtiments, décor, enceinte)
 
