@@ -78,3 +78,12 @@ Réglages pour comparer : `window.FX = { light, post, ink, ao }` (chacun à `fal
 
 `client/src/components/nav.css` (menu), `map.css` + `mapStyle.ts` (carte), `tribe.css` (page Tribu),
 `village.css` (vue du village), `NavIcon.tsx`, `TribeCrest.tsx`, `client/src/styles.css` (variables de base).
+
+## 8. Pages du jeu (bannière et cartes partagées)
+
+Les autres pages (hôtel de ville, caserne, marché, troupes, rapports, messagerie, classement, wiki, compte…) suivent toutes le même gabarit :
+
+- `PageBanner` (`client/src/components/PageBanner.tsx`) : bannière en bois texturé, médaillon doré avec l'icône du menu (ou l'image du bâtiment), sur-titre, titre Cinzel, phrase d'intro, pastilles, actions, et jusqu'à six chiffres clés en tuiles de verre.
+- `CardTitle` : titre de carte en majuscules espacées, icône dorée, compteur rond.
+- `page.css` : cartes, onglets en bois, tableaux, liens or, bouton or, barre de progression, rangées de mouvements. Tout est écrit sous `.app .pg` : une page entre dans le thème en ajoutant la classe `pg` à son conteneur, sans rien changer aux pages validées.
+- Une feuille par page (`townhall.css`, `barracks.css`, `reports.css`, `wiki.css`…) pour ce qui lui est propre, toujours sous `.app .pg`. Jamais de règle globale du type `.btn.gold` dans une feuille de page.
