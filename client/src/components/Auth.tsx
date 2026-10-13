@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, setToken } from '../api';
 import { logo, villageBg } from '../assets';
+import './auth.css';
 
 export default function Auth({ onLogin }: { onLogin: () => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
