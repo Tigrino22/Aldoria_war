@@ -166,21 +166,50 @@ export function halfTimbered(w, h, d, x = 0, y = 0, z = 0) {
   return g;
 }
 
+/** Lueur chaude des fenêtres et lanternes (heure dorée : le village est habité). */
+const GLOW = new THREE.MeshStandardMaterial({ color: 0x3a2412, emissive: 0xffa040, emissiveIntensity: 0.5, roughness: 0.4 });
+const FLOWERS = [0xc0392b, 0xe8a33a, 0xd94f8a, 0xf2e3b0];
+
+/** Petite lanterne en fer sur potence, allumée. */
+export function lantern(x = 0, y = 0, z = 0) {
+  return group(
+    box(0.06, 0.06, 0.3, 'iron', x, y + 0.42, z + 0.15),
+    box(0.04, 0.12, 0.04, 'iron', x, y + 0.36, z + 0.28),
+    place(mesh(new THREE.BoxGeometry(0.18, 0.24, 0.18), GLOW), x, y + 0.22, z + 0.28),
+    box(0.24, 0.05, 0.24, 'iron', x, y + 0.33, z + 0.28),
+  );
+}
+
 export function door(w = 1.1, h = 2, tex = 'planks') {
   const g = new THREE.Group();
   g.add(box(w + 0.24, h + 0.12, 0.12, 'timber', 0, 0, 0));
   const d = box(w, h, 0.16, tex, 0, 0, 0.02, { color: 0x9a8070 });
   g.add(d);
+  // Pentures en fer forgé et lanterne à côté de l'entrée.
+  for (const y of [h * 0.22, h * 0.72]) g.add(box(w * 0.86, 0.07, 0.04, 'iron', 0, y, 0.12));
+  g.add(lantern(w / 2 + 0.4, h * 0.62, 0));
   return g;
 }
 
-export function windowPane(w = 0.7, h = 0.8) {
+export function windowPane(w = 0.7, h = 0.8, { flowers = rand() < 0.65, shutters = true } = {}) {
   const g = new THREE.Group();
   g.add(box(w + 0.2, h + 0.2, 0.1, 'timber'));
   const glass = box(w, h, 0.12, 'timber', 0, 0.1, 0.01);
-  glass.material = plain(0x1c1712, 0.4);
+  glass.material = GLOW;
   g.add(glass);
   g.add(box(0.06, h, 0.14, 'timber', 0, 0.1, 0.02));
+  g.add(box(w, 0.06, 0.14, 'timber', 0, 0.1 + h / 2 - 0.03, 0.02));
+  if (shutters)
+    for (const s of [-1, 1]) g.add(box(w / 2 + 0.04, h + 0.12, 0.06, 'planks', s * (w / 2 + 0.1 + w / 4 + 0.02), 0.04, 0.04, { color: 0x7d8c62 }));
+  g.add(box(w + 0.36, 0.08, 0.22, 'timber', 0, 0.02, 0.08));
+  if (flowers) {
+    g.add(box(w + 0.16, 0.2, 0.22, 'planks', 0, -0.2, 0.14));
+    for (let i = 0; i < 6; i++) {
+      const fx = -w / 2 + 0.05 + (i * (w - 0.1)) / 5;
+      g.add(place(mesh(new THREE.IcosahedronGeometry(0.09, 0), plain(0x4f7a2c, 0.9)), fx, 0.02, 0.16));
+      g.add(place(mesh(new THREE.IcosahedronGeometry(0.06, 0), plain(FLOWERS[Math.floor(rand() * FLOWERS.length)], 0.7)), fx + 0.04, 0.09, 0.2));
+    }
+  }
   return g;
 }
 

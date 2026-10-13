@@ -31,7 +31,14 @@ function hangingBanner(color, x, y, z, w = 0.8, h = 1.6) {
   const geo = new THREE.PlaneGeometry(w, h, 4, 6);
   const m = mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: THREE.DoubleSide }));
   m.position.set(x, y - h / 2, z);
-  const g = group(m, box(w + 0.2, 0.08, 0.08, 'timber', x, y, z));
+  // Liseré et médaillon dorés, comme les titres de l'interface.
+  const gold = plain(0xd4a531, 0.45);
+  const trim = mesh(new THREE.BoxGeometry(w, 0.1, 0.03), gold);
+  trim.position.set(x, y - h + 0.06, z + 0.02);
+  const disc = mesh(new THREE.CylinderGeometry(w * 0.22, w * 0.22, 0.03, 16), gold);
+  disc.rotation.x = Math.PI / 2;
+  disc.position.set(x, y - h * 0.45, z + 0.02);
+  const g = group(m, trim, disc, box(w + 0.2, 0.08, 0.08, 'timber', x, y, z));
   return g;
 }
 
@@ -428,6 +435,10 @@ export const BUILDERS = {
       at(gableRoof(8.4, 5.4, 2.8, 'tiles', 'plaster', { overhang: 0.45 }), 0, 5.6, 0),
       at(door(2.4, 2.6), -1.2, 0, 2.83),
       at(door(1.2, 1.6, 'planks'), 2.2, 3.4, 2.73),
+      at(windowPane(0.7, 0.9), -2.4, 3.6, 2.76),
+      at(windowPane(0.6, 0.8), -3, 1.1, 2.83),
+      chimney(-2.6, 6.6, -1.2, 1.6),
+      smoke(-2.6, 8.4, -1.2),
       box(0.25, 0.25, 1.8, 'timber', 2.2, 5.2, 3.3),
       box(0.03, 1.6, 0.03, 'timber', 2.2, 3.6, 4.1),
       crate(0.7, 2.2, 2.9, 4.1),
