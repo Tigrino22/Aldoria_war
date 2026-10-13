@@ -68,6 +68,7 @@ Rendues par `tools/render` (three.js dans Chromium, `node render.mjs [filtre]`),
 - **Trait d'encre** `rgb(38 24 14)` sur les arêtes et le contour (normales + profondeur), façon illustration.
 - **Occlusion ambiante** sur les creux, pieds de murs et dessous de toits, et ombre de contact au sol.
 - Tuiles en terre cuite patinée (`#86361f → #a94f34`), ardoise bleu-gris, chaume doré, pierre beige-gris.
+- Détails de vie sur les bâtiments : fenêtres éclairées de l'intérieur (vitre ambrée émissive `#ffa040`, croisillon), volets en planches vert-de-gris `#7d8c62`, appuis et jardinières fleuries, portes ferrées avec lanterne, bannières bordées d'or avec disque doré (`tools/render/kit.js`).
 - La porte de la muraille est tournée de 32° pour s'aligner sur l'enceinte (tracée face à l'écran).
 - Côté page, le décor reçoit en plus un voile chaud (`.vv-light`, `mix-blend-mode: soft-light`), des ombres de nuages lentes et une vignette.
 
