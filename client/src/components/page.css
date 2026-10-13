@@ -177,3 +177,8 @@
 /* Titre de section entre deux séries de cartes. */
 .app .pg .pg-section { display: flex; align-items: center; gap: 8px; margin: 6px 0 -4px; font: 700 13px var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); }
 .app .pg .pg-section .pg-count { color: var(--ink); }
+
+/* Pastilles cliquables (filtres, périodes) : la pastille choisie passe en or. */
+.app .pg .chip-btn { cursor: pointer; font: 600 12px var(--body); }
+.app .pg .chip-btn.chip-ok, .app .pg .chip-btn.on { background: linear-gradient(180deg, #e2b43a, #b8871a); border-color: #8a6410; color: #2b2018; box-shadow: none; }
+.app .pg-chip-label { font-size: 12px; color: var(--pg-muted); align-self: center; }

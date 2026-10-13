@@ -12,8 +12,6 @@
 .offer-form input { width: 100px; }
 .offer-rate { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .offers-more { display: block; margin: 10px auto 0; }
-.app .pg .offer-filter .chip-btn { cursor: pointer; font: 600 12px var(--body); }
-.app .pg .offer-filter .chip-btn.chip-ok { background: linear-gradient(180deg, #e2b43a, #b8871a); border-color: #8a6410; color: #2b2018; }
 
 /* Envoi de ressources : une tuile par ressource. */
 .app .pg.market .market-form label[for='trade-target'] { font-weight: 700; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
