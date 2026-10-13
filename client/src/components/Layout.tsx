@@ -1,8 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { RESOURCES } from '@aldoria/shared';
-import { logo, RESOURCE_IMG } from '../assets';
-import { NavIcon, type NavIconName } from './NavIcon';
-import './nav.css';
+import { buildingImg, logo, MAP_IMG, NAV_IMG, RESOURCE_IMG, UNIT_IMG } from '../assets';
 import { fmt } from '../format';
 import { useGame, useNow, useRoute } from '../game';
 import { liveResources } from '../ui';
@@ -35,7 +33,7 @@ const MapView = lazy(loadMap);
 interface NavItem {
   path: string;
   label: string;
-  icon: NavIconName;
+  img: string;
 }
 
 // Menu complet, groupé : menu latéral sur ordinateur, tiroir « Menu » sur mobile.
@@ -43,44 +41,44 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Village',
     items: [
-      { path: 'village', label: 'Vue du village', icon: 'village' },
-      { path: 'hotel', label: 'Hôtel de ville', icon: 'hotel' },
-      { path: 'caserne', label: 'Caserne', icon: 'caserne' },
-      { path: 'marche', label: 'Marché', icon: 'marche' },
-      { path: 'marche/offres', label: 'Offres du marché', icon: 'offres' },
-      { path: 'apercu', label: 'Mes villages', icon: 'apercu' },
-      { path: 'gestionnaire', label: 'Gestionnaire de compte', icon: 'gestionnaire' },
+      { path: 'village', label: 'Vue du village', img: NAV_IMG.village },
+      { path: 'hotel', label: 'Hôtel de ville', img: buildingImg('townhall', 15) },
+      { path: 'caserne', label: 'Caserne', img: NAV_IMG.caserne },
+      { path: 'marche', label: 'Marché', img: buildingImg('market', 15) },
+      { path: 'marche/offres', label: 'Offres du marché', img: buildingImg('market', 15) },
+      { path: 'apercu', label: 'Mes villages', img: MAP_IMG.village3 },
+      { path: 'gestionnaire', label: 'Gestionnaire de compte', img: buildingImg('townhall', 15) },
     ],
   },
   {
     title: 'Armée',
     items: [
-      { path: 'troupes', label: 'Troupes', icon: 'troupes' },
-      { path: 'ralliement', label: 'Point de ralliement', icon: 'ralliement' },
-      { path: 'pillage', label: 'Assistant de pillage', icon: 'pillage' },
-      { path: 'carte', label: 'Carte', icon: 'carte' },
+      { path: 'troupes', label: 'Troupes', img: NAV_IMG.troupes },
+      { path: 'ralliement', label: 'Point de ralliement', img: NAV_IMG.troupes },
+      { path: 'pillage', label: 'Assistant de pillage', img: UNIT_IMG.cavalry },
+      { path: 'carte', label: 'Carte', img: NAV_IMG.carte },
     ],
   },
   {
     title: 'Social',
     items: [
-      { path: 'rapports', label: 'Rapports', icon: 'rapports' },
-      { path: 'messages', label: 'Messages', icon: 'messages' },
-      { path: 'tribu', label: 'Tribu', icon: 'tribu' },
-      { path: 'classement', label: 'Classement', icon: 'classement' },
-      { path: 'guerres', label: 'Guerres du monde', icon: 'guerres' },
-      { path: 'monde', label: 'Statistiques du monde', icon: 'monde' },
+      { path: 'rapports', label: 'Rapports', img: NAV_IMG.rapports },
+      { path: 'messages', label: 'Messages', img: NAV_IMG.messages },
+      { path: 'tribu', label: 'Tribu', img: NAV_IMG.tribu },
+      { path: 'classement', label: 'Classement', img: NAV_IMG.classement },
+      { path: 'guerres', label: 'Guerres du monde', img: NAV_IMG.classement },
+      { path: 'monde', label: 'Statistiques du monde', img: MAP_IMG.village3 },
     ],
   },
   {
     title: 'Aide',
     items: [
-      { path: 'wiki', label: 'Wiki', icon: 'wiki' },
-      { path: 'compte', label: 'Mon compte', icon: 'compte' },
+      { path: 'wiki', label: 'Wiki', img: NAV_IMG.rapports },
+      { path: 'compte', label: 'Mon compte', img: UNIT_IMG.noble },
     ],
   },
 ];
-const ADMIN_ITEM: NavItem = { path: 'admin', label: 'Administration', icon: 'admin' };
+const ADMIN_ITEM: NavItem = { path: 'admin', label: 'Administration', img: NAV_IMG.classement };
 const ALL_ITEMS = [...GROUPS.flatMap((g) => g.items), ADMIN_ITEM];
 /** Les quatre entrées toujours visibles en bas de l'écran sur mobile, le reste est dans « Menu ». */
 const TAB_PATHS = ['village', 'carte', 'troupes', 'rapports'];
@@ -203,7 +201,7 @@ export default function Layout() {
               <h4>{g.title}</h4>
               {g.items.map((n) => (
                 <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''}>
-                  <span className="nav-medal"><NavIcon name={n.icon} /></span>
+                  <img src={n.img} alt="" width={28} height={28} />
                   <span>{n.label}</span>
                   {badge(n.path) > 0 && <span className="badge-pill">{badge(n.path)}</span>}
                 </a>
@@ -211,7 +209,6 @@ export default function Layout() {
             </nav>
           ))}
           <button className="side-quit" onClick={logout}>
-            <NavIcon name="quitter" size={18} />
             Se déconnecter
           </button>
         </aside>
@@ -245,7 +242,7 @@ export default function Layout() {
       <nav className="nav" aria-label="Navigation">
         {TAB_ITEMS.map((n) => (
           <button key={n.path} className={page === n.path && !drawer ? 'active' : ''} onClick={() => (setDrawer(false), go(n.path))}>
-            <span className="nav-icon"><NavIcon name={n.icon} size={24} /></span>
+            <img className="nav-icon" src={n.img} alt="" width={26} height={26} />
             <span className="nav-label">{n.path === 'village' ? 'Village' : n.label}</span>
             {badge(n.path) > 0 && <span className="badge">{badge(n.path)}</span>}
           </button>
@@ -275,7 +272,7 @@ export default function Layout() {
                 <div className="sheet-grid">
                   {g.items.map((n) => (
                     <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''} onClick={() => setDrawer(false)}>
-                      <span className="nav-medal"><NavIcon name={n.icon} size={26} /></span>
+                      <img src={n.img} alt="" width={38} height={38} />
                       <span>{n.label}</span>
                       {badge(n.path) > 0 && <span className="badge">{badge(n.path)}</span>}
                     </a>
@@ -284,7 +281,6 @@ export default function Layout() {
               </section>
             ))}
             <button className="btn ghost sheet-quit" onClick={logout}>
-              <NavIcon name="quitter" size={18} />
               Se déconnecter
             </button>
           </div>
