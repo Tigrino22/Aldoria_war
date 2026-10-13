@@ -162,3 +162,14 @@
   .app .pg .tabs button { font-size: 12px; letter-spacing: 0.03em; min-height: 44px; }
   .app .pg .panel, .app .pg .pg-card { padding: 14px 12px; }
 }
+
+/* Lignes de mouvement (convois, ordres) : bandeau coloré à gauche, comme les mouvements de la page Troupes. */
+.app .pg .movements { gap: 8px; }
+.app .pg .movements .movement {
+  padding: 9px 12px; border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: 10px; background: var(--panel-2);
+}
+.app .pg .movements .movement.type-trade, .app .pg .movements .movement.type-trade_return { border-left-color: var(--gold); }
+.app .pg .movements .movement.type-trade .mv-type { color: var(--gold); }
+.app .pg .movements .movement.type-attack, .app .pg .movements .movement.hostile { border-left-color: var(--danger); }
+.app .pg .movements .movement.type-support { border-left-color: var(--ok); }
+.app .pg .movements .movement .mv-time .countdown { color: var(--gold); }
