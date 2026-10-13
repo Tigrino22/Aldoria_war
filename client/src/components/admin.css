@@ -78,3 +78,6 @@
 .app .pg .war-truce li { padding: 6px 10px; border-radius: 10px; background: var(--panel-2); border-left: 3px solid var(--gold); }
 .app .pg .switch.on { color: var(--gold); }
 .app .pg .switch.on .switch-track { background: linear-gradient(180deg, #e2b43a, #b8871a); }
+/* Administration : onglets et période sous la bannière. */
+.app .pg .admin-toolbar { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.app .pg .admin-toolbar .admin-chips { margin: 0; align-items: center; }

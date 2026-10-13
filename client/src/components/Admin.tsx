@@ -4,6 +4,7 @@ import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { Panel } from '../ui';
+import { PageBanner } from './PageBanner';
 import AdminWars from './AdminWars';
 import './admin.css';
 
@@ -154,8 +155,9 @@ export default function Admin() {
   const events = (log?.events ?? []).filter((e) => (kind === 'all' ? true : kind === 'quiet' ? e.quiet : e.kind === kind));
 
   return (
-    <div className="stack admin">
-      <Panel title="Administration" actions={<span className="muted small">Lecture seule · actualisé toutes les 20 s</span>}>
+    <div className="pg admin">
+      <PageBanner icon="admin" kicker="Administration" title="Tableau de bord du monde" lead="Lecture seule · actualisé toutes les 20 s" />
+      <div className="admin-toolbar">
         <div className="tabs" role="tablist">
           {tabs.map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
@@ -173,7 +175,7 @@ export default function Admin() {
             ))}
           </div>
         )}
-      </Panel>
+      </div>
 
       {tab === 'npc' && (
         <>
