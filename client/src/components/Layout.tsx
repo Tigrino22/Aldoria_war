@@ -121,6 +121,13 @@ export default function Layout() {
   const page = route[0] ?? 'village';
   const [drawer, setDrawer] = useState(false);
   useEffect(() => setDrawer(false), [route.join('/')]);
+  // Le tiroir se ferme aussi avec la touche Échap.
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawer]);
   useEffect(() => {
     const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 2000));
     idle(() => void loadMap());
@@ -252,14 +259,19 @@ export default function Layout() {
       </nav>
       {drawer && (
         <div className="sheet-backdrop" onClick={() => setDrawer(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-grip" />
+          <div className="sheet" role="dialog" aria-modal="true" aria-label="Menu" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <div className="sheet-grip" />
+              <button className="sheet-close" aria-label="Fermer le menu" onClick={() => setDrawer(false)}>
+                ✕
+              </button>
+            </div>
             {groups.map((g) => (
               <section key={g.title}>
                 <h4>{g.title}</h4>
                 <div className="sheet-grid">
                   {g.items.map((n) => (
-                    <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''}>
+                    <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''} onClick={() => setDrawer(false)}>
                       <img src={n.img} alt="" width={38} height={38} />
                       <span>{n.label}</span>
                       {badge(n.path) > 0 && <span className="badge">{badge(n.path)}</span>}

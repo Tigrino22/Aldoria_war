@@ -160,10 +160,9 @@ export async function grudgesOf(c: Db, npcId: number, tribe: TribeInfo | null, n
   const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];
   const { rows } = await c.query(
     `SELECT DISTINCT cm.player_id FROM commands cm
-     JOIN villages t ON t.id = cm.target_village_id
      JOIN players a ON a.id = cm.player_id
      WHERE cm.type = 'attack' AND NOT a.is_npc AND cm.sent_at > $1 AND ${REAL_ATTACK}
-       AND (t.owner_id = $2 OR t.owner_id IN (SELECT id FROM players WHERE tribe_id = ANY($3::int[])))`,
+       AND cm.target_village_id = ANY(ARRAY(SELECT id FROM villages WHERE owner_id = $2 OR owner_id IN (SELECT id FROM players WHERE tribe_id = ANY($3::int[]))))`,
     [new Date(now.getTime() - GRUDGE_DAYS * 86_400_000), npcId, friends],
   );
   return rows.map((r) => r.player_id as number);

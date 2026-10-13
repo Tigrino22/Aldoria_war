@@ -253,6 +253,29 @@ describe('PNJ en jeu', () => {
     expect(new Date(next).getTime()).toBeGreaterThan(NOON.getTime());
   });
 
+  it('processNpcs prend le verrou PNJ par PNJ pour laisser passer les joueurs', async () => {
+    await pool.query('UPDATE players SET npc_next_action_at = $1 WHERE is_npc', [new Date(NOON.getTime() + 10 * 3_600_000)]);
+    const ids = (await pool.query('SELECT id FROM players WHERE is_npc ORDER BY id LIMIT 2')).rows.map((r) => r.id);
+    await pool.query('UPDATE players SET npc_next_action_at = $2 WHERE id = ANY($1)', [ids, NOON]);
+    let held = 0;
+    let max = 0;
+    let calls = 0;
+    const lock = async <T,>(fn: () => Promise<T>) => {
+      calls++;
+      held++;
+      max = Math.max(max, held);
+      try {
+        return await fn();
+      } finally {
+        held--;
+      }
+    };
+    expect(await processNpcs(NOON, 25, { lock, clock: () => NOON })).toBe(2);
+    // Six étapes communes (alertes, guerres, nouveau PNJ, offres expirées), puis une par PNJ, jamais imbriquées.
+    expect(calls).toBe(8);
+    expect(max).toBe(1);
+  });
+
   it('un PNJ sans village repart ailleurs après un délai', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'builder'));
     await pool.query('DELETE FROM villages WHERE owner_id = $1', [npc]);

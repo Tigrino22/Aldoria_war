@@ -41,6 +41,31 @@ const readStoredVillage = () => {
   }
 };
 
+/**
+ * Regroupe les rechargements : pendant qu'une requête est en cours, les demandes suivantes n'en relancent qu'une seule
+ * à la fin (au lieu d'une par notification reçue), et toutes attendent ce dernier résultat.
+ */
+function coalesce(fn: () => Promise<void>): () => Promise<void> {
+  let running: Promise<void> | null = null;
+  let queued: Promise<void> | null = null;
+  const start = (): Promise<void> => {
+    running = fn().finally(() => {
+      running = null;
+    });
+    return running;
+  };
+  return () => {
+    if (!running) return start();
+    if (!queued) {
+      queued = running.then(() => {
+        queued = null;
+        return start();
+      });
+    }
+    return queued;
+  };
+}
+
 /** Heure du serveur, rafraîchie chaque seconde. */
 let serverOffset = 0;
 export function useNow(intervalMs = 1000) {
@@ -81,29 +106,37 @@ export function GameProvider({ children, onLogout }: { children: (state: 'loadin
     [logout, toast],
   );
 
-  const refreshMe = useCallback(async () => {
-    try {
-      const data = await api<MeResponse>('/api/me');
-      setMe(data);
-      if (data.villages.length && !data.villages.some((v) => v.id === villageIdRef.current)) {
-        setVillageIdState(data.villages[0].id);
-      }
-    } catch (err) {
-      handleError(err);
-    }
-  }, [handleError]);
+  const refreshMe = useMemo(
+    () =>
+      coalesce(async () => {
+        try {
+          const data = await api<MeResponse>('/api/me');
+          setMe(data);
+          if (data.villages.length && !data.villages.some((v) => v.id === villageIdRef.current)) {
+            setVillageIdState(data.villages[0].id);
+          }
+        } catch (err) {
+          handleError(err);
+        }
+      }),
+    [handleError],
+  );
 
-  const refreshVillage = useCallback(async () => {
-    const id = villageIdRef.current;
-    if (!id) return;
-    try {
-      const v = await api<VillageState>(`/api/villages/${id}`);
-      if (v.id === villageIdRef.current) setVillage(v);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 403) return refreshMe();
-      handleError(err);
-    }
-  }, [handleError, refreshMe]);
+  const refreshVillage = useMemo(
+    () =>
+      coalesce(async () => {
+        const id = villageIdRef.current;
+        if (!id) return;
+        try {
+          const v = await api<VillageState>(`/api/villages/${id}`);
+          if (v.id === villageIdRef.current) setVillage(v);
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 403) return refreshMe();
+          handleError(err);
+        }
+      }),
+    [handleError, refreshMe],
+  );
 
   const run = useCallback(
     async <T,>(fn: () => Promise<T>) => {

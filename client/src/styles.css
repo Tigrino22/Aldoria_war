@@ -398,8 +398,10 @@ textarea { width: 100%; resize: vertical; }
 .burger { width: 26px; height: 26px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 3px; }
 .burger i { display: block; height: 3px; border-radius: 2px; background: currentColor; }
 .sheet-backdrop { position: fixed; inset: 0; z-index: 99999; background: rgb(20 14 8 / 0.55); display: flex; align-items: flex-end; }
-.sheet { width: 100%; max-height: 100%; overflow-y: auto; background: var(--panel); border-radius: 18px 18px 0 0; padding: 8px 16px calc(84px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; box-shadow: 0 -10px 30px rgb(0 0 0 / 0.3); }
-.sheet-grip { width: 44px; height: 5px; border-radius: 3px; background: var(--line); align-self: center; flex: none; }
+.sheet { width: 100%; max-height: calc(100% - 56px - env(safe-area-inset-top, 0px)); overflow-y: auto; background: var(--panel); border-radius: 18px 18px 0 0; padding: 8px 16px calc(84px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; box-shadow: 0 -10px 30px rgb(0 0 0 / 0.3); }
+.sheet-head { position: sticky; top: -8px; z-index: 1; margin: -8px -16px 0; padding: 8px 16px 0; height: 34px; background: var(--panel); display: flex; justify-content: center; flex: none; }
+.sheet-grip { width: 44px; height: 5px; border-radius: 3px; background: var(--line); align-self: flex-start; margin-top: 2px; flex: none; }
+.sheet-close { position: absolute; right: 10px; top: 6px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 16px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .sheet h4 { margin-left: 0; }
 .sheet-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .sheet-grid a { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 2px 8px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 500; text-align: center; line-height: 1.2; }

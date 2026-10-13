@@ -26,8 +26,13 @@ export class Outbox {
     if (playerId) this.items.push({ playerId, notice });
   }
   flush() {
+    // Une même notification n'est envoyée qu'une fois : chaque « village » reçu déclenche un rechargement côté client.
+    const sent = new Set<string>();
     for (const { playerId, notice } of this.items) {
       const payload = JSON.stringify(notice);
+      const key = `${playerId}:${payload}`;
+      if (sent.has(key)) continue;
+      sent.add(key);
       for (const s of sockets.get(playerId) ?? []) if (s.readyState === 1) s.send(payload);
     }
     this.items = [];
