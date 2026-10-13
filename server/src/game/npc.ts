@@ -1,5 +1,7 @@
 import {
   MERCHANT_CAPACITY,
+  emptyResources,
+  merchantsNeeded,
   STARTING_BUILDINGS,
   STARTING_RESOURCES,
   type BuildingKey,
@@ -49,7 +51,7 @@ import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars'
 import { refreshTribeWars } from './tribe-wars';
 import { raidStep } from './npc-raids';
 import { pickIntel } from './intel';
-import { acceptOffer, createOffer, expireOffers, freeMerchants } from './market';
+import { acceptOffer, cancelOffer, createOffer, expireOffers, freeMerchants } from './market';
 
 /** Nombre maximal d'échanges (acceptations ou publications) d'un PNJ par village et par réflexion. */
 const MARKET_ROUNDS = 10;
@@ -619,12 +621,33 @@ async function economyStep(c: Db, npcId: number, profile: NpcProfile, role: Vill
 /**
  * Marché : un PNJ rééquilibre ses ressources sans limite de distance, d'offres ni de fréquence. Il accepte les offres qui lui
  * apportent ce qui lui manque contre son excédent, puis publie les siennes, jusqu'à épuisement de ses marchands libres.
+ * Les marchands qui livreront ses offres ouvertes sont réservés : il n'en publie pas plus qu'il ne peut en livrer, et retire
+ * ses offres les plus récentes quand ses convois en cours ne lui laissent plus de quoi les honorer.
  */
+/**
+ * Marchands réservés par les offres ouvertes d'un village de PNJ. Si ses convois en cours ne lui en laissent plus assez,
+ * il annule ses offres les plus récentes (ressources rendues) pour que chacune de celles qui restent puisse être livrée.
+ */
+async function reserveMerchants(c: Db, outbox: Outbox, npcId: number, villageId: number, marketLevel: number, now: Date): Promise<number> {
+  const { rows } = await c.query(
+    "SELECT id, give_resource, give_amount FROM market_offers WHERE village_id = $1 AND player_id = $2 AND status = 'open' AND expires_at > $3 ORDER BY id",
+    [villageId, npcId, now],
+  );
+  const available = await freeMerchants(c, villageId, marketLevel);
+  let reserved = 0;
+  for (const o of rows) {
+    const need = merchantsNeeded({ ...emptyResources(), [o.give_resource]: o.give_amount });
+    if (reserved + need <= available) reserved += need;
+    else await cancelOffer(c, outbox, npcId, o.id, now);
+  }
+  return reserved;
+}
+
 async function marketStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, villageId: number, now: Date) {
   for (let round = 0; round < MARKET_ROUNDS; round++) {
     const v = await syncVillage(c, villageId, now);
     if (v.buildings.market < 1) return;
-    const free = await freeMerchants(c, villageId, v.buildings.market);
+    const free = (await freeMerchants(c, villageId, v.buildings.market)) - (await reserveMerchants(c, outbox, npcId, villageId, v.buildings.market, now));
     if (free < 1) return;
     const npc = { stock: resourcesOf(v), capacity: warehouseCapacity(v.buildings.warehouse) };
 
@@ -639,6 +662,7 @@ async function marketStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     for (const o of rows) {
       const offer = { give: o.give_resource, giveAmount: o.give_amount, want: o.want_resource, wantAmount: o.want_amount };
       if (!npcAccepts(npc, offer)) continue;
+      if (merchantsNeeded({ ...emptyResources(), [offer.want]: offer.wantAmount }) > free) continue;
       try {
         await acceptOffer(c, outbox, npcId, villageId, o.id, now);
         done = true;
