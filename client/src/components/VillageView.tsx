@@ -18,7 +18,7 @@ import { useGame, useNow, useRoute } from '../game';
 import { NavIcon } from './NavIcon';
 import { CancelButton, Cost, Countdown, liveResources } from '../ui';
 import Quests from './Quests';
-import { effect, effectiveLevels } from './buildingInfo';
+import { effect, effectiveLevels, queueProgress } from './buildingInfo';
 
 
 function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onClose: () => void }) {
@@ -100,19 +100,6 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
 }
 
 import IncomingDetail from './IncomingDetail';
-
-/** Avancement (0 à 1) de chaque construction de la file : la première a commencé à son arrivée en tête, les suivantes à la fin de la précédente. */
-function queueProgress(v: VillageState, now: number, speed: number): number[] {
-  let prevEnd = 0;
-  return v.buildQueue.map((q, i) => {
-    const end = Date.parse(q.finishAt);
-    const start =
-      i === 0 ? Math.max(Date.parse(q.queuedAt), end - buildingTime(q.building, q.level, v.buildings.townhall, speed) * 1000) : Math.max(prevEnd, Date.parse(q.queuedAt));
-    prevEnd = end;
-    if (now <= start) return 0;
-    return Math.min(1, (now - start) / Math.max(1, end - start));
-  });
-}
 
 /** Bas de l'étiquette sous le centre d'un emplacement, en % de la hauteur du décor (emplacement carré, décor en 800 × 560). */
 const LABEL_DY = SPOT_WIDTH * (800 / 560) * (0.5 - 0.12);

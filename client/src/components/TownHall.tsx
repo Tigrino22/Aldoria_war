@@ -3,6 +3,7 @@ import {
   BUILDING_KEYS,
   BUILD_QUEUE_LIMIT,
   RESOURCES,
+  RESOURCE_NAMES,
   type BuildingKey,
   type Resources,
   type VillageState,
@@ -15,9 +16,10 @@ import { api } from '../api';
 import { buildingImg } from '../assets';
 import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow } from '../game';
-import { Panel } from '../ui';
 import { CancelButton, Cost, Countdown, ResIcon, liveResources } from '../ui';
-import { effect, effectiveLevels } from './buildingInfo';
+import { effect, effectiveLevels, queueProgress } from './buildingInfo';
+import { CardTitle, PageBanner } from './PageBanner';
+import './townhall.css';
 
 /** Moment où le village aura de quoi payer `cost` au rythme de production actuel ; null si c'est impossible (entrepôt trop petit ou production négative). */
 function affordableAt(v: VillageState, res: Resources, cost: Resources, now: number): number | null {
@@ -41,112 +43,138 @@ export default function TownHall({ v }: { v: VillageState }) {
 
   const upgrade = (k: BuildingKey) => run(async () => setVillage(await api(`/api/villages/${v.id}/build`, { body: { building: k } })));
 
+  const qp = queueProgress(v, now, world.speed);
+
   return (
-    <Panel title="Hôtel de ville" actions={<a className="btn small ghost" href="#/village">← Retour au village</a>}>
-      <div className="townhall">
-        <header className="th-head">
-          <img src={buildingImg('townhall', Math.max(v.buildings.townhall, 1))} alt="" width={84} height={84} />
-          <div className="th-title">
-            <h2>{v.name}</h2>
-            <p className="muted">
-              {v.name} · niveau {v.buildings.townhall} · {effect('townhall', v.buildings.townhall, world.speed)} · {fmt(v.points)} points
-            </p>
-          </div>
+    <div className="pg townhall">
+      <PageBanner
+        media={<img src={buildingImg('townhall', Math.max(v.buildings.townhall, 1))} alt="" width={96} height={96} />}
+        kicker={`Hôtel de ville · niveau ${v.buildings.townhall}`}
+        title={
+          <>
+            {v.name} <em>({v.x}|{v.y})</em>
+          </>
+        }
+        lead={`${effect('townhall', v.buildings.townhall, world.speed)} · ${fmt(v.points)} points`}
+        actions={<a className="btn small" href="#/village">← Retour au village</a>}
+        statsClass="th-stats"
+        stats={[
+          ...RESOURCES.map((r) => ({
+            value: (
+              <span className={`th-res ${res[r] >= v.capacity ? 'full' : ''}`}>
+                <ResIcon r={r} size={18} /> {fmt(Math.floor(res[r]))}
+              </span>
+            ),
+            className: 'th-res-tile',
+            label: `${RESOURCE_NAMES[r]} · ${v.rates[r] >= 0 ? '+' : ''}${fmt(v.rates[r])}/h`,
+          })),
+          { value: fmt(v.capacity), label: 'Entrepôt', tone: 'gold' as const },
+        ]}
+      />
+
+      <section className="pg-card">
+        <header className="pg-card-head">
+          <CardTitle icon="hotel" count={`${v.buildQueue.length}/${BUILD_QUEUE_LIMIT}`}>
+            Constructions en cours
+          </CardTitle>
         </header>
-
-        <div className="th-stock">
-          {RESOURCES.map((r) => (
-            <span key={r} className={`inline-res ${res[r] >= v.capacity ? 'full' : ''}`} title={`${fmt(v.rates[r])} par heure`}>
-              <ResIcon r={r} size={18} /> <b>{fmt(Math.floor(res[r]))}</b>
-              <span className="muted small">/{fmt(v.capacity)}</span>
-            </span>
-          ))}
-        </div>
-
-        <section>
-          <h3>
-            Constructions en cours ({v.buildQueue.length}/{BUILD_QUEUE_LIMIT})
-          </h3>
-          {v.buildQueue.length === 0 ? (
-            <p className="muted small">Aucune construction : choisissez un bâtiment à améliorer ci-dessous.</p>
-          ) : (
-            <ul className="queue">
-              {v.buildQueue.map((q, i) => (
-                <li key={q.id}>
-                  <img src={buildingImg(q.building, q.level)} alt="" width={32} height={32} />
-                  <span>
-                    {BUILDINGS[q.building].name} → niveau {q.level}
-                  </span>
-                  <Countdown to={q.finishAt} />
-                  {i === v.buildQueue.length - 1 && (
-                    <CancelButton
-                      since={q.queuedAt}
-                      onCancel={() => run(async () => setVillage(await api(`/api/villages/${v.id}/build/${q.id}`, { method: 'DELETE' })))}
-                    />
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section>
-          <h3>Bâtiments</h3>
-          <div className="th-grid">
-            {BUILDING_KEYS.map((k) => {
-              const def = BUILDINGS[k];
-              const current = v.buildings[k];
-              const next = levels[k] + 1;
-              const maxed = next > def.maxLevel;
-              const cost = maxed ? null : buildingCost(k, next);
-              const time = maxed ? 0 : buildingTime(k, next, levels.townhall, world.speed);
-              const reqOk = meetsRequirements(levels, def.requires);
-              const affordable = cost ? canAfford(res, cost) : false;
-              const building = levels[k] > current;
-              const readyAt = cost && !affordable ? affordableAt(v, res, cost, now) : null;
-              const missing = Object.entries(def.requires)
-                .filter(([rk, lvl]) => levels[rk as BuildingKey] < (lvl as number))
-                .map(([rk, lvl]) => `${BUILDINGS[rk as BuildingKey].name} niv. ${lvl}`)
-                .join(', ');
-              return (
-                <article key={k} className={`th-card ${building ? 'building' : ''}`}>
-                  <img src={buildingImg(k, Math.max(current, 1))} alt="" width={56} height={56} />
-                  <div className="th-card-body">
-                    <h4>
-                      {def.name} <span className="lvl">niv. {current}</span>
-                      {building && <span className="lvl"> → {levels[k]} ⚒</span>}
-                    </h4>
-                    <p className="muted small">{effect(k, current, world.speed)}</p>
-                    {maxed ? (
-                      <p className="ok small">Niveau maximum</p>
-                    ) : (
-                      <>
-                        <p className="small">
-                          <b>Niv. {next} :</b> {effect(k, next, world.speed)}
-                        </p>
-                        <div className="bp-cost">
-                          <Cost cost={cost!} have={res} />
-                          <span className="muted small">⏱ {duration(time)}</span>
-                        </div>
-                        {!reqOk && <p className="warn small">Nécessite {missing}</p>}
-                        <button className="btn primary small" disabled={!reqOk || queueFull || !affordable} onClick={() => upgrade(k)}>
-                          {levels[k] === 0 ? 'Construire' : `Améliorer au niveau ${next}`}
-                        </button>
-                        {reqOk && !affordable && (
-                          <p className="muted small">
-                            {readyAt === null ? 'Ressources indisponibles : entrepôt trop petit ou production insuffisante.' : <>Ressources disponibles {clockTime(new Date(readyAt))}</>}
-                          </p>
-                        )}
-                      </>
-                    )}
+        {v.buildQueue.length === 0 ? (
+          <p className="muted small">Aucune construction : choisissez un bâtiment à améliorer ci-dessous.</p>
+        ) : (
+          <ul className="th-queue">
+            {v.buildQueue.map((q, i) => (
+              <li key={q.id}>
+                <img src={buildingImg(q.building, q.level)} alt="" width={44} height={44} />
+                <div className="th-q-body">
+                  <div className="th-q-top">
+                    <span>
+                      {BUILDINGS[q.building].name} <span className="muted">→ niveau {q.level}</span>
+                    </span>
+                    <b>
+                      <Countdown to={q.finishAt} />
+                    </b>
                   </div>
-                </article>
-              );
-            })}
-          </div>
-          {queueFull && <p className="muted small">La file de construction est pleine.</p>}
-        </section>
-      </div>
-    </Panel>
+                  <span className="pg-progress">
+                    <i style={{ width: `${Math.round((qp[i] ?? 0) * 100)}%` }} />
+                  </span>
+                </div>
+                {i === v.buildQueue.length - 1 && (
+                  <CancelButton
+                    since={q.queuedAt}
+                    onCancel={() => run(async () => setVillage(await api(`/api/villages/${v.id}/build/${q.id}`, { method: 'DELETE' })))}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="pg-card">
+        <header className="pg-card-head">
+          <CardTitle icon="village" count={BUILDING_KEYS.length}>
+            Bâtiments
+          </CardTitle>
+          {queueFull && <span className="muted small">La file de construction est pleine.</span>}
+        </header>
+        <div className="th-grid">
+          {BUILDING_KEYS.map((k) => {
+            const def = BUILDINGS[k];
+            const current = v.buildings[k];
+            const next = levels[k] + 1;
+            const maxed = next > def.maxLevel;
+            const cost = maxed ? null : buildingCost(k, next);
+            const time = maxed ? 0 : buildingTime(k, next, levels.townhall, world.speed);
+            const reqOk = meetsRequirements(levels, def.requires);
+            const affordable = cost ? canAfford(res, cost) : false;
+            const building = levels[k] > current;
+            const readyAt = cost && !affordable ? affordableAt(v, res, cost, now) : null;
+            const missing = Object.entries(def.requires)
+              .filter(([rk, lvl]) => levels[rk as BuildingKey] < (lvl as number))
+              .map(([rk, lvl]) => `${BUILDINGS[rk as BuildingKey].name} niv. ${lvl}`)
+              .join(', ');
+            return (
+              <article key={k} className={`th-card ${building ? 'building' : ''} ${maxed ? 'maxed' : ''}`}>
+                <div className="th-card-media">
+                  <img src={buildingImg(k, Math.max(current, 1))} alt="" width={72} height={72} />
+                  <span className="th-seal" title={`Niveau ${current}`}>
+                    {current}
+                  </span>
+                </div>
+                <div className="th-card-body">
+                  <h4>
+                    {def.name}
+                    {building && <span className="th-up"> → {levels[k]}</span>}
+                  </h4>
+                  <p className="muted small">{effect(k, current, world.speed)}</p>
+                  {maxed ? (
+                    <p className="th-max small">Niveau maximum</p>
+                  ) : (
+                    <>
+                      <p className="small th-next">
+                        <b>Niv. {next} :</b> {effect(k, next, world.speed)}
+                      </p>
+                      <div className="bp-cost">
+                        <Cost cost={cost!} have={res} />
+                        <span className="muted small">⏱ {duration(time)}</span>
+                      </div>
+                      {!reqOk && <p className="warn small">Nécessite {missing}</p>}
+                      <button className="btn primary small" disabled={!reqOk || queueFull || !affordable} onClick={() => upgrade(k)}>
+                        {levels[k] === 0 ? 'Construire' : `Améliorer au niveau ${next}`}
+                      </button>
+                      {reqOk && !affordable && (
+                        <p className="muted small">
+                          {readyAt === null ? 'Ressources indisponibles : entrepôt trop petit ou production insuffisante.' : <>Ressources disponibles {clockTime(new Date(readyAt))}</>}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </div>
   );
 }

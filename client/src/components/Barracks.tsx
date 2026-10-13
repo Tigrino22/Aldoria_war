@@ -16,7 +16,11 @@ import { api } from '../api';
 import { duration, fmt } from '../format';
 import { awayTroops } from '../troops';
 import { useGame, useNow, useRoute } from '../game';
-import { CancelButton, Cost, Countdown, liveResources, Panel, UnitIcon } from '../ui';
+import { buildingImg } from '../assets';
+import { CancelButton, Cost, Countdown, liveResources, UnitIcon } from '../ui';
+import { effect } from './buildingInfo';
+import { CardTitle, PageBanner } from './PageBanner';
+import './barracks.css';
 
 export default function Barracks() {
   const { village: v, world, setVillage, run } = useGame();
@@ -27,12 +31,19 @@ export default function Barracks() {
 
   if (v.buildings.barracks === 0) {
     return (
-      <Panel title="Caserne">
-        <p>Vous n'avez pas encore de caserne. Construisez-la depuis la vue du village (hôtel de ville niveau 3 requis).</p>
-        <button className="btn primary" onClick={() => go('village')}>
-          Aller au village
-        </button>
-      </Panel>
+      <div className="pg barracks">
+        <PageBanner
+          icon="caserne"
+          kicker="Armée"
+          title="Caserne"
+          lead="Vous n'avez pas encore de caserne. Construisez-la depuis la vue du village (hôtel de ville niveau 3 requis)."
+          actions={
+            <button className="btn primary" onClick={() => go('village')}>
+              Aller au village
+            </button>
+          }
+        />
+      </div>
     );
   }
 
@@ -60,13 +71,78 @@ export default function Barracks() {
       setCounts((c) => ({ ...c, [k]: '' }));
     });
 
+  const inTraining = v.recruitQueue.reduce((n, q) => n + q.count - q.delivered, 0);
+  const homeTotal = UNIT_KEYS.reduce((n, k) => n + v.troopsHome[k], 0);
+  const awayTotal = UNIT_KEYS.reduce((n, k) => n + away[k], 0);
+
   return (
-    <div className="stack">
-      <Panel title={`Caserne (niveau ${v.buildings.barracks})`}>
-        <p className="muted small">
-          Population : <b>{fmt(v.population)}</b> / {fmt(v.populationMax)} ({fmt(freePopulation)} places libres). Les recrues en formation et les troupes parties au combat comptent. Améliorez la ferme pour loger une plus grande armée.
-        </p>
-        <h3>Troupes du village</h3>
+    <div className="pg barracks">
+      <PageBanner
+        media={<img src={buildingImg('barracks', v.buildings.barracks)} alt="" width={96} height={96} />}
+        kicker={`Armée · caserne niveau ${v.buildings.barracks}`}
+        title="Caserne"
+        lead={
+          <>
+            {effect('barracks', v.buildings.barracks, world.speed)}. Les recrues en formation et les troupes parties au combat comptent dans la population. Améliorez la ferme pour loger une plus grande armée.
+          </>
+        }
+        stats={[
+          { value: freePopulation, label: 'places libres', tone: 'gold' },
+          { value: `${fmt(v.population)} / ${fmt(v.populationMax)}`, label: 'population' },
+          { value: homeTotal, label: 'au village' },
+          { value: inTraining, label: 'en formation' },
+          { value: awayTotal, label: 'hors du village' },
+        ]}
+      />
+
+      <section className="pg-card">
+        <header className="pg-card-head">
+          <CardTitle icon="caserne" count={v.recruitQueue.length || undefined}>
+            Recrutement en cours
+          </CardTitle>
+        </header>
+        {v.recruitQueue.length === 0 ? (
+          <p className="muted small">Aucun recrutement en cours : choisissez une unité ci-dessous.</p>
+        ) : (
+          <ul className="bk-queue">
+            {v.recruitQueue.map((q, i) => {
+              const end = Date.parse(q.startAt) + q.count * q.unitSeconds * 1000;
+              const done = Math.min(q.count, Math.max(0, Math.floor((now - Date.parse(q.startAt)) / 1000 / q.unitSeconds)));
+              return (
+                <li key={q.id}>
+                  <span className="bk-q-medal">
+                    <UnitIcon unit={q.unit} size={36} />
+                  </span>
+                  <div className="bk-q-body">
+                    <div className="bk-q-top">
+                      <span>
+                        {UNITS[q.unit].name} <span className="muted">{done}/{q.count}</span>
+                      </span>
+                      <b>
+                        <Countdown to={end} />
+                      </b>
+                    </div>
+                    <span className="pg-progress" role="progressbar" aria-valuemin={0} aria-valuemax={q.count} aria-valuenow={done}>
+                      <i style={{ width: `${Math.round((done / Math.max(1, q.count)) * 100)}%` }} />
+                    </span>
+                  </div>
+                  {i === v.recruitQueue.length - 1 && (
+                    <CancelButton
+                      since={q.queuedAt}
+                      onCancel={() => run(async () => setVillage(await api(`/api/villages/${v.id}/recruit/${q.id}`, { method: 'DELETE' })))}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="pg-card">
+        <header className="pg-card-head">
+          <CardTitle icon="troupes">Troupes du village</CardTitle>
+        </header>
         {owned.length ? (
           <div className="table-wrap">
             <table className="troop-table barracks-troops">
@@ -101,6 +177,12 @@ export default function Barracks() {
         ) : (
           <p className="muted">Le village n'a encore aucune troupe.</p>
         )}
+      </section>
+
+      <section className="pg-card">
+        <header className="pg-card-head">
+          <CardTitle icon="caserne">Recruter</CardTitle>
+        </header>
         <div className="unit-cards">
           {UNIT_KEYS.map((k) => {
             const def = UNITS[k];
@@ -110,7 +192,9 @@ export default function Barracks() {
             return (
               <article key={k} className={`unit-card ${ok ? '' : 'locked'}`}>
                 <header>
-                  <UnitIcon unit={k} size={48} />
+                  <span className="bk-medal">
+                    <UnitIcon unit={k} size={52} />
+                  </span>
                   <div>
                     <h3>{def.name}</h3>
                     <p className="muted small">{def.description}</p>
@@ -175,36 +259,7 @@ export default function Barracks() {
             );
           })}
         </div>
-      </Panel>
-
-      <Panel title="Recrutement en cours">
-        {v.recruitQueue.length === 0 ? (
-          <p className="muted">Aucun recrutement en cours.</p>
-        ) : (
-          <ul className="queue">
-            {v.recruitQueue.map((q, i) => {
-              const end = Date.parse(q.startAt) + q.count * q.unitSeconds * 1000;
-              const done = Math.min(q.count, Math.max(0, Math.floor((now - Date.parse(q.startAt)) / 1000 / q.unitSeconds)));
-              return (
-                <li key={q.id}>
-                  <UnitIcon unit={q.unit} size={32} />
-                  <span>
-                    {UNITS[q.unit].name} : {done}/{q.count}
-                  </span>
-                  <progress max={q.count} value={done} />
-                  <Countdown to={end} />
-                  {i === v.recruitQueue.length - 1 && (
-                    <CancelButton
-                      since={q.queuedAt}
-                      onCancel={() => run(async () => setVillage(await api(`/api/villages/${v.id}/recruit/${q.id}`, { method: 'DELETE' })))}
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Panel>
+      </section>
     </div>
   );
 }

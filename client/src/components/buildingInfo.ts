@@ -9,6 +9,7 @@ import {
   resourceProduction,
   warehouseCapacity,
   WALL_BONUS_PER_LEVEL,
+  buildingTime,
 } from '@aldoria/shared';
 import { fmt } from '../format';
 
@@ -37,4 +38,17 @@ export function effect(key: BuildingKey, level: number, speed: number): string {
     case 'wall':
       return `+${Math.round(level * WALL_BONUS_PER_LEVEL * 100)} % de défense`;
   }
+}
+
+/** Avancement (0 à 1) de chaque construction de la file : la première a commencé à son arrivée en tête, les suivantes à la fin de la précédente. */
+export function queueProgress(v: VillageState, now: number, speed: number): number[] {
+  let prevEnd = 0;
+  return v.buildQueue.map((q, i) => {
+    const end = Date.parse(q.finishAt);
+    const start =
+      i === 0 ? Math.max(Date.parse(q.queuedAt), end - buildingTime(q.building, q.level, v.buildings.townhall, speed) * 1000) : Math.max(prevEnd, Date.parse(q.queuedAt));
+    prevEnd = end;
+    if (now <= start) return 0;
+    return Math.min(1, (now - start) / Math.max(1, end - start));
+  });
 }
