@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BUILDINGS, RESOURCES, UNITS, type BuildingKey, type Resource, type UnitKey } from '@aldoria/shared';
+import { BUILDINGS, RESOURCES, RESOURCE_NAMES, UNITS, type BuildingKey, type Resource, type UnitKey } from '@aldoria/shared';
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
@@ -155,6 +155,7 @@ export default function WorldStats() {
                       <td>
                         <span className="ws-unit">
                           <ResIcon r={r} size={20} />
+                          {RESOURCE_NAMES[r]}
                         </span>
                       </td>
                       <td className="num">{fmt(x.total)}</td>
