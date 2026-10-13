@@ -20,6 +20,7 @@ import {
   refundShare,
   emptyUnits,
   meetsRequirements,
+  MERCHANT_CAPACITY,
   merchantCount,
   normalizeUnits,
   populationCapacity,
@@ -410,10 +411,24 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
 
 
 /** Marchands partis en convoi ou sur le chemin du retour. */
-export async function busyMerchants(c: Db, villageId: number): Promise<number> {
+export async function transitMerchants(c: Db, villageId: number): Promise<number> {
   const { rows } = await c.query(
     "SELECT COALESCE(SUM(merchants), 0)::int AS n FROM commands WHERE home_village_id = $1 AND type IN ('trade', 'trade_return') AND NOT processed",
     [villageId],
   );
   return rows[0].n;
+}
+
+/** Marchands réservés par les offres ouvertes du village : ils attendent au marché de livrer l'offre quand elle sera acceptée. */
+export async function reservedMerchants(c: Db, villageId: number): Promise<number> {
+  const { rows } = await c.query(
+    "SELECT COALESCE(SUM(CEIL(give_amount::numeric / $2)), 0)::int AS n FROM market_offers WHERE village_id = $1 AND status = 'open'",
+    [villageId, MERCHANT_CAPACITY],
+  );
+  return rows[0].n;
+}
+
+/** Marchands indisponibles : en convoi, ou réservés par une offre ouverte. */
+export async function busyMerchants(c: Db, villageId: number): Promise<number> {
+  return (await transitMerchants(c, villageId)) + (await reservedMerchants(c, villageId));
 }
