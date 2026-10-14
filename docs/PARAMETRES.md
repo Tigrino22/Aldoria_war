@@ -351,16 +351,16 @@ Les mouvements de troupes se voient sur la carte : une petite colonne de soldats
 | Qui voit quoi | |
 |---|---|
 | Ses propres mouvements, ceux de sa tribu et des tribus alliées | Trajet complet, taille, nom du joueur |
-| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur ; composition cachée (taille moyenne affichée) tant qu'elle n'est pas repérée, à 3 cases ou moins de l'un de ses villages |
-| Toute autre armée | Seulement pendant qu'elle passe à 3 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille et sa composition, ni origine, ni destination, ni propriétaire |
+| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur ; composition cachée (taille moyenne affichée) tant qu'elle n'est pas repérée, à 10 cases ou moins de l'un de ses villages |
+| Toute autre armée | Seulement pendant qu'elle passe à 10 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille et sa composition, ni origine, ni destination, ni propriétaire |
 
 ### Interception
 
-Une armée ennemie repérée (attaque, renfort ou retour d'un joueur hors de sa tribu et de ses alliés, PNJ compris) peut être attaquée en chemin : on la touche sur la carte, on choisit ses troupes et la fiche annonce le point et l'heure de rencontre (`interceptPoint`). Règles :
+Une armée ennemie repérée (attaque, renfort ou retour d'un joueur hors de sa tribu et de ses alliés, PNJ compris) peut être attaquée en chemin : on la touche sur la carte, on choisit ses troupes et la fiche annonce le point et l'heure de rencontre (`interceptPoint`, calculé par le serveur : `POST /api/villages/:id/intercept/preview`). Règles :
 
 | Règle | Valeur |
 |---|---|
-| Où | La rencontre doit avoir lieu pendant que l'armée passe à 3 cases ou moins de l'un de vos villages ; sinon l'envoi est refusé |
+| Où | L'interception se lance pendant que l'armée est repérée (10 cases ou moins de l'un de vos villages, `ARMY_SIGHT`) : vos troupes la poursuivent alors jusqu'à la rattraper, même hors de la zone, pourvu qu'elles la rejoignent avant son arrivée. Lancée avant qu'elle n'entre dans la zone, la rencontre doit avoir lieu dans la zone. Sinon l'envoi est refusé |
 | Départ | Le village actif, à la vitesse de l'unité la plus lente ; pas d'éclaireurs seuls ; rations comme une attaque ; fin de la protection débutant |
 | Bataille | En rase campagne : ni muraille ni défense de base ; nos troupes attaquent, l'armée surprise défend (`resolveCombat`, `baseDefense: 0`) |
 | Après | Les survivants adverses poursuivent leur route ; une armée détruite laisse son butin, que nos survivants rapportent (dans la limite de ce qu'ils portent) ; nos troupes rentrent depuis le champ de bataille |

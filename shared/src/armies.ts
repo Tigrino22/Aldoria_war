@@ -1,11 +1,12 @@
 /**
  * Armées en marche sur la carte. Chacun voit ses propres mouvements, ceux de sa tribu et de ses alliés, et le trajet des
- * attaques et renforts qui visent ses villages. Une armée étrangère n'est repérée qu'à 3 cases ou moins de l'un de ses
- * villages : on voit alors sa composition, et on peut l'intercepter (bataille en rase campagne).
+ * attaques et renforts qui visent ses villages. Une armée étrangère n'est repérée qu'à 10 cases ou moins de l'un de ses
+ * villages : on voit alors sa composition, et on peut l'intercepter (bataille en rase campagne). Une interception lancée
+ * pendant qu'elle est repérée la poursuit jusqu'à la rattraper, même si elle sort ensuite de la zone.
  */
 
 /** Portée de vue d'un village, en cases : en deçà, une armée étrangère est repérée (composition visible, interception possible). */
-export const ARMY_SIGHT = 3;
+export const ARMY_SIGHT = 10;
 
 export type MapArmyRelation = 'own' | 'tribe' | 'ally' | 'threat' | 'guest' | 'seen';
 
