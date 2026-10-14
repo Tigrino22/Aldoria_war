@@ -29,6 +29,30 @@ export default async function mapRoutes(app: FastifyInstance) {
          AND (v.kind = 'village' OR EXISTS (SELECT 1 FROM crusades cr WHERE cr.village_id = v.id AND cr.status <> 'ended'))`,
       [q.x0, q.y0, q.x1, q.y1],
     );
+    // Citadelle d'une croisade : état en direct pour la carte (bannière, muraille, armées en marche, fenêtre d'assaut).
+    const citadelIds = rows.filter((r) => r.kind === 'citadel').map((r) => r.id as number);
+    const live = new Map<number, NonNullable<MapVillage['crusade']>>();
+    if (citadelIds.length) {
+      const { rows: crs } = await pool.query(
+        `SELECT cr.village_id, cr.opens_at, cr.closes_at, cr.holder_tribe_id, cr.holder_player_id, (v.buildings->>'wall')::int AS wall,
+                (SELECT count(*)::int FROM commands cm WHERE cm.target_village_id = cr.village_id AND NOT cm.processed AND cm.type = 'attack'
+                   AND coalesce((cm.units->>'scout')::int, 0) < (SELECT sum(value::int) FROM jsonb_each_text(cm.units))) AS attacks,
+                (SELECT count(*)::int FROM commands cm WHERE cm.target_village_id = cr.village_id AND NOT cm.processed AND cm.type = 'support') AS supports
+         FROM crusades cr JOIN villages v ON v.id = cr.village_id WHERE cr.village_id = ANY($1::int[]) AND cr.status <> 'ended'`,
+        [citadelIds],
+      );
+      for (const c of crs) {
+        live.set(c.village_id, {
+          opensAt: new Date(c.opens_at).toISOString(),
+          closesAt: new Date(c.closes_at).toISOString(),
+          wall: c.wall ?? 0,
+          holderTribeId: c.holder_tribe_id,
+          holderPlayerId: c.holder_player_id,
+          attacks: c.attacks,
+          supports: c.supports,
+        });
+      }
+    }
     return rows.map(
       (r): MapVillage => ({
         id: r.id,
@@ -41,7 +65,7 @@ export default async function mapRoutes(app: FastifyInstance) {
         tribeId: r.tribe_id,
         tribeTag: r.tag,
         protected: r.protected === true,
-        ...(r.kind === 'citadel' ? { kind: 'citadel' as const, holderTag: r.holder ?? null } : {}),
+        ...(r.kind === 'citadel' ? { kind: 'citadel' as const, holderTag: r.holder ?? null, crusade: live.get(r.id) } : {}),
         ...(r.relic ? { relic: true } : {}),
       }),
     );

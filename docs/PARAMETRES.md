@@ -339,6 +339,8 @@ Migration 020, règles pures dans `shared/src/crusade.ts`, serveur dans `server/
 | Trésor | 2 × la population de la garnison par ressource, partagé au prorata de la gloire, livré au plus ancien village de chacun |
 | Titres | Croisé, Briseur de murailles, Porte-étendard, Champion de la Croisade, Gardien de la Citadelle, Héros de la saison : à afficher à côté de son nom (Profil) |
 
+Sur la carte, la Citadelle se suit en direct : pendant l'annonce et l'assaut, un étendard flotte aux couleurs du détenteur (les mêmes que la légende de la carte : vous, tribu, alliés, guerre, autres), une jauge de 20 crans montre la muraille, deux pastilles comptent les attaques et les renforts en route (sans révéler leur origine), et un panneau donne le compte à rebours et le dernier événement de la chronique. La carte se recharge toutes les 10 secondes pendant l'assaut. Code : `server/src/routes/map.ts` (champ `crusade` de la Citadelle), `client/src/components/MapView.tsx` (`drawCitadelLive`), `CrusadeMapHud` dans `client/src/components/CrusadeBanner.tsx`.
+
 Réglages à chaud (Administration > Monde) : `CRUSADES` (0 pour couper), `CRUSADE_DAYS` (« 3,6 », 0 = dimanche), `CRUSADE_TIME` (« 20:30 »), `CRUSADE_MINUTES`, `CRUSADE_NOTICE_HOURS`, `CRUSADE_GARRISON` (%), `CRUSADE_RELIC_BONUS` (%). L'administration peut lancer une croisade de test ou terminer la croisade en cours.
 
 ## Ménage des rapports et des mouvements

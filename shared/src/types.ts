@@ -135,6 +135,16 @@ export interface MapVillage {
   kind?: 'citadel';
   /** Pour une Citadelle : tag de la tribu qui tient la bannière. */
   holderTag?: string | null;
+  /** Pour une Citadelle : état en direct de la croisade (armées en marche : nombre seulement, ni l'origine ni les troupes). */
+  crusade?: {
+    opensAt: string;
+    closesAt: string;
+    wall: number;
+    holderTribeId: number | null;
+    holderPlayerId: number | null;
+    attacks: number;
+    supports: number;
+  };
   /** Le village appartient à un camp qui détient la relique d'une croisade (bannière dorée sur la carte). */
   relic?: boolean;
 }

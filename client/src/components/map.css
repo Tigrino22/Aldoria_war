@@ -126,3 +126,35 @@
   .map-stage.has-popup .minimap { display: none; }
   .map-popup, .map-panel { top: auto; bottom: 8px; right: 8px; left: 8px; width: auto; max-height: 72%; border-radius: 16px; }
 }
+
+/* Panneau de la croisade sur la carte (verre de bois, liseré or). */
+.crusade-hud {
+  position: absolute; top: 64px; left: 12px; z-index: 9; width: min(380px, calc(100% - 24px));
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px;
+  background: var(--glass); color: var(--glass-ink); border: 1px solid #e0b23c;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.crusade-hud .ch-top { display: flex; align-items: center; gap: 10px; }
+.crusade-hud .cb-icon {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #2b2018;
+  background: linear-gradient(180deg, #f1cc63, #a77a14); box-shadow: inset 0 0 0 1px #f6dc8c;
+}
+.crusade-hud.open .cb-icon { animation: ch-pulse 1.8s ease-in-out infinite; }
+@keyframes ch-pulse { 50% { box-shadow: inset 0 0 0 1px #f6dc8c, 0 0 0 6px rgb(224 178 60 / 0.3); } }
+.crusade-hud .ch-title { flex: 1; display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.crusade-hud .ch-title b { font: 700 15px var(--display); color: #fbf3df; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crusade-hud .ch-title span { font-size: 12px; color: #e9d6a8; }
+.crusade-hud .ch-title .countdown { font-weight: 700; color: #f1cc63; font-variant-numeric: tabular-nums; }
+.crusade-hud .ch-facts { display: flex; flex-wrap: wrap; gap: 4px; }
+.crusade-hud .ch-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--glass-line); background: rgb(0 0 0 / 0.25); }
+.crusade-hud .ch-chip i { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1.5px rgb(0 0 0 / 0.5); }
+.crusade-hud .ch-atk { color: #ff9b8c; }
+.crusade-hud .ch-sup { color: #9fe09f; }
+.crusade-hud .ch-last { margin: 0; font-size: 12px; color: #f3e9d2; border-left: 2px solid #e0b23c; padding-left: 8px; }
+.crusade-hud .ch-link { align-self: flex-start; font-size: 12px; color: #f1cc63; }
+@media (prefers-reduced-motion: reduce) { .crusade-hud.open .cb-icon { animation: none; } }
+@media (max-width: 640px) {
+  .crusade-hud { top: 56px; left: 8px; right: 8px; transform: none; width: auto; padding: 8px 10px; }
+  .crusade-hud .ch-last, .crusade-hud .ch-link { display: none; }
+  .map-stage.has-popup .crusade-hud { display: none; }
+}
