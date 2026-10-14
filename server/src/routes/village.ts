@@ -8,7 +8,7 @@ import { GameError, forbidden } from '../errors';
 import { pickIntel } from '../game/intel';
 import { cancelOrder, placeOrder, plannedOrders } from '../game/orders';
 import { cancelCommand, disbandTroops, recallTroops, sendCommand, sendTrade } from '../game/commands';
-import { sendInterception } from '../game/intercept';
+import { planInterception, sendInterception } from '../game/intercept';
 import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -19,6 +19,12 @@ async function ownVillage(c: Db, villageId: number, playerId: number) {
   if (v.owner_id !== playerId) throw forbidden("Ce village n'est pas à vous");
   return v;
 }
+
+const ownVillageRow = async (id: number, playerId: number) => {
+  const v = (await pool.query('SELECT id, x, y, owner_id FROM villages WHERE id = $1', [id])).rows[0];
+  if (!v || v.owner_id !== playerId) throw forbidden("Ce village n'est pas à vous");
+  return v as { id: number; x: number; y: number; owner_id: number };
+};
 
 export default async function villageRoutes(app: FastifyInstance) {
   app.get('/api/villages/:id', async (req) => {
@@ -166,6 +172,21 @@ export default async function villageRoutes(app: FastifyInstance) {
       const sent = await sendInterception(c, outbox, playerId, id, body, now);
       return { ...sent, village: await villageState(c, await syncVillage(c, id, now), playerId) };
     });
+  });
+
+  /** Point et heure de rencontre d'une interception, sans rien envoyer : la fiche de l'armée sur la carte l'affiche. */
+  app.post('/api/villages/:id/intercept/preview', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const body = z.object({ commandId: z.number().int().positive(), units: unitsSchema }).parse(req.body);
+    // Lecture seule, hors du verrou du jeu : la fiche la redemande à chaque changement de troupes.
+    try {
+      const { meet, chase } = await planInterception(pool, playerId, await ownVillageRow(id, playerId), body, new Date(), false);
+      return { ok: true, meet: { x: meet.x, y: meet.y }, arriveAt: new Date(meet.at), chase };
+    } catch (err) {
+      if (!(err instanceof GameError) || err.status !== 400) throw err;
+      return { ok: false, error: err.message };
+    }
   });
 
   /**

@@ -117,6 +117,31 @@ describe('interception des armées en marche', () => {
     expect((await pool.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'return' AND NOT processed", [s.meId])).rows[0].n).toBe(1);
   });
 
+  it("poursuit hors de la zone une armée prise en chasse pendant qu'elle était repérée", async () => {
+    const s = await setup({ swordsman: 300 });
+    // De (x-2|98) à (x+58|98), 30 min par case, partie il y a 300 min : elle est en (x+8|98), à portée de vue mais sur le départ.
+    const left = await village(s.enemy, s.x - 2, 98);
+    const right = await village(null, s.x + 58, 98);
+    const target = (
+      await pool.query(
+        `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, sent_at, arrive_at)
+         VALUES ('attack', $1, $2, $1, $3, $4, now() - interval '300 minutes', now() + interval '1500 minutes') RETURNING id`,
+        [left, right, s.enemy, JSON.stringify(units({ ram: 5 }))],
+      )
+    ).rows[0].id as number;
+    const preview = await app.inject({ method: 'POST', url: `/api/villages/${s.homeId}/intercept/preview`, headers: s.headers, payload: { commandId: target, units: { swordsman: 300 } } });
+    expect(preview.json()).toMatchObject({ ok: true, chase: true });
+    const res = await intercept(s, target, { swordsman: 300 });
+    expect(res.statusCode).toBe(200);
+    const { meet } = res.json();
+    // Les épéistes (22 min par case) la rattrapent bien au-delà des 10 cases.
+    expect(meet.x - s.x).toBeGreaterThan(20);
+    expect(Math.abs(meet.y - 98)).toBeLessThan(0.01);
+    // Trop lents (béliers, 30 min par case comme elle) : ils ne la rattraperaient pas.
+    const slow = await app.inject({ method: 'POST', url: `/api/villages/${s.homeId}/intercept/preview`, headers: s.headers, payload: { commandId: target, units: { swordsman: 1, ram: 1 } } });
+    expect(slow.json()).toMatchObject({ ok: false, error: expect.stringMatching(/rattraperaient/) });
+  });
+
   it("refuse une armée trop loin, une armée amie et des éclaireurs seuls", async () => {
     const s = await setup({ swordsman: 100, scout: 10 });
     const far = await passing(s.enemy, s.x, 90, 'attack', { spearman: 50 });

@@ -7,7 +7,7 @@ import { sendInterception } from './intercept';
 import { getTroops } from './village';
 
 /**
- * Interceptions des PNJ : une armée hostile repérée à portée de vue d'un village de PNJ (3 cases, voir shared/src/armies.ts)
+ * Interceptions des PNJ : une armée hostile repérée à portée de vue d'un village de PNJ (10 cases, voir shared/src/armies.ts)
  * peut être attaquée en chemin, comme le ferait un joueur. Le PNJ intercepte :
  * - les attaques qui visent ses villages, ceux de sa tribu ou d'une tribu alliée ;
  * - les armées (attaque, renfort, retour) de ses ennemis : tribus rivales ou en guerre, joueurs et PNJ à qui il en veut.
@@ -68,7 +68,7 @@ export async function interceptStep(c: Db, outbox: Outbox, npcId: number, villag
     const available = await getTroops(c, villageId, villageId);
     const units = SHARES.map((s) => interceptUnits(available, s)).find((u) => winsInField(u, theirs));
     if (!units) continue;
-    // L'envoi vérifie le reste (armée repérée, rencontre possible dans la zone, rations) : un refus n'est pas une erreur.
+    // L'envoi vérifie le reste (armée repérée, rencontre possible, rations) : un refus n'est pas une erreur.
     await c.query('SAVEPOINT interception');
     try {
       await sendInterception(c, outbox, npcId, villageId, { commandId: r.id, units }, now);

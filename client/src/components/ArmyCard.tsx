@@ -1,12 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ARMY_SIGHT,
   UNITS,
   UNIT_KEYS,
   attackWheatCost,
-  interceptPoint,
   normalizeUnits,
-  slowestSpeed,
   totalUnits,
   type ArmyKind,
   type MapArmy,
@@ -15,7 +13,7 @@ import {
 import { api } from '../api';
 import { clockTime, duration, fmt } from '../format';
 import { liveResources, ResIcon, UnitIcon } from '../ui';
-import { serverNow, useGame, useNow } from '../game';
+import { useGame, useNow } from '../game';
 import { ARMY_COLORS, ARMY_LABELS } from './mapArmies';
 
 /** Silhouette de la carte → unité dont l'icône la représente. */
@@ -48,9 +46,11 @@ const TYPE_LABEL: Record<MapArmy['type'], string> = {
 
 const at1 = (n: number) => Math.round(n * 10) / 10;
 
+type Preview = { ok: true; meet: { x: number; y: number }; arriveAt: string; chase: boolean } | { ok: false; error: string };
+
 /** Fiche d'une armée en marche choisie sur la carte, avec l'interception quand elle est repérée et ennemie. */
 export default function ArmyCard({ army, onSent }: { army: MapArmy; onSent: () => void }) {
-  const { village: v, world, setVillage, run, toast } = useGame();
+  const { village: v, setVillage, run, toast } = useGame();
   const now = useNow();
   const [counts, setCounts] = useState<Partial<Record<UnitKey, string>>>({});
   const spotFrom = army.spotFrom ? Date.parse(army.spotFrom) : null;
@@ -62,14 +62,25 @@ export default function ArmyCard({ army, onSent }: { army: MapArmy; onSent: () =
   const units = normalizeUnits(Object.fromEntries(UNIT_KEYS.map((k) => [k, Number(counts[k] || 0)])));
   const total = totalUnits(units);
   const valid = !!v && total > 0 && units.scout !== total && UNIT_KEYS.every((k) => units[k] <= v.troopsHome[k]);
-  const path = {
-    from: { x: army.from.x - 0.5, y: army.from.y - 0.5 },
-    to: { x: army.to.x - 0.5, y: army.to.y - 0.5 },
-    t0: Date.parse(army.fromAt),
-    t1: Date.parse(army.toAt),
-  };
-  const meet =
-    v && valid && spotFrom !== null && spotTo !== null ? interceptPoint(v, (slowestSpeed(units) * 60) / world.speed, path, serverNow(), [spotFrom, spotTo]) : null;
+  // Le serveur calcule la rencontre : il connaît tout le trajet, y compris la partie hors de vue où l'on peut la poursuivre.
+  const chasing = spotFrom !== null && spotFrom <= now;
+  const key = valid && open && v ? `${v.id}:${army.id}:${UNIT_KEYS.map((k) => units[k]).join(',')}` : '';
+  const [preview, setPreview] = useState<{ key: string; p: Preview } | null>(null);
+  useEffect(() => {
+    if (!key || !v) return;
+    let live = true;
+    const t = setTimeout(() => {
+      api<Preview>(`/api/villages/${v.id}/intercept/preview`, { body: { commandId: army.id, units } })
+        .then((p) => live && setPreview({ key, p }))
+        .catch(() => live && setPreview(null));
+    }, 250);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [key]);
+  const plan = preview && preview.key === key ? preview.p : null;
+  const meet = plan?.ok ? { ...plan.meet, at: Date.parse(plan.arriveAt) } : null;
   const wheat = attackWheatCost(units);
   const wheatHave = v ? Math.floor(liveResources(v, now).wheat) : 0;
 
@@ -134,7 +145,10 @@ export default function ArmyCard({ army, onSent }: { army: MapArmy; onSent: () =
       {open && v && (
         <div className="send">
           <p className="small">
-            <b>Intercepter</b> depuis {v.name} : la bataille a lieu en rase campagne, sans muraille, tant qu'elle passe à {ARMY_SIGHT} cases ou moins de vos villages.
+            <b>Intercepter</b> depuis {v.name} : la bataille a lieu en rase campagne, sans muraille.{' '}
+            {chasing
+              ? `Elle est à ${ARMY_SIGHT} cases ou moins de vos villages : vos troupes la poursuivent jusqu'à la rattraper, même si elle sort de la zone.`
+              : `Lancée avant qu'elle n'approche, la rencontre doit avoir lieu à ${ARMY_SIGHT} cases ou moins de vos villages ; une fois repérée, vous pourrez la poursuivre.`}
           </p>
           <div className="send-grid">
             {UNIT_KEYS.map((k) => (
@@ -159,6 +173,7 @@ export default function ArmyCard({ army, onSent }: { army: MapArmy; onSent: () =
             ))}
           </div>
           {valid &&
+            plan &&
             (meet ? (
               <p className="small">
                 Rencontre près de{' '}
@@ -168,7 +183,7 @@ export default function ArmyCard({ army, onSent }: { army: MapArmy; onSent: () =
                 dans {duration(Math.max(0, Math.round((meet.at - now) / 1000)))}, à {clockTime(new Date(meet.at))}
               </p>
             ) : (
-              <p className="warn small">Trop lentes : vos troupes n'arriveraient pas avant qu'elle ne quitte la zone.</p>
+              <p className="warn small">{!plan.ok && /temps/.test(plan.error) ? (chasing ? 'Trop lentes : vos troupes ne la rattraperaient pas avant qu’elle n’arrive.' : 'Trop lentes : vos troupes n’arriveraient pas avant qu’elle ne quitte la zone.') : !plan.ok ? plan.error : ''}</p>
             ))}
           {total > 0 && units.scout === total && <p className="muted small">Les éclaireurs seuls ne livrent pas bataille.</p>}
           {total > 0 && (
