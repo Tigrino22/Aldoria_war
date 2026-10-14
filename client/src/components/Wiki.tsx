@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import {
+  ARMY_SIGHT,
   BASE_VILLAGE_DEFENSE,
   BEGINNER_PROTECTION_HOURS,
   BUILDINGS,
@@ -511,6 +512,16 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         <p>
           De petits médaillons en haut à droite d'un village signalent les mouvements en route vers lui : deux épées croisées pour une attaque, un écu pour un soutien. Vous voyez
           ceux que vous avez envoyés et ceux qui visent vos villages ; une attaque ennemie qui arrive chez vous a son médaillon en rouge.
+        </p>
+        <p>
+          <b>Armées en marche :</b> vos mouvements, ceux de votre tribu et de vos alliés se voient de bout en bout, comme le trajet des attaques et renforts qui visent vos villages. Une armée
+          étrangère n'est <b>repérée</b> qu'à {ARMY_SIGHT} cases ou moins de l'un de vos villages : c'est seulement là qu'on voit sa composition (une attaque qui vous vise reste visible de loin,
+          mais son contenu est caché jusque-là). Touchez une armée pour ouvrir sa fiche.
+        </p>
+        <p>
+          <b>Interception :</b> une armée ennemie repérée peut être attaquée en chemin. Choisissez vos troupes dans sa fiche : le point et l'heure de rencontre s'affichent, et la bataille doit avoir
+          lieu tant qu'elle passe à {ARMY_SIGHT} cases de vos villages. On s'y bat en rase campagne, sans muraille ; les survivants adverses poursuivent leur route, et une armée détruite laisse
+          son butin à vos troupes. L'envoi coûte des rations comme une attaque.
         </p>
         <p>
           <b>Couleurs :</b> jaune pour vos villages, blanc pour votre village actif, bleu pour votre tribu, bleu ciel pour les tribus alliées, rouge vif pour les tribus en guerre déclarée avec la

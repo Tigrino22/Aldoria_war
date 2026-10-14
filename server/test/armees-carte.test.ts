@@ -53,20 +53,26 @@ describe('armées en marche sur la carte', () => {
     const threat = await move(stranger, far, home.id, 'attack', { swordsman: 10 });
     const passing = await move(stranger, left, right, 'attack', { cavalry: 200 });
     const hidden = await move(stranger, far, farB, 'attack', { swordsman: 10 });
+    const nearV = await village(stranger, home.x + 2, home.y + 1);
+    const close = await move(stranger, nearV, home.id, 'attack', { cavalry: 30, noble: 1 });
 
     const res = await app.inject({ method: 'GET', url: '/api/map/armies', headers });
     expect(res.statusCode).toBe(200);
     const byId = new Map((res.json() as MapArmy[]).map((a) => [a.id, a]));
     expect(byId.get(own)).toMatchObject({ rel: 'own', type: 'attack', size: 3, owner: 'Vigie', kinds: ['foot'] });
     expect(byId.get(mate)).toMatchObject({ rel: 'tribe', type: 'support', size: 1 });
-    // Une attaque qui vise notre village : on sait d'où elle vient, pas ce qu'elle contient.
-    expect(byId.get(threat)).toMatchObject({ rel: 'threat', type: 'attack', size: 2, owner: 'Inconnu', kinds: ['foot'] });
+    // Une attaque qui vise notre village : on voit tout son trajet, mais pas ce qu'elle contient tant qu'elle est à plus de 3 cases.
+    const t = byId.get(threat)!;
+    expect(t).toMatchObject({ rel: 'threat', type: 'attack', size: 2, owner: 'Inconnu', kinds: ['foot'], interceptable: true, from: { x: home.x + 40.5, y: home.y + 40.5 } });
+    expect(Date.parse(t.spotFrom!)).toBeGreaterThan(Date.now());
+    // Repérée à 3 cases ou moins : sa composition apparaît.
+    expect(byId.get(close)).toMatchObject({ rel: 'threat', kinds: ['horse', 'noble'], interceptable: true });
     expect(byId.has(hidden)).toBe(false);
     // Armée aperçue : ni origine, ni destination, ni propriétaire, seulement la portion à portée de vue.
     const seen = byId.get(passing)!;
-    expect(seen).toMatchObject({ rel: 'seen', type: 'unknown', owner: null, size: 2, kinds: ['horse'] });
-    expect(Math.abs(seen.from.x - (home.x + 0.5))).toBeLessThanOrEqual(5);
-    expect(Math.abs(seen.to.x - (home.x + 0.5))).toBeLessThanOrEqual(5);
+    expect(seen).toMatchObject({ rel: 'seen', type: 'unknown', owner: null, size: 2, kinds: ['horse'], interceptable: true });
+    expect(Math.abs(seen.from.x - (home.x + 0.5))).toBeLessThanOrEqual(3);
+    expect(Math.abs(seen.to.x - (home.x + 0.5))).toBeLessThanOrEqual(3);
     expect(Date.parse(seen.fromAt)).toBeGreaterThan(Date.now() - 10 * 60_000);
   });
 });

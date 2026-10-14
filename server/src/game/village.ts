@@ -366,6 +366,7 @@ export function toCommandView(r: any, showUnits: boolean): CommandView {
     units: showUnits ? normalizeUnits(r.units) : null,
     loot: showUnits ? r.loot : null,
     merchants: r.merchants ?? 0,
+    meet: r.meet_x !== null && r.meet_x !== undefined ? { x: Number(r.meet_x), y: Number(r.meet_y) } : null,
     sentAt: new Date(r.sent_at).toISOString(),
     arriveAt: new Date(r.arrive_at).toISOString(),
   };
@@ -375,7 +376,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
   const population = await computePopulation(c, v.id);
   const buildQueue = (await c.query('SELECT * FROM build_queue WHERE village_id = $1 ORDER BY finish_at, id', [v.id])).rows;
   const recruitQueue = (await c.query('SELECT * FROM recruit_queue WHERE village_id = $1 ORDER BY start_at, id', [v.id])).rows;
-  const incoming = (await c.query(`${COMMAND_SELECT} WHERE c.target_village_id = $1 AND NOT c.processed ORDER BY c.arrive_at`, [v.id]))
+  const incoming = (await c.query(`${COMMAND_SELECT} WHERE c.target_village_id = $1 AND c.type <> 'intercept' AND NOT c.processed ORDER BY c.arrive_at`, [v.id]))
     .rows;
   const outgoing = (
     await c.query(`${COMMAND_SELECT} WHERE c.origin_village_id = $1 AND c.type NOT IN ('return', 'trade_return') AND NOT c.processed ORDER BY c.arrive_at`, [

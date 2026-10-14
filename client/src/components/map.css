@@ -160,3 +160,7 @@
   .crusade-hud .ch-last, .crusade-hud .ch-link { display: none; }
   .map-stage.has-popup .crusade-hud { display: none; }
 }
+
+/* Fiche d'une armée en marche. */
+.army-kinds { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.army-card .send { border-top: 1px solid var(--glass-line); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }

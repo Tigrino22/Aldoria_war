@@ -38,6 +38,7 @@ import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { assertCitadelMove, handleCitadelAttack, handleCitadelSupport } from './crusades';
+import { handleIntercept } from './intercept';
 import { launchDueOrders } from './orders';
 import { createReport } from './reports';
 import { recordBattle } from './war-stats';
@@ -609,6 +610,7 @@ export async function processDueEvents(now: Date, max = Infinity): Promise<numbe
       if (cmd.type === 'attack') await handleAttack(c, outbox, cmd);
       else if (cmd.type === 'support') await handleSupport(c, outbox, cmd);
       else if (cmd.type === 'trade') await handleTrade(c, outbox, cmd);
+      else if (cmd.type === 'intercept') await handleIntercept(c, outbox, cmd);
       else if (cmd.type === 'trade_return') outbox.push(cmd.player_id, { type: 'village', villageId: cmd.target_village_id });
       else await handleReturn(c, outbox, cmd);
       return true;

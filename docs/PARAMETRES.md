@@ -351,8 +351,23 @@ Les mouvements de troupes se voient sur la carte : une petite colonne de soldats
 | Qui voit quoi | |
 |---|---|
 | Ses propres mouvements, ceux de sa tribu et des tribus alliées | Trajet complet, taille, nom du joueur |
-| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur, contenu caché (taille moyenne affichée) |
-| Toute autre armée | Seulement pendant qu'elle passe à 5 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille, ni origine, ni destination, ni propriétaire |
+| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur ; composition cachée (taille moyenne affichée) tant qu'elle n'est pas repérée, à 3 cases ou moins de l'un de ses villages |
+| Toute autre armée | Seulement pendant qu'elle passe à 3 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille et sa composition, ni origine, ni destination, ni propriétaire |
+
+### Interception
+
+Une armée ennemie repérée (attaque, renfort ou retour d'un joueur hors de sa tribu et de ses alliés, PNJ compris) peut être attaquée en chemin : on la touche sur la carte, on choisit ses troupes et la fiche annonce le point et l'heure de rencontre (`interceptPoint`). Règles :
+
+| Règle | Valeur |
+|---|---|
+| Où | La rencontre doit avoir lieu pendant que l'armée passe à 3 cases ou moins de l'un de vos villages ; sinon l'envoi est refusé |
+| Départ | Le village actif, à la vitesse de l'unité la plus lente ; pas d'éclaireurs seuls ; rations comme une attaque ; fin de la protection débutant |
+| Bataille | En rase campagne : ni muraille ni défense de base ; nos troupes attaquent, l'armée surprise défend (`resolveCombat`, `baseDefense: 0`) |
+| Après | Les survivants adverses poursuivent leur route ; une armée détruite laisse son butin, que nos survivants rapportent (dans la limite de ce qu'ils portent) ; nos troupes rentrent depuis le champ de bataille |
+| Armée disparue | Si elle est arrivée, annulée ou détruite avant la rencontre, nos troupes rentrent bredouilles |
+| Rapports | Un rapport d'attaque pour l'intercepteur, de défense pour l'armée interceptée, avec le lieu de la bataille |
+
+Côté serveur, l'interception est un mouvement de type `intercept` (migration 022 : `target_command_id`, point de rencontre `meet_x`/`meet_y`), traité dans l'ordre chronologique avec les autres (`server/src/game/intercept.ts`).
 
 Coût serveur : une requête (`GET /api/map/armies`, 600 mouvements au plus) à chaque rechargement de la carte (30 s, 10 s pendant un assaut de croisade) ; le navigateur calcule seul la position entre deux rechargements. Pour une armée aperçue, le serveur n'envoie que la portion de trajet à portée de vue (`sightWindow` dans `shared/src/armies.ts`), pour qu'on ne puisse pas lire sa destination. Le bouton « Armées » de la carte les masque. Les animations s'arrêtent quand l'onglet est caché ; avec « réduire les animations », les armées avancent une fois par seconde sans balancer.
 

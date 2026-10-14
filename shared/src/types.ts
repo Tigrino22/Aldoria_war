@@ -62,7 +62,7 @@ export interface TroopGroup {
   units: UnitCounts;
 }
 
-export type CommandType = 'attack' | 'support' | 'return' | 'trade' | 'trade_return';
+export type CommandType = 'attack' | 'support' | 'return' | 'trade' | 'trade_return' | 'intercept';
 
 export interface CommandView {
   id: number;
@@ -74,6 +74,8 @@ export interface CommandView {
   /** Butin au retour d'une attaque, ou cargaison d'un convoi de marchands. */
   loot: Resources | null;
   merchants: number;
+  /** Point de rencontre d'une interception (ou point de départ du retour qui en revient). */
+  meet?: { x: number; y: number } | null;
   sentAt: string;
   arriveAt: string;
 }
@@ -220,6 +222,8 @@ export interface AttackReportData {
   wallDamage?: { before: number; after: number } | null;
   /** Ce que les éclaireurs survivants ont vu. */
   intel?: Intel | null;
+  /** Bataille en rase campagne (interception) : lieu de la rencontre, en cases. */
+  field?: { x: number; y: number } | null;
 }
 
 export interface Intel {

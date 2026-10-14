@@ -140,14 +140,19 @@ function AttackReport({ d }: { d: AttackReportData }) {
   return (
     <div className="stack">
       <p className={`verdict ${d.attackerWins ? 'win' : 'loss'}`}>
-        {d.conquered ? 'Le village a été conquis !' : d.attackerWins ? "L'attaquant l'emporte" : 'Le défenseur tient bon'}
+        {d.conquered ? 'Le village a été conquis !' : d.field ? (d.attackerWins ? "L'armée interceptée est détruite" : "L'armée interceptée force le passage") : d.attackerWins ? "L'attaquant l'emporte" : 'Le défenseur tient bon'}
       </p>
+      {d.field && (
+        <p>
+          Bataille en rase campagne près de <a href={`#/carte/${Math.floor(d.field.x)},${Math.floor(d.field.y)}`}>({Math.floor(d.field.x)}|{Math.floor(d.field.y)})</a>, sans muraille. Ci-dessous, les villages d'où viennent les deux armées.
+        </p>
+      )}
       <h3>
-        Attaquant : {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <a href={`#/carte/${d.attacker.village.x},${d.attacker.village.y}`}>{d.attacker.village.name} ({d.attacker.village.x}|{d.attacker.village.y})</a>
+        {d.field ? 'Intercepteur' : 'Attaquant'} : {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <a href={`#/carte/${d.attacker.village.x},${d.attacker.village.y}`}>{d.attacker.village.name} ({d.attacker.village.x}|{d.attacker.village.y})</a>
       </h3>
       <TroopTable units={d.attacker.units} losses={d.attacker.losses} />
       <h3>
-        Défenseur : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · <a href={`#/carte/${d.defender.village.x},${d.defender.village.y}`}>{d.defender.village.name} ({d.defender.village.x}|{d.defender.village.y})</a>
+        {d.field ? 'Armée interceptée' : 'Défenseur'} : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · <a href={`#/carte/${d.defender.village.x},${d.defender.village.y}`}>{d.defender.village.name} ({d.defender.village.x}|{d.defender.village.y})</a>
       </h3>
       <TroopTable units={d.defender.units} losses={d.defender.losses} />
       {d.wall !== null && <p>Muraille : niveau {d.wall}</p>}

@@ -98,8 +98,10 @@ interface Token {
   phase: number;
 }
 
-/** Fanion du chef de colonne, qui ondule : queue d'aronde pour une attaque, carré pour un renfort, triangle pour un retour. */
-function drawFlag(g: Graphics, type: MapArmy['type'], color: number, t: number) {
+/** Fanion du chef de colonne, qui ondule : queue d'aronde pour une attaque ou une interception, carré pour un renfort, triangle pour un retour. */
+function drawFlag(g: Graphics, kind: MapArmy['type'], color: number, t: number) {
+  // Une interception porte le fanion d'attaque.
+  const type = kind === 'intercept' ? 'attack' : kind;
   const L = type === 'support' ? 12 : 14;
   const H = 9;
   const wave = (x: number) => Math.sin(t * 7 - x * 0.45) * (x / L) * 1.8;
@@ -261,4 +263,25 @@ export function drawArmies(s: ArmyScene, armies: MapArmy[]): () => void {
     layer.destroy({ children: true });
     s.request();
   };
+}
+
+/** Armée sous le doigt ou la souris (position en cases, échelle de la carte), la plus proche de la colonne dessinée. */
+export function pickArmy(armies: MapArmy[], fx: number, fy: number, scale: number): MapArmy | null {
+  const now = serverNow();
+  const k = Math.min(4, Math.max(1.6, 1.2 / scale));
+  const reach = (16 * k) / TILE;
+  let best: MapArmy | null = null;
+  let bestD = Infinity;
+  for (const a of armies) {
+    const t0 = Date.parse(a.fromAt);
+    const t1 = Date.parse(a.toAt);
+    const p = (now - t0) / Math.max(1, t1 - t0);
+    if (p < 0 || p >= 1) continue;
+    const x = a.from.x + (a.to.x - a.from.x) * p;
+    // La colonne marche au-dessus de son point d'ancrage.
+    const y = a.from.y + (a.to.y - a.from.y) * p - (10 * k) / TILE;
+    const d = Math.hypot((fx - x) * 0.8, fy - y);
+    if (d < reach && d < bestD) (best = a), (bestD = d);
+  }
+  return best;
 }

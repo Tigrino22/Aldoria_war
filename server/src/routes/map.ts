@@ -6,6 +6,7 @@ import { pool } from '../db';
 import { forbidden } from '../errors';
 import { env } from '../env';
 import { estimateLoot, pickIntel } from '../game/intel';
+import { pathOf } from '../game/intercept';
 import { allyTribeIdsOf } from '../game/tribe-alliances';
 
 export default async function mapRoutes(app: FastifyInstance) {
@@ -101,52 +102,58 @@ export default async function mapRoutes(app: FastifyInstance) {
     const allies = await allyTribeIdsOf(pool, tribeId);
     const mine = (await pool.query('SELECT x, y FROM villages WHERE owner_id = $1', [playerId])).rows as { x: number; y: number }[];
     const { rows } = await pool.query(
-      `SELECT c.id, c.type, c.player_id, c.units, c.sent_at, c.arrive_at, o.x AS ox, o.y AS oy, t.x AS tx, t.y AS ty, t.owner_id AS t_owner, pp.tribe_id, pp.username
+      `SELECT c.id, c.type, c.player_id, c.units, c.sent_at, c.arrive_at, c.meet_x, c.meet_y, o.x AS ox, o.y AS oy, t.x AS tx, t.y AS ty,
+              t.owner_id AS t_owner, pp.tribe_id, pp.username
        FROM commands c JOIN villages o ON o.id = c.origin_village_id JOIN villages t ON t.id = c.target_village_id LEFT JOIN players pp ON pp.id = c.player_id
        WHERE NOT c.processed AND c.arrive_at > now() AND (
          c.player_id = $1
          OR pp.tribe_id = ANY($2::int[])
          OR (t.owner_id = $1 AND c.type IN ('attack', 'support'))
          OR EXISTS (SELECT 1 FROM villages m WHERE m.owner_id = $1
-                    AND m.x BETWEEN least(o.x, t.x) - $3 AND greatest(o.x, t.x) + $3 AND m.y BETWEEN least(o.y, t.y) - $3 AND greatest(o.y, t.y) + $3))
+                    AND m.x BETWEEN least(o.x, t.x, coalesce(c.meet_x, o.x)) - $3 AND greatest(o.x, t.x, coalesce(c.meet_x, o.x)) + $3
+                    AND m.y BETWEEN least(o.y, t.y, coalesce(c.meet_y, o.y)) - $3 AND greatest(o.y, t.y, coalesce(c.meet_y, o.y)) + $3))
        ORDER BY c.arrive_at LIMIT 600`,
       [playerId, tribeId ? [tribeId, ...allies] : [], ARMY_SIGHT],
     );
     const now = Date.now();
+    const iso = (t: number) => new Date(t).toISOString();
     const out: MapArmy[] = [];
     for (const r of rows) {
       const units = normalizeUnits(r.units);
       const scouts = units.scout > 0 && units.scout === totalUnits(units);
-      const sent = new Date(r.sent_at).getTime();
-      const arrive = new Date(r.arrive_at).getTime();
-      const from = { x: r.ox + 0.5, y: r.oy + 0.5 };
-      const to = { x: r.tx + 0.5, y: r.ty + 0.5 };
-      const known = (rel: MapArmy['rel'], seeUnits: boolean, owner: string | null): MapArmy => ({
+      const path = pathOf(r);
+      const at = (u: number) => path.t0 + (path.t1 - path.t0) * u;
+      const pos = (u: number) => ({ x: path.from.x + (path.to.x - path.from.x) * u + 0.5, y: path.from.y + (path.to.y - path.from.y) * u + 0.5 });
+      // Période où l'armée passe à portée de vue de nos villages : on ne voit sa composition qu'à ce moment-là.
+      const w = sightWindow(path.from, path.to, mine);
+      const spot = w && at(w[1]) > now ? [at(w[0]), at(w[1])] : null;
+      const spotted = !!spot && spot[0] <= now;
+      const army = (rel: MapArmy['rel'], seeUnits: boolean, owner: string | null, u0 = 0, u1 = 1): MapArmy => ({
         id: r.id,
         type: r.type,
         rel,
-        from,
-        to,
-        fromAt: new Date(sent).toISOString(),
-        toAt: new Date(arrive).toISOString(),
+        interceptable: false,
+        spotFrom: spot ? iso(spot[0]) : null,
+        spotTo: spot ? iso(spot[1]) : null,
+        from: pos(u0),
+        to: pos(u1),
+        fromAt: iso(at(u0)),
+        toAt: iso(at(u1)),
         size: seeUnits ? armySize(populationOf(units)) : 2,
         scouts: seeUnits && scouts,
         kinds: seeUnits ? armyKinds(units) : ['foot'],
         owner,
       });
-      if (r.player_id === playerId) out.push(known('own', true, r.username));
-      else if (tribeId && r.tribe_id === tribeId) out.push(known('tribe', true, r.username));
-      else if (r.tribe_id && allies.includes(r.tribe_id)) out.push(known('ally', true, r.username));
-      else if (r.t_owner === playerId && r.type === 'attack') out.push(known('threat', false, r.username));
-      else if (r.t_owner === playerId && r.type === 'support') out.push(known('guest', false, r.username));
-      else {
-        // Armée aperçue : on voit sa taille, mais seule la portion du trajet à portée de vue est envoyée.
-        const w = sightWindow({ x: r.ox, y: r.oy }, { x: r.tx, y: r.ty }, mine);
-        if (!w) continue;
-        const at = (u: number) => sent + (arrive - sent) * u;
-        if (at(w[1]) <= now) continue;
-        const pos = (u: number) => ({ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u });
-        out.push({ id: r.id, type: 'unknown', rel: 'seen', from: pos(w[0]), to: pos(w[1]), fromAt: new Date(at(w[0])).toISOString(), toAt: new Date(at(w[1])).toISOString(), size: armySize(populationOf(units)), scouts, kinds: armyKinds(units), owner: null });
+      const hostile = ['attack', 'support', 'return'].includes(r.type);
+      if (r.player_id === playerId) out.push(army('own', true, r.username));
+      else if (tribeId && r.tribe_id === tribeId) out.push(army('tribe', true, r.username));
+      else if (r.tribe_id && allies.includes(r.tribe_id)) out.push(army('ally', true, r.username));
+      // Ce qui vise nos villages : le trajet reste visible de bout en bout, la composition seulement une fois repérée.
+      else if (r.t_owner === playerId && r.type === 'attack') out.push({ ...army('threat', spotted, r.username), interceptable: !!spot });
+      else if (r.t_owner === playerId && r.type === 'support') out.push(army('guest', spotted, r.username));
+      else if (w && spot) {
+        // Armée aperçue : seule la portion du trajet à portée de vue est envoyée.
+        out.push({ ...army('seen', true, null, w[0], w[1]), type: 'unknown', interceptable: hostile });
       }
     }
     return out;

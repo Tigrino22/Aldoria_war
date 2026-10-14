@@ -6,6 +6,8 @@ export interface CombatInput {
   /** Chaque groupe de défenseurs présent (troupes du village et renforts alliés). */
   defenders: UnitCounts[];
   wallLevel: number;
+  /** Défense de base du village (milice, palissade) ; 0 pour une bataille en rase campagne. */
+  baseDefense?: number;
 }
 
 export interface CombatResult {
@@ -27,7 +29,7 @@ function losses(units: UnitCounts, ratio: number): UnitCounts {
  * la défense de chaque unité est pondérée par la part d'infanterie et de cavalerie dans l'attaque,
  * le camp le plus fort gagne et perd une part de ses troupes égale à (force adverse / sa force)^1.5.
  */
-export function resolveCombat({ attackers, defenders, wallLevel }: CombatInput): CombatResult {
+export function resolveCombat({ attackers, defenders, wallLevel, baseDefense = BASE_VILLAGE_DEFENSE }: CombatInput): CombatResult {
   let attackInfantry = 0;
   let attackCavalry = 0;
   for (const k of UNIT_KEYS) {
@@ -38,7 +40,7 @@ export function resolveCombat({ attackers, defenders, wallLevel }: CombatInput):
   const attackPower = attackInfantry + attackCavalry;
   const infantryShare = attackPower > 0 ? attackInfantry / attackPower : 1;
 
-  let rawDefense = BASE_VILLAGE_DEFENSE;
+  let rawDefense = baseDefense;
   for (const group of defenders) {
     for (const k of UNIT_KEYS) {
       const def = UNITS[k];

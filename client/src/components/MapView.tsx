@@ -10,7 +10,8 @@ import MapColors from './MapColors';
 import { CrusadeMapHud } from './CrusadeBanner';
 import { PlayerLink } from '../ui';
 import { REL_COLORS, hash, hexToNum, makeColorContext, readMarks, styleOf, terrainAt, terrainCanvas, writeMarks, type ColorContext, type Mark } from './mapStyle';
-import { ARMY_COLORS, ARMY_LABELS, drawArmies } from './mapArmies';
+import { ARMY_COLORS, ARMY_LABELS, drawArmies, pickArmy } from './mapArmies';
+import ArmyCard from './ArmyCard';
 import './map.css';
 
 const TILE = 64;
@@ -96,8 +97,21 @@ export default function MapView({ focus }: { focus?: string }) {
   const [showArmies, setShowArmies] = useState(() => readPref('armies', true));
   const scene = useRef<Scene | null>(null);
   const villagesRef = useRef<Map<string, MapVillage>>(new Map());
+  const [armySel, setArmySel] = useState<MapArmy | null>(null);
   const selectRef = useRef<(v: MapVillage | null) => void>(() => undefined);
-  selectRef.current = (v) => setSelected(v);
+  selectRef.current = (v) => {
+    setSelected(v);
+    setArmySel(null);
+  };
+  // Une armée sous le doigt passe avant le village de la case.
+  const pickArmyRef = useRef<(fx: number, fy: number, scale: number) => boolean>(() => false);
+  pickArmyRef.current = (fx, fy, scale) => {
+    const a = showArmies ? pickArmy(armies, fx, fy, scale) : null;
+    if (!a) return false;
+    setArmySel(a);
+    setSelected(null);
+    return true;
+  };
   const hoverRef = useRef<(v: MapVillage | null, c: { x: number; y: number } | null) => void>(() => undefined);
   hoverRef.current = (v, c) => {
     setHovered(v);
@@ -129,6 +143,8 @@ export default function MapView({ focus }: { focus?: string }) {
         setRelations(rel);
         setMovements(moves);
         setArmies(marching);
+        // La fiche ouverte suit l'armée rechargée (composition dévoilée en approchant) ou se ferme si elle est arrivée.
+        setArmySel((cur) => (cur ? (marching.find((a) => a.id === cur.id) ?? null) : null));
       }),
     [run],
   );
@@ -532,8 +548,14 @@ export default function MapView({ focus }: { focus?: string }) {
         pointers.delete(e.pointerId);
         if (pointers.size < 2) pinchDist = 0;
         if (wasTap) {
-          const c = toCell(e.clientX, e.clientY);
-          selectRef.current(villagesRef.current.get(`${c.x},${c.y}`) ?? null);
+          const r = canvas.getBoundingClientRect();
+          const sc = worldC.scale.x;
+          const fx = (e.clientX - r.left - worldC.x) / (TILE * sc);
+          const fy = (e.clientY - r.top - worldC.y) / (TILE * sc);
+          if (!pickArmyRef.current(fx, fy, sc)) {
+            const c = toCell(e.clientX, e.clientY);
+            selectRef.current(villagesRef.current.get(`${c.x},${c.y}`) ?? null);
+          }
         }
         if (e.pointerType === 'mouse') {
           lastCell = '';
@@ -740,7 +762,7 @@ export default function MapView({ focus }: { focus?: string }) {
 
   return (
     <div className="map-page">
-      <div ref={stageRef} className={`map-stage ${selected ? 'has-popup' : ''}`}>
+      <div ref={stageRef} className={`map-stage ${selected || armySel ? 'has-popup' : ''}`}>
         <div className="map-canvas" ref={hostRef} />
         <div className="map-vignette" />
         {!ready && (
@@ -857,6 +879,20 @@ export default function MapView({ focus }: { focus?: string }) {
           />
         )}
 
+        {armySel && !selected && (
+          <aside className="map-popup">
+            <button className="map-close" onClick={() => setArmySel(null)} aria-label="Fermer">
+              ✕
+            </button>
+            <ArmyCard
+              army={armySel}
+              onSent={() => {
+                setArmySel(null);
+                load();
+              }}
+            />
+          </aside>
+        )}
         {selected && (
           <aside className="map-popup">
             <button className="map-close" onClick={() => setSelected(null)} aria-label="Fermer">
