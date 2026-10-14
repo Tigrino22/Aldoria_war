@@ -57,14 +57,14 @@ describe('armées en marche sur la carte', () => {
     const res = await app.inject({ method: 'GET', url: '/api/map/armies', headers });
     expect(res.statusCode).toBe(200);
     const byId = new Map((res.json() as MapArmy[]).map((a) => [a.id, a]));
-    expect(byId.get(own)).toMatchObject({ rel: 'own', type: 'attack', size: 3, owner: 'Vigie' });
+    expect(byId.get(own)).toMatchObject({ rel: 'own', type: 'attack', size: 3, owner: 'Vigie', kinds: ['foot'] });
     expect(byId.get(mate)).toMatchObject({ rel: 'tribe', type: 'support', size: 1 });
     // Une attaque qui vise notre village : on sait d'où elle vient, pas ce qu'elle contient.
-    expect(byId.get(threat)).toMatchObject({ rel: 'threat', type: 'attack', size: 2, owner: 'Inconnu' });
+    expect(byId.get(threat)).toMatchObject({ rel: 'threat', type: 'attack', size: 2, owner: 'Inconnu', kinds: ['foot'] });
     expect(byId.has(hidden)).toBe(false);
     // Armée aperçue : ni origine, ni destination, ni propriétaire, seulement la portion à portée de vue.
     const seen = byId.get(passing)!;
-    expect(seen).toMatchObject({ rel: 'seen', type: 'unknown', owner: null, size: 2 });
+    expect(seen).toMatchObject({ rel: 'seen', type: 'unknown', owner: null, size: 2, kinds: ['horse'] });
     expect(Math.abs(seen.from.x - (home.x + 0.5))).toBeLessThanOrEqual(5);
     expect(Math.abs(seen.to.x - (home.x + 0.5))).toBeLessThanOrEqual(5);
     expect(Date.parse(seen.fromAt)).toBeGreaterThan(Date.now() - 10 * 60_000);

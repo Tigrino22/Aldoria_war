@@ -346,7 +346,7 @@ Réglages à chaud (Administration > Monde) : `CRUSADES` (0 pour couper), `CRUSA
 
 ## Armées en marche sur la carte
 
-Les mouvements de troupes se voient sur la carte : un groupe de soldats derrière un fanion avance le long d'un chemin en pointillés. Le fanion dit le genre du mouvement (queue d'aronde : attaque, carré : renfort, triangle : retour ou inconnu), le nombre de soldats sa taille (1 : moins de 100 places, 3 : jusqu'à 2 000, 5 : au-delà), un sac sur le dos le butin qui rentre.
+Les mouvements de troupes se voient sur la carte : une petite colonne de soldats rendus en 3D (fantassins, cavaliers, éclaireurs, noble, bélier, selon ce que contient l'armée) marche au pas derrière le fanion de son camp, en soulevant un peu de poussière, le long d'un chemin en pointillés. Le fanion ondule et dit le genre du mouvement (queue d'aronde : attaque, carré : renfort, triangle : retour ou inconnu) ; le nombre de soldats dit sa taille (1 : moins de 100 places, 3 : jusqu'à 2 000, 5 : au-delà) ; une attaque qui vous vise est cerclée de rouge. Les images de marche sont rendues par `node tools/render/render.mjs march-` (quatre temps de foulée par unité, `client/src/assets/map/march-*.png` et `march.json`).
 
 | Qui voit quoi | |
 |---|---|

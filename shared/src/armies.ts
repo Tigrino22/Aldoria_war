@@ -22,8 +22,28 @@ export interface MapArmy {
   /** 1 petite troupe, 2 armée, 3 grande armée (2 pour une armée qui vise vos villages : son contenu reste caché). */
   size: 1 | 2 | 3;
   scouts: boolean;
+  /** Genres d'unités qu'on voit marcher, du plus nombreux au moins nombreux (fantassins seuls quand le contenu est caché). */
+  kinds: ArmyKind[];
   /** Joueur qui l'envoie, quand on le connaît. */
   owner: string | null;
+}
+
+/** Silhouettes dessinées sur la carte. */
+export type ArmyKind = 'foot' | 'horse' | 'scout' | 'noble' | 'ram';
+
+/** Genres présents dans une armée, du plus gros en population au plus petit (trois au plus, dont le noble s'il y en a un). */
+export function armyKinds(u: { spearman: number; halberdier: number; swordsman: number; scout: number; cavalry: number; ram: number; noble: number }): ArmyKind[] {
+  const pop: [ArmyKind, number][] = [
+    ['foot', u.spearman + u.halberdier + u.swordsman],
+    ['horse', u.cavalry * 4],
+    ['scout', u.scout * 2],
+    ['ram', u.ram * 5],
+    ['noble', u.noble * 100],
+  ];
+  const kinds = pop.filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k);
+  // Un noble se voit toujours : c'est lui qui annonce une conquête.
+  if (u.noble > 0 && !kinds.includes('noble')) kinds[2] = 'noble';
+  return kinds.length ? kinds : ['foot'];
 }
 
 /** Taille affichée d'une armée d'après sa population. */

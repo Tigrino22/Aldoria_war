@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { ARMY_SIGHT, RESOURCES, UNIT_KEYS, armySize, normalizeUnits, populationOf, sightWindow, totalUnits, type MapArmy, type MapMovement, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
+import { ARMY_SIGHT, RESOURCES, UNIT_KEYS, armyKinds, armySize, normalizeUnits, populationOf, sightWindow, totalUnits, type MapArmy, type MapMovement, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { forbidden } from '../errors';
@@ -131,6 +131,7 @@ export default async function mapRoutes(app: FastifyInstance) {
         toAt: new Date(arrive).toISOString(),
         size: seeUnits ? armySize(populationOf(units)) : 2,
         scouts: seeUnits && scouts,
+        kinds: seeUnits ? armyKinds(units) : ['foot'],
         owner,
       });
       if (r.player_id === playerId) out.push(known('own', true, r.username));
@@ -145,7 +146,7 @@ export default async function mapRoutes(app: FastifyInstance) {
         const at = (u: number) => sent + (arrive - sent) * u;
         if (at(w[1]) <= now) continue;
         const pos = (u: number) => ({ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u });
-        out.push({ id: r.id, type: 'unknown', rel: 'seen', from: pos(w[0]), to: pos(w[1]), fromAt: new Date(at(w[0])).toISOString(), toAt: new Date(at(w[1])).toISOString(), size: armySize(populationOf(units)), scouts, owner: null });
+        out.push({ id: r.id, type: 'unknown', rel: 'seen', from: pos(w[0]), to: pos(w[1]), fromAt: new Date(at(w[0])).toISOString(), toAt: new Date(at(w[1])).toISOString(), size: armySize(populationOf(units)), scouts, kinds: armyKinds(units), owner: null });
       }
     }
     return out;

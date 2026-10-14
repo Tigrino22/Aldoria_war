@@ -23,6 +23,12 @@ import trees from './assets/map/trees.png';
 import hill from './assets/map/hill.png';
 import villageBg from './assets/village-bg.png';
 import ground from './assets/map/ground.jpg';
+import marchFoot from './assets/map/march-foot.png';
+import marchHorse from './assets/map/march-horse.png';
+import marchScout from './assets/map/march-scout.png';
+import marchNoble from './assets/map/march-noble.png';
+import marchRam from './assets/map/march-ram.png';
+import marchMeta from './assets/map/march.json';
 import spots from './assets/village-spots.json';
 import logo from './assets/logo.svg';
 import scroll from './assets/ui/scroll.svg';
@@ -51,7 +57,9 @@ export function buildingImg(key: BuildingKey, level: number): string {
 }
 export const UNIT_IMG: Record<UnitKey, string> = { spearman, halberdier, swordsman, scout, cavalry, ram, noble };
 export const RESOURCE_IMG: Record<Resource, string> = { wood, clay, iron, wheat };
-export const MAP_IMG = { village1, village2, village3, barbarian, citadel: citadelMap, flag, trees, hill, ground };
+export const MAP_IMG = { village1, village2, village3, barbarian, citadel: citadelMap, flag, trees, hill, ground, marchFoot, marchHorse, marchScout, marchNoble, marchRam };
+/** Images de marche des armées sur la carte : une bande de `frames` images de `w` × `h` pixels par genre d'unité. */
+export const MARCH_SHEETS = marchMeta as Record<'foot' | 'horse' | 'scout' | 'noble' | 'ram', { frames: number; w: number; h: number }>;
 /** La Citadelle des Croisades, grand rendu pour sa page. */
 export const CITADEL_IMG = citadel;
 /** Centre de chaque emplacement sur le décor du village, en % (calculé au rendu du décor). */

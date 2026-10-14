@@ -76,6 +76,19 @@ for (const r of ['wood', 'clay', 'iron', 'wheat'])
   if (want(r)) save(`${out}/resources/${r}.png`, await page.evaluate((n) => window.renderIcon(n), r));
 for (const u of ['spearman', 'halberdier', 'swordsman', 'scout', 'cavalry', 'ram', 'noble'])
   if (want(u)) save(`${out}/units/${u}.png`, await page.evaluate((n) => window.renderIcon(n), u));
+// Armées en marche sur la carte : une bande d'images de foulée par genre d'unité, et leur taille dans un fichier commun.
+const MARCH_FRAMES = { foot: 4, noble: 4, horse: 4, scout: 4, ram: 1 };
+if (Object.keys(MARCH_FRAMES).some((k) => want(`march-${k}`))) {
+  const metaFile = `${out}/map/march.json`;
+  const meta = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')) : {};
+  for (const [kind, frames] of Object.entries(MARCH_FRAMES)) {
+    if (!want(`march-${kind}`)) continue;
+    const r = await page.evaluate(([k, f]) => window.renderMarch(k, f), [kind, frames]);
+    save(`${out}/map/march-${kind}.png`, r.png);
+    meta[kind] = { frames, w: r.w, h: r.h };
+  }
+  fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2) + '\n');
+}
 // Herbe de la carte en JPEG : pas de transparence utile, dix fois plus léger, la carte s'ouvre plus vite.
 if (want('ground')) save(`${out}/map/ground.jpg`, await page.evaluate(() => window.exportTexture('grass', 'image/jpeg', 0.82)));
 

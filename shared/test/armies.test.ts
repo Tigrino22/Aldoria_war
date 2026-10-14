@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armySize, sightWindow } from '../src/armies';
+import { armyKinds, armySize, sightWindow } from '../src/armies';
 
 describe('armées sur la carte', () => {
   it('ne montre que la portion du trajet à portée de vue', () => {
@@ -20,5 +20,12 @@ describe('armées sur la carte', () => {
     expect(armySize(10)).toBe(1);
     expect(armySize(500)).toBe(2);
     expect(armySize(5000)).toBe(3);
+  });
+
+  it('donne les genres d’unités du plus gros au plus petit', () => {
+    const u = { spearman: 0, halberdier: 0, swordsman: 300, scout: 0, cavalry: 200, ram: 10, noble: 1 };
+    expect(armyKinds(u)).toEqual(['horse', 'foot', 'noble']);
+    expect(armyKinds({ ...u, swordsman: 0, cavalry: 0, ram: 0, noble: 0 })).toEqual(['foot']);
+    expect(armyKinds({ ...u, swordsman: 3000, ram: 30 })).toEqual(['foot', 'horse', 'noble']);
   });
 });
