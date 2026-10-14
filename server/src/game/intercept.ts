@@ -41,7 +41,7 @@ export function pathOf(cmd: { ox: number; oy: number; tx: number; ty: number; me
   return { from: start, to: end, t0: new Date(cmd.sent_at).getTime(), t1: new Date(cmd.arrive_at).getTime() };
 }
 
-const MOVE_SELECT = `SELECT c.*, o.x AS ox, o.y AS oy, t.x AS tx, t.y AS ty, p.tribe_id, p.username
+const MOVE_SELECT = `SELECT c.*, o.x AS ox, o.y AS oy, t.x AS tx, t.y AS ty, p.tribe_id, p.username, p.protection_until
   FROM commands c JOIN villages o ON o.id = c.origin_village_id JOIN villages t ON t.id = c.target_village_id LEFT JOIN players p ON p.id = c.player_id`;
 
 /** Envoie des troupes intercepter une armée repérée. */
@@ -54,6 +54,7 @@ export async function sendInterception(c: Db, outbox: Outbox, playerId: number, 
   const me = (await c.query('SELECT tribe_id FROM players WHERE id = $1', [playerId])).rows[0];
   const friends = me?.tribe_id ? [me.tribe_id, ...(await allyTribeIdsOf(c, me.tribe_id))] : [];
   if (target.tribe_id && friends.includes(target.tribe_id)) throw new GameError('Cette armée appartient à votre tribu ou à un allié');
+  if (target.protection_until && new Date(target.protection_until) > now) throw new GameError('Ce joueur est encore sous protection débutant');
 
   // La bataille doit avoir lieu pendant que l'armée passe à portée de vue de l'un de nos villages.
   const path = pathOf(target);

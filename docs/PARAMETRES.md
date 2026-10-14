@@ -365,6 +365,8 @@ Une armée ennemie repérée (attaque, renfort ou retour d'un joueur hors de sa 
 | Bataille | En rase campagne : ni muraille ni défense de base ; nos troupes attaquent, l'armée surprise défend (`resolveCombat`, `baseDefense: 0`) |
 | Après | Les survivants adverses poursuivent leur route ; une armée détruite laisse son butin, que nos survivants rapportent (dans la limite de ce qu'ils portent) ; nos troupes rentrent depuis le champ de bataille |
 | Armée disparue | Si elle est arrivée, annulée ou détruite avant la rencontre, nos troupes rentrent bredouilles |
+| PNJ | Ils interceptent aussi, quand ils sont sûrs de gagner (voir docs/PNJ.md, interrupteur `NPC_INTERCEPT`) |
+| Protection | Jamais l'armée d'un joueur sous protection débutant |
 | Rapports | Un rapport d'attaque pour l'intercepteur, de défense pour l'armée interceptée, avec le lieu de la bataille |
 
 Côté serveur, l'interception est un mouvement de type `intercept` (migration 022 : `target_command_id`, point de rencontre `meet_x`/`meet_y`), traité dans l'ordre chronologique avec les autres (`server/src/game/intercept.ts`).

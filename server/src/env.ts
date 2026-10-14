@@ -36,6 +36,8 @@ export const env = {
   npcOffensive: count('NPC_OFFENSIVE', 1) > 0 ? 1 : 0,
   npcOffensiveShare: count('NPC_OFFENSIVE_SHARE', 50),
   npcOffensiveHours: count('NPC_OFFENSIVE_HOURS', 24),
+  /** Interceptions des armées hostiles repérées par les PNJ (1 = activées), modifiables à chaud. */
+  npcIntercept: count('NPC_INTERCEPT', 1) > 0 ? 1 : 0,
   /** Pillage intensif des PNJ (1 = activé) : pillages par village et par réflexion, rayon (cases) ; modifiables à chaud. */
   /** Marge de sécurité des attaques des PNJ, en % de la défense estimée (0 = ils attaquent dès que leur armée bat celle d'en face) ; modifiable à chaud. */
   npcAttackMargin: count('NPC_ATTACK_MARGIN', 0),

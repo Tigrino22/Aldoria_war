@@ -43,6 +43,8 @@ const attacksOn = async (npc: number, target: number) =>
 describe('PNJ agressifs', () => {
   beforeAll(async () => {
     await migrate(true);
+    // Ces scénarios comptent attaques et éclaireurs : les interceptions (testées à part) videraient les casernes entre deux réflexions.
+    env.npcIntercept = 0;
     let seed = 11;
     setNpcRandom(() => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296));
     await pool.query('DELETE FROM villages WHERE owner_id IS NULL');

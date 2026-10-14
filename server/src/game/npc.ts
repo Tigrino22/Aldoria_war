@@ -51,6 +51,7 @@ import {
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
 import { villageRoles, type VillageRole } from './npc-roles';
 import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, recentlyHit } from './npc-offensive';
+import { interceptStep } from './npc-intercept';
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { refreshTribeWars } from './tribe-wars';
 import { raidStep } from './npc-raids';
@@ -761,6 +762,12 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   // Pillage intensif : chaque village (pas seulement les trois premiers) envoie ses pillages vers les villages sans défense qu'il connaît.
   const hostiles = { tribes: [...(tribe?.state.rivals ?? []), ...warEnemiesOf(tribe, now)], npcs: await npcGrudgesOf(c, npcId, tribe, now) };
   for (const [i, v] of villages.entries()) if (!(holdForCrusade && roles[i] === 'offense')) await raidStep(c, outbox, npcId, v.id, hostiles, now);
+  // Interceptions : chaque village (sauf les offensifs réservés pour une croisade) peut attaquer en chemin une armée hostile repérée.
+  if (env.npcIntercept) {
+    const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];
+    const foes = { friends, tribes: hostiles.tribes, players: [...hostiles.npcs, ...(await grudgesOf(c, npcId, tribe, now))], quiet: isQuietAt(now) };
+    for (const [i, v] of villages.entries()) if (!(holdForCrusade && roles[i] === 'offense')) await interceptStep(c, outbox, npcId, v.id, foes, now);
+  }
   // Croisade : préparation de l'assaut, renforts quand la tribu tient la bannière, contre-attaques sinon (voir npc-crusade.ts).
   await crusadeStep(c, outbox, npcId, villages.map((v, i) => ({ id: v.id, role: roles[i] })), tribe, now);
   // Les rapports d'un PNJ ne servent qu'à ses décisions récentes et au suivi des guerres de l'administration (72 h au plus).

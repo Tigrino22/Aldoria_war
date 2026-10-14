@@ -521,7 +521,8 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         <p>
           <b>Interception :</b> une armée ennemie repérée peut être attaquée en chemin. Choisissez vos troupes dans sa fiche : le point et l'heure de rencontre s'affichent, et la bataille doit avoir
           lieu tant qu'elle passe à {ARMY_SIGHT} cases de vos villages. On s'y bat en rase campagne, sans muraille ; les survivants adverses poursuivent leur route, et une armée détruite laisse
-          son butin à vos troupes. L'envoi coûte des rations comme une attaque.
+          son butin à vos troupes. L'envoi coûte des rations comme une attaque. Attention : les PNJ font de même, et peuvent attaquer en chemin vos armées
+          qui passent près de leurs villages.
         </p>
         <p>
           <b>Couleurs :</b> jaune pour vos villages, blanc pour votre village actif, bleu pour votre tribu, bleu ciel pour les tribus alliées, rouge vif pour les tribus en guerre déclarée avec la
