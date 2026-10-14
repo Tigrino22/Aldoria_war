@@ -3,6 +3,7 @@ import { pool, tx } from './db';
 import { env } from './env';
 import { processDueEvents } from './game/commands';
 import { processCrusades } from './game/crusades';
+import { ensureProvinces, processProvinces } from './game/provinces';
 import { housekeeping } from './game/housekeeping';
 import { Outbox } from './notify';
 import { assignTriblessNpcs, ensureNpcTribes, ensureNpcs, processNpcs } from './game/npc';
@@ -16,6 +17,7 @@ async function main() {
   await migrate();
   await loadSettings();
   await tx((c) => ensureWorld(c, new Date()));
+  await tx((c) => ensureProvinces(c, new Date()));
   await tx((c) => ensureNpcs(c, new Date()));
   await tx((c) => ensureNpcTribes(c, new Date()));
   await tx((c) => assignTriblessNpcs(c));
@@ -58,6 +60,7 @@ async function main() {
   );
 
   // Croisades : toutes les 10 secondes, ouverture et fermeture des portes à l'heure, annonce de la suivante.
+  // Provinces : contrôle des bastions tenus assez longtemps, victoire du monde.
   const crusadeTimer = setInterval(
     report(
       skipIfBusy(() =>
@@ -65,6 +68,7 @@ async function main() {
           await processDueEvents(new Date());
           const outbox = new Outbox();
           await tx((c) => processCrusades(c, outbox, new Date()));
+          await tx((c) => processProvinces(c, outbox, new Date()));
           outbox.flush();
         }),
       ),

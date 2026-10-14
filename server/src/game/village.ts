@@ -37,6 +37,7 @@ import type { Db } from '../db';
 import { env } from '../env';
 import { barbarianCap, barbarianTier, growBarbarian } from './barbarians';
 import { relicBonus } from './crusades';
+import { provinceBonuses } from './provinces';
 import { GameError, notFound } from '../errors';
 
 export interface VillageRow {
@@ -53,7 +54,7 @@ export interface VillageRow {
   resources_at: Date;
   loyalty: number;
   points: number;
-  /** « village », ou « citadel » pour la Citadelle d'une croisade. */
+  /** « village », « citadel » pour la Citadelle d'une croisade, « bastion » pour le bastion d'une province. */
   kind?: string;
 }
 
@@ -120,11 +121,25 @@ export async function computePopulation(c: Db, villageId: number): Promise<numbe
 
 // ---------- Synchronisation dans le temps ----------
 
-/** Production augmentée d'un bonus (relique d'une croisade : 0,05 = +5 %) ; une consommation négative n'est pas touchée. */
-const boosted = (rates: Resources, bonus: number): Resources =>
-  bonus > 0 ? (Object.fromEntries(RESOURCES.map((r) => [r, rates[r] > 0 ? rates[r] * (1 + bonus) : rates[r]])) as unknown as Resources) : rates;
+/**
+ * Production augmentée d'un bonus par ressource (relique d'une croisade et provinces contrôlées : 0,05 = +5 %) ;
+ * une consommation négative n'est pas touchée.
+ */
+const boosted = (rates: Resources, bonus: Resources): Resources =>
+  Object.fromEntries(RESOURCES.map((r) => [r, rates[r] > 0 && bonus[r] > 0 ? rates[r] * (1 + bonus[r]) : rates[r]])) as unknown as Resources;
 
-function produce(v: VillageRow, from: Date, to: Date, bonus = 0) {
+const NO_BONUS: Resources = { wood: 0, clay: 0, iron: 0, wheat: 0 };
+
+/** Bonus de production d'un village : la relique (toutes ressources) et les provinces que contrôle la tribu de son propriétaire. */
+async function productionBonus(c: Db, ownerId: number | null, at: Date): Promise<{ relic: number; province: Resources; total: Resources }> {
+  const relic = await relicBonus(c, ownerId, at);
+  const p = await provinceBonuses(c, ownerId, at);
+  const province = { wood: p.wood, clay: p.clay, iron: p.iron, wheat: p.wheat };
+  const total = Object.fromEntries(RESOURCES.map((r) => [r, relic + province[r]])) as unknown as Resources;
+  return { relic, province, total };
+}
+
+function produce(v: VillageRow, from: Date, to: Date, bonus: Resources = NO_BONUS) {
   const hours = (to.getTime() - from.getTime()) / 3_600_000;
   if (hours <= 0) return;
   const rates = boosted(productionRates(v.buildings, env.worldSpeed), bonus);
@@ -144,7 +159,7 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
   const v = await loadVillage(c, id, true);
   if (at.getTime() <= new Date(v.resources_at).getTime()) return v;
   const start = new Date(v.resources_at);
-  const bonus = await relicBonus(c, v.owner_id, at);
+  const bonus = (await productionBonus(c, v.owner_id, at)).total;
 
   const builds = await c.query(
     'SELECT id, building, level, finish_at FROM build_queue WHERE village_id = $1 AND finish_at <= $2 ORDER BY finish_at, id',
@@ -173,7 +188,7 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
     else if (fresh > 0) await c.query('UPDATE recruit_queue SET delivered = $2 WHERE id = $1', [r.id, done]);
   }
 
-  if (v.owner_id === null && v.kind !== 'citadel') await regrowBarbarian(c, v, hours);
+  if (v.owner_id === null && v.kind !== 'citadel' && v.kind !== 'bastion') await regrowBarbarian(c, v, hours);
 
   v.resources_at = at;
   v.points = villagePoints(v.buildings);
@@ -318,7 +333,9 @@ export async function enqueueRecruit(c: Db, villageId: number, unit: UnitKey, co
   }
   pay(v, scaleResources(def.cost, count));
 
-  const unitSeconds = recruitTime(unit, v.buildings.barracks, env.worldSpeed);
+  // Une province de recrutement contrôlée par la tribu raccourcit le temps de chaque unité.
+  const speedUp = (await provinceBonuses(c, v.owner_id, now)).recruit;
+  const unitSeconds = recruitTime(unit, v.buildings.barracks, env.worldSpeed) / (1 + speedUp);
   const last = await c.query(
     `SELECT max(start_at + make_interval(secs => count * unit_seconds)) AS end_at FROM recruit_queue WHERE village_id = $1`,
     [villageId],
@@ -384,7 +401,8 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     ])
   ).rows;
 
-  const relic = await relicBonus(c, v.owner_id, new Date());
+  const bonus = await productionBonus(c, v.owner_id, new Date());
+  const recruitBonus = (await provinceBonuses(c, v.owner_id, new Date())).recruit;
   return {
     id: v.id,
     name: v.name,
@@ -393,8 +411,10 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     points: v.points,
     loyalty: Math.floor(v.loyalty),
     resources: resourcesOf(v),
-    rates: boosted(productionRates(v.buildings, env.worldSpeed), relic),
-    relicBonus: relic,
+    rates: boosted(productionRates(v.buildings, env.worldSpeed), bonus.total),
+    relicBonus: bonus.relic,
+    provinceBonus: bonus.province,
+    recruitBonus,
     capacity: warehouseCapacity(v.buildings.warehouse),
     syncedAt: new Date(v.resources_at).toISOString(),
     buildings: v.buildings,

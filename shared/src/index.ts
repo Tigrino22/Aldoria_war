@@ -7,3 +7,4 @@ export * from './orders';
 export * from './report-tone';
 export * from './crusade';
 export * from './armies';
+export * from './provinces';

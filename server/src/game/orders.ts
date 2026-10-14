@@ -21,6 +21,7 @@ import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { assertCanAttack, chargeAttackWheat, dispatchCommand, refundAttackWheat } from './commands';
 import { assertCitadelMove } from './crusades';
+import { assertBastionMove } from './provinces';
 import { addTroops, getTroops, loadVillage, setTroops, syncVillage } from './village';
 
 /**
@@ -88,7 +89,10 @@ export async function placeOrder(c: Db, outbox: Outbox, playerId: number, origin
   });
 
   // Vers la Citadelle d'une croisade, chaque mouvement de l'ordre doit arriver pendant la fenêtre d'assaut.
-  for (const part of parts) await assertCitadelMove(c, { type: input.type, playerId, target, units: part.units, arriveAt: part.arriveAt });
+  for (const part of parts) {
+    await assertCitadelMove(c, { type: input.type, playerId, target, units: part.units, arriveAt: part.arriveAt });
+    await assertBastionMove(c, { type: input.type, playerId, target, units: part.units, arriveAt: part.arriveAt });
+  }
   // Le blé de toute l'attaque est payé à la commande, comme les troupes sont réservées ; il est rendu si l'ordre est annulé.
   if (input.type === 'attack') await chargeAttackWheat(c, playerId, origin, units);
   await setTroops(c, origin.id, origin.id, subtractUnits(available, units));

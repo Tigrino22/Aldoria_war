@@ -62,6 +62,13 @@ export const env = {
   crusadeNoticeHours: count('CRUSADE_NOTICE_HOURS', 48),
   crusadeGarrison: count('CRUSADE_GARRISON', 150),
   crusadeRelicBonus: count('CRUSADE_RELIC_BONUS', 5),
+  /** Provinces (1 = activées) : tenue d'un bastion avant contrôle (heures), bonus d'une province (%), provinces voisines contrôlées
+   *  exigées pour attaquer la Terre sainte et tenue de la Terre sainte pour gagner le monde (jours) ; modifiables à chaud. */
+  provinces: count('PROVINCES', 1) > 0 ? 1 : 0,
+  provinceHoldHours: count('PROVINCE_HOLD_HOURS', 12),
+  provinceBonus: count('PROVINCE_BONUS', 10),
+  holyAccess: count('HOLY_ACCESS', 2),
+  holyHoldDays: count('HOLY_HOLD_DAYS', 3),
   /** Ménage : rapports des joueurs gardés (jours, hors archives ; 0 = tous) et mouvements terminés gardés (jours). */
   reportsKeepDays: count('REPORTS_KEEP_DAYS', 30),
   commandsKeepDays: count('COMMANDS_KEEP_DAYS', 4),

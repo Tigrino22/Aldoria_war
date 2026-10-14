@@ -101,6 +101,10 @@ export interface VillageState {
   rates: Resources;
   /** Bonus de production de la relique d'une croisade (0,05 = +5 %), déjà compris dans `rates`. */
   relicBonus?: number;
+  /** Bonus de production des provinces que contrôle la tribu (0,1 = +10 %), par ressource. */
+  provinceBonus?: Resources;
+  /** Recrutement accéléré par les provinces contrôlées (0,1 = 10 % plus vite). */
+  recruitBonus?: number;
   capacity: number;
   syncedAt: string;
   buildings: Buildings;
@@ -134,8 +138,10 @@ export interface MapVillage {
   /** Le propriétaire est sous protection débutant (attaques impossibles). */
   protected: boolean;
   /** Citadelle des Croisades (absent pour un village ordinaire). */
-  kind?: 'citadel';
-  /** Pour une Citadelle : tag de la tribu qui tient la bannière. */
+  kind?: 'citadel' | 'bastion';
+  /** Pour un bastion : province dont il est le fort. */
+  provinceId?: number;
+  /** Pour une Citadelle ou un bastion : tag de la tribu qui tient la bannière. */
   holderTag?: string | null;
   /** Pour une Citadelle : état en direct de la croisade (armées en marche : nombre seulement, ni l'origine ni les troupes). */
   crusade?: {
