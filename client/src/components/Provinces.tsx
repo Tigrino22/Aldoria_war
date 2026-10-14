@@ -172,7 +172,7 @@ export default function Provinces() {
           </section>
         </div>
         <div className="stack">
-          <section className="pg-card">
+          <section className="pg-card prov-map-card">
             <CardTitle icon="carte">Carte des provinces</CardTitle>
             <ProvinceMap state={state} colorOf={colorOf} />
             <p className="muted small">Couleurs de la carte : bleu pour votre tribu, bleu ciel pour vos alliés, rouge vif pour vos ennemis, rouge foncé pour les autres. Plus pâle : bannière pas encore tenue assez longtemps.</p>
