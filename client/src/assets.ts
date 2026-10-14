@@ -17,6 +17,8 @@ import village2 from './assets/map/village-2.png';
 import village3 from './assets/map/village-3.png';
 import barbarian from './assets/map/barbarian.png';
 import citadelMap from './assets/map/citadel.png';
+import bastionMap from './assets/map/bastion.png';
+import sanctuaryMap from './assets/map/sanctuary.png';
 import citadel from './assets/citadel.png';
 import flag from './assets/map/flag.svg';
 import trees from './assets/map/trees.png';
@@ -57,7 +59,7 @@ export function buildingImg(key: BuildingKey, level: number): string {
 }
 export const UNIT_IMG: Record<UnitKey, string> = { spearman, halberdier, swordsman, scout, cavalry, ram, noble };
 export const RESOURCE_IMG: Record<Resource, string> = { wood, clay, iron, wheat };
-export const MAP_IMG = { village1, village2, village3, barbarian, citadel: citadelMap, flag, trees, hill, ground, marchFoot, marchHorse, marchScout, marchNoble, marchRam };
+export const MAP_IMG = { village1, village2, village3, barbarian, citadel: citadelMap, bastion: bastionMap, sanctuary: sanctuaryMap, flag, trees, hill, ground, marchFoot, marchHorse, marchScout, marchNoble, marchRam };
 /** Images de marche des armées sur la carte : une bande de `frames` images de `w` × `h` pixels par genre d'unité. */
 export const MARCH_SHEETS = marchMeta as Record<'foot' | 'horse' | 'scout' | 'noble' | 'ram', { frames: number; w: number; h: number }>;
 /** La Citadelle des Croisades, grand rendu pour sa page. */

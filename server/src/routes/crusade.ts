@@ -6,6 +6,7 @@ import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { GameError } from '../errors';
 import { crusadeState } from '../game/crusades';
+import { provincesState } from '../game/provinces';
 
 const TITLE_KEYS = Object.keys(CRUSADE_TITLES) as CrusadeTitleKey[];
 
@@ -14,6 +15,12 @@ export default async function crusadeRoutes(app: FastifyInstance) {
   app.get('/api/crusade', async (req) => {
     const playerId = await requirePlayer(req);
     return act((c, _o, now) => crusadeState(c, playerId, now));
+  });
+
+  /** Provinces : découpage de la carte (points et poids), bannières, contrôle, accès à la Terre sainte et victoire du monde. */
+  app.get('/api/provinces', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act((c, _o, now) => provincesState(c, playerId, now));
   });
 
   /** Saison en cours (la plus récente) et saisons connues. */

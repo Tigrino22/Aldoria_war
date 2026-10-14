@@ -105,6 +105,25 @@ function TradeReport({ d }: { d: TradeReportData }) {
 }
 
 /** Compte rendu d'une croisade (fin de l'assaut) ou troupes refoulées aux portes de la Citadelle. */
+/** Rapport des provinces : bannière plantée ou tombée, contrôle, victoire du monde, troupes renvoyées. */
+function ProvinceReport({ d }: { d: any }) {
+  return (
+    <div className="stack">
+      {d.province && (
+        <p>
+          <b>{d.province}</b>
+          {d.bastion ? ` · ${d.bastion}` : ''}
+        </p>
+      )}
+      {d.text && <p>{d.text}</p>}
+      {d.units && <UnitList units={d.units} />}
+      <p>
+        <a href="#/provinces">Voir les provinces</a>
+      </p>
+    </div>
+  );
+}
+
 function CrusadeReport({ d }: { d: any }) {
   if (!d.crusadeId) {
     return (
@@ -222,6 +241,8 @@ export default function Reports({ id }: { id?: number }) {
             <TradeReport d={report.data} />
           ) : report.type === 'crusade' ? (
             <CrusadeReport d={report.data} />
+          ) : report.type === 'province' ? (
+            <ProvinceReport d={report.data} />
           ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
             <AttackReport d={report.data} />
           ) : (
@@ -246,6 +267,7 @@ const CATEGORIES: { key: string; label: string }[] = [
   { key: 'trade', label: 'Livraisons' },
   { key: 'support', label: 'Renforts' },
   { key: 'crusade', label: 'Croisades' },
+  { key: 'province', label: 'Provinces' },
 ];
 
 const LEGEND: { tone: string; label: string }[] = [

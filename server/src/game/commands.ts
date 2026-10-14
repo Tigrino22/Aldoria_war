@@ -38,6 +38,7 @@ import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { assertCitadelMove, handleCitadelAttack, handleCitadelSupport } from './crusades';
+import { assertBastionMove, handleBastionAttack, handleBastionSupport } from './provinces';
 import { handleIntercept } from './intercept';
 import { launchDueOrders } from './orders';
 import { createReport } from './reports';
@@ -113,6 +114,8 @@ export async function dispatchCommand(
   const arriveAt = cmd.arriveAt ?? new Date(cmd.sentAt.getTime() + travelTime(cmd.units, cmd.origin, cmd.target, env.worldSpeed) * 1000);
   // La Citadelle d'une croisade n'accepte que les arrivées pendant la fenêtre d'assaut.
   await assertCitadelMove(c, { type: cmd.type, playerId: cmd.playerId, target: cmd.target, units: cmd.units, arriveAt });
+  // Un bastion : renforts réservés à la tribu de la bannière, Sanctuaire réservé aux tribus qui contrôlent assez de provinces voisines.
+  await assertBastionMove(c, { type: cmd.type, playerId: cmd.playerId, target: cmd.target, units: cmd.units, arriveAt });
   const id = await insertCommand(c, {
     type: cmd.type,
     originId: cmd.origin.id,
@@ -398,6 +401,8 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
   if (attackers.scout > 0 && attackers.scout === totalUnits(attackers)) return handleScouting(c, outbox, cmd, target, origin, attackers);
   // La Citadelle d'une croisade : bannière, gloire et fenêtre d'assaut (voir crusades.ts).
   if (target.kind === 'citadel') return handleCitadelAttack(c, outbox, cmd, target, origin);
+  // Le bastion d'une province : bannière, tenue et accès à la Terre sainte (voir provinces.ts).
+  if (target.kind === 'bastion') return handleBastionAttack(c, outbox, cmd, target, origin);
 
   const defenderRows = (await c.query('SELECT home_village_id, units FROM troops WHERE village_id = $1 FOR UPDATE', [target.id])).rows;
   const defenders = defenderRows.map((r) => normalizeUnits(r.units));
@@ -568,6 +573,7 @@ async function handleSupport(c: Db, outbox: Outbox, cmd: any) {
   const units = normalizeUnits(cmd.units);
   const target = await loadVillage(c, cmd.target_village_id);
   if (target.kind === 'citadel') return handleCitadelSupport(c, outbox, cmd, target);
+  if (target.kind === 'bastion') return handleBastionSupport(c, outbox, cmd, target);
   const origin = await loadVillage(c, cmd.home_village_id);
   await addTroops(c, target.id, origin.id, units);
   await createReport(c, outbox, cmd.player_id, 'support', `Vos renforts sont arrivés à ${label(target)}`, { units, target: label(target) }, at);

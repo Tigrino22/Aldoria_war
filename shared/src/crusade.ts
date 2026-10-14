@@ -98,6 +98,7 @@ export const CRUSADE_TITLES = {
   champion: 'Champion de la Croisade',
   keeper: 'Gardien de la Citadelle',
   hero: 'Héros de la saison',
+  master: 'Maître d’Aldoria',
 } as const;
 export type CrusadeTitleKey = keyof typeof CRUSADE_TITLES;
 export const CRUSADE_TITLE_HELP: Record<CrusadeTitleKey, string> = {
@@ -107,6 +108,7 @@ export const CRUSADE_TITLE_HELP: Record<CrusadeTitleKey, string> = {
   champion: 'Avoir gagné le plus de gloire lors d’une Croisade',
   keeper: 'Avoir remporté une Croisade avec son camp',
   hero: 'Avoir fini premier du classement de gloire d’une saison',
+  master: 'Avoir gagné le monde avec sa tribu en tenant la Terre sainte',
 };
 
 /** Statut d'une croisade à un instant donné. */

@@ -6,14 +6,14 @@ import { rand } from './textures.js';
 
 const CRIMSON = 0x7d1d1a, GOLD = 0xd4a531;
 
-function at(obj, x, y, z, rotY = 0) {
+export function at(obj, x, y, z, rotY = 0) {
   obj.position.set(x, y, z);
   if (rotY) obj.rotation.y = rotY;
   return obj;
 }
 
 /** Oriflamme pourpre à liseré et médaillon d'or, suspendue à un mur (face +z). */
-function banner(x, y, z, w = 0.9, h = 2, rotY = 0) {
+export function banner(x, y, z, w = 0.9, h = 2, rotY = 0) {
   const g = new THREE.Group();
   const geo = new THREE.PlaneGeometry(w, h, 4, 8);
   const p = geo.attributes.position;
@@ -34,7 +34,7 @@ function banner(x, y, z, w = 0.9, h = 2, rotY = 0) {
 }
 
 /** Grand étendard au sommet du donjon : mât, traverse et long drapeau ondulé. */
-function standard(h, x, y, z) {
+export function standard(h, x, y, z) {
   const g = new THREE.Group();
   g.add(cyl(0.07, 0.09, h, 'timber', 0, 0, 0, { seg: 8 }));
   g.add(at(mesh(new THREE.SphereGeometry(0.16, 12, 8), plain(GOLD, 0.35)), 0, h + 0.1, 0));
@@ -56,7 +56,7 @@ function standard(h, x, y, z) {
 }
 
 /** Tour ronde de l'enceinte, toit conique d'ardoise et fanion. */
-function roundTower(r, h, x, y, z, { roof = true, pennant = true } = {}) {
+export function roundTower(r, h, x, y, z, { roof = true, pennant = true } = {}) {
   const g = group(
     cyl(r * 1.08, r * 1.2, 0.8, 'stone', 0, 0, 0, { seg: 18 }), // empattement
     cyl(r, r * 1.06, h, 'stone', 0, 0, 0, { seg: 18 }),
@@ -89,7 +89,7 @@ function standardSmall(x, y, z) {
 }
 
 /** Courtine crénelée entre deux points (x, z), avec chemin de ronde. */
-function curtain(a, b, h, y, thick = 1.1) {
+export function curtain(a, b, h, y, thick = 1.1) {
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
   const g = group(box(len, h, thick, 'stone', 0, 0, 0), crenels(len, thick, h, 'stone', 0.42), box(len, 0.5, thick + 0.3, 'stone', 0, 0, 0));
   g.position.set((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2);
@@ -98,7 +98,7 @@ function curtain(a, b, h, y, thick = 1.1) {
 }
 
 /** Éperon rocheux qui porte la citadelle : un plateau aux flancs de roche. */
-function crag(rx, rz, h) {
+export function crag(rx, rz, h) {
   const g = new THREE.Group();
   const geo = new THREE.CylinderGeometry(1, 1.25, h, 40, 4);
   const p = geo.attributes.position;

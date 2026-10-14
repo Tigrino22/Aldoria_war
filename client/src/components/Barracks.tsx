@@ -221,7 +221,7 @@ export default function Barracks() {
                 </dl>
                 <div className="row wrap">
                   <Cost cost={def.cost} have={res} />
-                  <span className="muted small">⏱ {duration(recruitTime(k, v.buildings.barracks, world.speed))}</span>
+                  <span className="muted small">⏱ {duration(recruitTime(k, v.buildings.barracks, world.speed) / (1 + (v.recruitBonus ?? 0)))}</span>
                 </div>
                 {ok ? (
                   <div className="row">
