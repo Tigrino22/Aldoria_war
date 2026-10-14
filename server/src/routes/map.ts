@@ -20,9 +20,13 @@ export default async function mapRoutes(app: FastifyInstance) {
       })
       .parse(req.query);
     const { rows } = await pool.query(
-      `SELECT v.id, v.name, v.x, v.y, v.points, v.owner_id, p.username, p.protection_until > now() AS protected, t.id AS tribe_id, t.tag
+      `SELECT v.id, v.name, v.x, v.y, v.points, v.owner_id, v.kind, p.username, p.protection_until > now() AS protected, t.id AS tribe_id, t.tag,
+              (p.relic_until > now() OR t.relic_until > now()) AS relic,
+              (SELECT coalesce(ht.tag, hp.username) FROM crusades cr LEFT JOIN tribes ht ON ht.id = cr.holder_tribe_id LEFT JOIN players hp ON hp.id = cr.holder_player_id
+               WHERE cr.village_id = v.id AND cr.status <> 'ended' AND (cr.holder_tribe_id IS NOT NULL OR cr.holder_player_id IS NOT NULL)) AS holder
        FROM villages v LEFT JOIN players p ON p.id = v.owner_id LEFT JOIN tribes t ON t.id = p.tribe_id
-       WHERE v.x BETWEEN $1 AND $3 AND v.y BETWEEN $2 AND $4`,
+       WHERE v.x BETWEEN $1 AND $3 AND v.y BETWEEN $2 AND $4
+         AND (v.kind = 'village' OR EXISTS (SELECT 1 FROM crusades cr WHERE cr.village_id = v.id AND cr.status <> 'ended'))`,
       [q.x0, q.y0, q.x1, q.y1],
     );
     return rows.map(
@@ -37,6 +41,8 @@ export default async function mapRoutes(app: FastifyInstance) {
         tribeId: r.tribe_id,
         tribeTag: r.tag,
         protected: r.protected === true,
+        ...(r.kind === 'citadel' ? { kind: 'citadel' as const, holderTag: r.holder ?? null } : {}),
+        ...(r.relic ? { relic: true } : {}),
       }),
     );
   });
@@ -82,7 +88,7 @@ export default async function mapRoutes(app: FastifyInstance) {
     if (!home) throw forbidden("Ce village n'est pas à vous");
     const { rows } = await pool.query(
       `SELECT id, name, x, y, points, sqrt((x - $1)^2 + (y - $2)^2) AS dist FROM villages
-       WHERE owner_id IS NULL AND (x - $1)^2 + (y - $2)^2 <= $3 ORDER BY dist, id LIMIT 200`,
+       WHERE owner_id IS NULL AND kind = 'village' AND (x - $1)^2 + (y - $2)^2 <= $3 ORDER BY dist, id LIMIT 200`,
       [home.x, home.y, radius * radius],
     );
     const ids = rows.map((r) => r.id as number);

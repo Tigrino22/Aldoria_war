@@ -97,6 +97,8 @@ export interface VillageState {
   loyalty: number;
   resources: Resources;
   rates: Resources;
+  /** Bonus de production de la relique d'une croisade (0,05 = +5 %), déjà compris dans `rates`. */
+  relicBonus?: number;
   capacity: number;
   syncedAt: string;
   buildings: Buildings;
@@ -129,6 +131,12 @@ export interface MapVillage {
   tribeTag: string | null;
   /** Le propriétaire est sous protection débutant (attaques impossibles). */
   protected: boolean;
+  /** Citadelle des Croisades (absent pour un village ordinaire). */
+  kind?: 'citadel';
+  /** Pour une Citadelle : tag de la tribu qui tient la bannière. */
+  holderTag?: string | null;
+  /** Le village appartient à un camp qui détient la relique d'une croisade (bannière dorée sur la carte). */
+  relic?: boolean;
 }
 
 /** Mouvements de troupes connus du joueur vers un village : les siens, et ceux qui visent ses villages (icônes de la carte). */

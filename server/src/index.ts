@@ -2,6 +2,9 @@ import { buildApp } from './app';
 import { pool, tx } from './db';
 import { env } from './env';
 import { processDueEvents } from './game/commands';
+import { processCrusades } from './game/crusades';
+import { housekeeping } from './game/housekeeping';
+import { Outbox } from './notify';
 import { assignTriblessNpcs, ensureNpcTribes, ensureNpcs, processNpcs } from './game/npc';
 import { ensureWorld } from './game/world';
 import { skipIfBusy, withGameLock } from './lock';
@@ -54,8 +57,29 @@ async function main() {
     60_000,
   );
 
+  // Croisades : toutes les 10 secondes, ouverture et fermeture des portes à l'heure, annonce de la suivante.
+  const crusadeTimer = setInterval(
+    report(
+      skipIfBusy(() =>
+        withGameLock(async () => {
+          await processDueEvents(new Date());
+          const outbox = new Outbox();
+          await tx((c) => processCrusades(c, outbox, new Date()));
+          outbox.flush();
+        }),
+      ),
+    ),
+    10_000,
+  );
+
+  // Ménage : une fois par heure, les vieux mouvements terminés et les vieux rapports sont effacés, par petits lots.
+  const houseTimer = setInterval(report(skipIfBusy(() => housekeeping(new Date()))), 3_600_000);
+  setTimeout(report(() => housekeeping(new Date())), 60_000);
+
   const stop = async () => {
     clearInterval(timer);
+    clearInterval(crusadeTimer);
+    clearInterval(houseTimer);
     clearInterval(managerTimer);
     if (npcTimer) clearInterval(npcTimer);
     await app.close();

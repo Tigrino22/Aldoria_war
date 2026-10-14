@@ -86,7 +86,7 @@ export default async function statsRoutes(app: FastifyInstance) {
                 (SELECT count(*)::int FROM players WHERE is_npc) AS npcs,
                 (SELECT count(*)::int FROM tribes) AS tribes,
                 (SELECT count(*)::int FROM villages WHERE owner_id IS NOT NULL) AS villages,
-                (SELECT count(*)::int FROM villages WHERE owner_id IS NULL) AS barbarians,
+                (SELECT count(*)::int FROM villages WHERE owner_id IS NULL AND kind = 'village') AS barbarians,
                 (SELECT coalesce(sum(points), 0)::int FROM villages WHERE owner_id IS NOT NULL) AS points,
                 (SELECT count(*)::int FROM commands WHERE type = 'attack' AND NOT processed) AS "attacksInFlight",
                 (SELECT count(*)::int FROM commands WHERE type = 'attack' AND processed AND arrive_at > now() - interval '24 hours') AS "attacks24h",

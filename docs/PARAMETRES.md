@@ -283,7 +283,7 @@ Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaq
 
 ### Marge de sécurité des attaques des PNJ
 
-Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes et aux opérations de tribu. Les offensives occasionnelles n'en tiennent pas compte : elles partent toujours avec leur part d'armée (« Part de l'armée engagée dans une offensive »), même si elle ne bat pas la défense espionnée, car leur but est de déstabiliser les joueurs.
+Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes et aux opérations de tribu. Les offensives occasionnelles partent avec leur part d'armée (« Part de l'armée engagée dans une offensive ») si cette part bat la défense espionnée ; sinon avec toute l'armée offensive si elle suffit ; sinon le PNJ renonce et retente plus tard. Une attaque perdue d'avance ne faisait que remplir les rapports.
 
 ### Recrutement accéléré des PNJ
 
@@ -321,3 +321,32 @@ Migration 014 : compteurs `conquests`, `villages_lost`, `attack_wins`, `defense_
 | Classement | Onglet « Guerre » de la page Classement (`GET /api/ranking/war/players`, `/tribes`, `/feed`) : podium, tableau, dernières conquêtes, guerres de tribus en cours. Seuls les scores > 0 figurent au tableau |
 | Statistiques du monde | Page `#/monde` (`GET /api/world/stats`, `server/src/game/world-stats.ts`, partagée avec l'onglet Statistiques de l'administration) : totaux et moyennes uniquement, aucun nom de joueur ni village précis |
 
+
+## Croisades : la Citadelle
+
+Migration 020, règles pures dans `shared/src/crusade.ts`, serveur dans `server/src/game/crusades.ts`, route `server/src/routes/crusade.ts`, tests dans `server/test/croisades.test.ts`.
+
+| Élément | Règle |
+|---|---|
+| Calendrier | Deux soirs par semaine (mercredi et samedi par défaut), à 20 h 30, pendant 60 minutes, dans le fuseau `NPC_TIMEZONE`. La Citadelle est annoncée 48 heures avant l'ouverture |
+| Emplacement | Un quart de la carte différent à chaque croisade, sur une case libre. La Citadelle est un village sans propriétaire (`villages.kind = 'citadel'`), muraille 20, que ni les pillages ni la repousse des barbares ne touchent |
+| Garnison | 60 % de l'armée offensive de la tribu la plus forte (entre 1 500 et 250 000 places) : 40 % lanciers, 40 % hallebardiers, 20 % épéistes |
+| Fenêtre d'assaut | Attaques et renforts doivent arriver entre l'ouverture et la fermeture ; les éclaireurs peuvent partir dès l'annonce. Une arrivée hors de la fenêtre fait demi-tour |
+| Bannière | Une attaque qui vide la Citadelle avec un noble survivant plante la bannière de son camp (tribu et tribus alliées, ou joueur seul) ; ses survivants restent en garnison. Seul ce camp peut envoyer des renforts ; une attaque de ce camp devient un renfort |
+| Victoire | Le camp qui tient la bannière à la fermeture des portes gagne. Les troupes rentrent, les ordres programmés non partis sont annulés et remboursés |
+| Gloire | 1 par 10 places ennemies tuées, +100 pour la brèche, +150 par prise de bannière, +300 pour chaque membre du camp vainqueur qui a combattu (×0,75 par victoire consécutive de la même tribu). Saison de 28 jours |
+| Relique | Le camp vainqueur gagne +5 % de production pendant 7 jours |
+| Trésor | 2 × la population de la garnison par ressource, partagé au prorata de la gloire, livré au plus ancien village de chacun |
+| Titres | Croisé, Briseur de murailles, Porte-étendard, Champion de la Croisade, Gardien de la Citadelle, Héros de la saison : à afficher à côté de son nom (Profil) |
+
+Réglages à chaud (Administration > Monde) : `CRUSADES` (0 pour couper), `CRUSADE_DAYS` (« 3,6 », 0 = dimanche), `CRUSADE_TIME` (« 20:30 »), `CRUSADE_MINUTES`, `CRUSADE_NOTICE_HOURS`, `CRUSADE_GARRISON` (%), `CRUSADE_RELIC_BONUS` (%). L'administration peut lancer une croisade de test ou terminer la croisade en cours.
+
+## Ménage des rapports et des mouvements
+
+`server/src/game/housekeeping.ts`, une fois par heure (et une minute après le démarrage), par lots de 5 000 :
+
+| Élément | Règle |
+|---|---|
+| Mouvements terminés | Supprimés après `COMMANDS_KEEP_DAYS` jours (4 par défaut, jamais moins) |
+| Rapports des joueurs | Supprimés après `REPORTS_KEEP_DAYS` jours (30 par défaut), sauf les rapports archivés |
+| Rapports des PNJ | 72 heures au plus, et un seul renseignement par village barbare (voir PNJ.md) |

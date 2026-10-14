@@ -9,6 +9,8 @@ import { worldStats } from '../game/world-stats';
 import { isQuiet } from '../game/npc-rules';
 import { warOverview } from '../game/npc-war-report';
 import { GameError } from '../errors';
+import { act } from '../act';
+import { announceCrusade, endCrusade } from '../game/crusades';
 import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
 /** Réservé aux pseudos listés dans ADMIN_USERNAMES : vérifié à chaque requête, côté serveur. */
@@ -155,6 +157,30 @@ export default async function adminRoutes(app: FastifyInstance) {
     return fillNpcWarehouses(percent, new Date());
   });
 
+  /**
+   * Croisade d'essai : annonce tout de suite une Citadelle dont les portes s'ouvrent dans `inMinutes` minutes
+   * (pour tester sans attendre le jour prévu), ou ferme celle en cours.
+   */
+  app.post('/api/admin/crusade/start', async (req) => {
+    await requireAdmin(req);
+    const { inMinutes } = z.object({ inMinutes: z.number().int().min(1).max(7 * 24 * 60) }).parse(req.body);
+    return act(async (c, _o, now) => {
+      const busy = (await c.query("SELECT 1 FROM crusades WHERE status <> 'ended'")).rowCount;
+      if (busy) throw new GameError('Une croisade est déjà annoncée ou en cours');
+      const opens = new Date(now.getTime() + inMinutes * 60_000);
+      return { id: await announceCrusade(c, now, opens, new Date(opens.getTime() + env.crusadeMinutes * 60_000)) };
+    });
+  });
+  app.post('/api/admin/crusade/end', async (req) => {
+    await requireAdmin(req);
+    return act(async (c, outbox, now) => {
+      const cr = (await c.query("SELECT * FROM crusades WHERE status <> 'ended' ORDER BY id LIMIT 1 FOR UPDATE")).rows[0];
+      if (!cr) throw new GameError('Aucune croisade en cours');
+      await endCrusade(c, outbox, cr, now);
+      return { id: cr.id };
+    });
+  });
+
   /** Totaux du monde et paramètres actifs. */
   app.get('/api/admin/world', async (req) => {
     await requireAdmin(req);
@@ -162,7 +188,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       await pool.query(
         `SELECT (SELECT count(*)::int FROM players WHERE NOT is_npc) AS humans,
                 (SELECT count(*)::int FROM players WHERE is_npc) AS npcs,
-                (SELECT count(*)::int FROM villages WHERE owner_id IS NULL) AS barbarians,
+                (SELECT count(*)::int FROM villages WHERE owner_id IS NULL AND kind = 'village') AS barbarians,
                 (SELECT count(*)::int FROM villages WHERE owner_id IS NOT NULL) AS owned,
                 (SELECT count(*)::int FROM tribes) AS tribes,
                 (SELECT count(*)::int FROM commands WHERE NOT processed AND type = 'attack') AS attacksInFlight`,
@@ -189,6 +215,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         npcDifficulty: env.npcDifficulty,
         npcTimezone: env.npcTimezone,
         quietHours: `${env.npcQuietStart} h → ${env.npcQuietEnd} h`,
+        crusades: env.crusades ? `activées (jours ${env.crusadeDays}, ${env.crusadeTime}, ${env.crusadeMinutes} min)` : 'désactivées',
       },
     };
   });

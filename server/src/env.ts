@@ -51,6 +51,18 @@ export const env = {
   /** Gestionnaire de compte (1 = activé sur le monde), modifiable à chaud depuis l'administration. */
   accountManager: count('ACCOUNT_MANAGER', 1) > 0 ? 1 : 0,
   npcMax: count('NPC_MAX', 200),
+  /** Croisades (1 = activées) : jours (0 = dimanche … 6 = samedi), heure d'ouverture, durée (minutes), annonce (heures avant),
+   *  garnison (% de l'armée offensive de la tribu la plus forte) et bonus de production de la relique (%) ; modifiables à chaud. */
+  crusades: count('CRUSADES', 1) > 0 ? 1 : 0,
+  crusadeDays: process.env.CRUSADE_DAYS || '3,6',
+  crusadeTime: process.env.CRUSADE_TIME || '20:30',
+  crusadeMinutes: count('CRUSADE_MINUTES', 60),
+  crusadeNoticeHours: count('CRUSADE_NOTICE_HOURS', 48),
+  crusadeGarrison: count('CRUSADE_GARRISON', 60),
+  crusadeRelicBonus: count('CRUSADE_RELIC_BONUS', 5),
+  /** Ménage : rapports des joueurs gardés (jours, hors archives ; 0 = tous) et mouvements terminés gardés (jours). */
+  reportsKeepDays: count('REPORTS_KEEP_DAYS', 30),
+  commandsKeepDays: count('COMMANDS_KEEP_DAYS', 4),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',
   npcQuietStart: count('NPC_QUIET_START', 22),

@@ -167,19 +167,20 @@ describe('PNJ agressifs', () => {
     const giant = await makePlayer('Géant');
     // Trois villages : trois fois les points du PNJ, hors de la fourchette.
     const big = await villageOf(giant, home.x + 2, home.y + 3);
-    await villageOf(giant, home.x + 4, home.y + 3);
-    await villageOf(giant, home.x + 6, home.y + 3);
+    const giantVillages = [big, await villageOf(giant, home.x + 4, home.y + 3), await villageOf(giant, home.x + 6, home.y + 3)];
     await pool.query('UPDATE players SET protection_until = NULL');
     const t = new Date(NOON.getTime() + 75 * HOUR);
-    await scouted(npc, big, t);
+    // Les trois villages sont espionnés : la riposte peut viser n'importe lequel.
+    for (const id of giantVillages) await scouted(npc, id, t);
+    const attacksOnGiant = async () => (await Promise.all(giantVillages.map((id) => attacksOn(npc, id)))).flat();
     await tx((c) => npcThink(c, new Outbox(), npc, t));
-    expect(await attacksOn(npc, big)).toHaveLength(0);
+    expect(await attacksOnGiant()).toHaveLength(0);
 
     // S'il a été attaqué par ce joueur, la fourchette ne compte plus.
     await tx((c) => setTroops(c, big, big, troops({ swordsman: 20 })));
     await tx((c) => sendCommand(c, new Outbox(), giant, big, { type: 'attack', targetId: home.id, units: { swordsman: 20 } }, t));
     await tx((c) => npcThink(c, new Outbox(), npc, new Date(t.getTime() + 1000)));
-    expect((await attacksOn(npc, big)).length).toBeGreaterThan(0);
+    expect((await attacksOnGiant()).length).toBeGreaterThan(0);
   });
 
   it('aucune limite journalière : un PNJ attaqué frappe le même joueur autant de fois que nécessaire', async () => {
@@ -340,14 +341,21 @@ describe('PNJ agressifs', () => {
     await pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $1) WHERE id = $2', [home.id, v]);
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 300, scout: 300 })));
     env.npcOffensive = 0;
-    for (const [roll, expected] of [[0.1, 0], [0.7, 30]] as const) {
+    // Hors riposte, l'intimidation ne fait que remplir les rapports : le PNJ attend. Le joueur qui l'a attaqué, lui, est intimidé.
+    for (const [roll, grudge, expected] of [[0.1, false, 0], [0.7, false, 0], [0.7, true, 30]] as const) {
       await pool.query('DELETE FROM commands');
       await pool.query('DELETE FROM reports WHERE player_id = $1', [npc]);
       await failed(new Date(t3.getTime() - HOUR));
+      if (grudge) {
+        await pool.query(
+          `INSERT INTO commands (type, player_id, origin_village_id, home_village_id, target_village_id, units, sent_at, arrive_at) VALUES ('attack', $1, $2, $2, $3, '{"swordsman": 5}', $4, $5)`,
+          [other, v, home.id, new Date(t3.getTime() - HOUR), new Date(t3.getTime() + HOUR)],
+        );
+      }
       setScoutFailureRandom(() => roll);
       await tx((c) => npcThink(c, new Outbox(), npc, t3));
       const sentNow = await attacksSent();
-      expect(sentNow.reduce((n, u) => n + (u.swordsman ?? 0) + (u.cavalry ?? 0), 0)).toBe(expected);
+      expect(sentNow.reduce((n: number, u: Record<string, number>) => n + (u.swordsman ?? 0) + (u.cavalry ?? 0), 0)).toBe(expected);
       expect(await scoutsSent()).toEqual([]);
     }
     env.npcOffensive = 1;

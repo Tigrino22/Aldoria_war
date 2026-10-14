@@ -55,3 +55,14 @@ Le code est dans `npc-tribes.ts` (défense, alertes, opérations) et `npc.ts`, l
 - Au démarrage, tout PNJ sans tribu (les anciens solitaires comme les nouveaux arrivants) entre dans la tribu de PNJ la moins peuplée qui a de la place ; si toutes sont pleines, une nouvelle tribu est fondée avec un nom tiré d'une liste (« Ordre du Cormoran », etc.) et le premier membre en devient le chef. Alliances et rivalités sont redistribuées à chaque nouvelle tribu.
 - Équilibrage : des tribus de 5 à 7 membres, des renforts mutuels, des opérations coordonnées menées par le chef ou un conquérant, et toujours le ratio de points et les heures calmes. Une attaque contre un membre mobilise donc toute la tribu et ses alliées.
 - Les tribus de PNJ ne portent aucune mention « PNJ » côté joueur (description neutre).
+
+## PNJ stratèges : croisades, conquêtes et rapports
+
+Les PNJ ne font plus rien « à l'aveugle » qui ne servirait qu'à remplir les rapports.
+
+- **Croisades** (`server/src/game/npc-crusade.ts`) : dès l'annonce d'une croisade, le chef de chaque tribu de PNJ espionne la Citadelle avec 5 éclaireurs et décide si la tribu s'engage (son armée offensive doit valoir au moins 40 % de la garnison, béliers suffisants pour la muraille). Une tribu engagée garde les troupes de ses villages offensifs en réserve (ni pillage ni attaque dans les 2 heures qui précèdent l'ouverture), puis programme au point de ralliement un assaut par village offensif : vagues échelonnées de 20 secondes à partir de la première minute, train de nobles 10 minutes après l'ouverture. Si la tribu tient la bannière, ses villages défensifs envoient des renforts ; sinon elle contre-attaque (au plus une fois tous les quarts d'heure par village). L'état de la tribu est gardé dans `tribes.npc_state.crusade`.
+- **Conquête réfléchie** : un PNJ qui a de quoi former un train de nobles choisit un village à prendre dans un rayon de 12 cases (barbare ou PNJ rival, jamais un joueur), le plus gros au plus près, et s'y tient d'une réflexion à l'autre (`players.npc_state.conquest`).
+- **Offensives** : une offensive part seulement si sa part d'armée bat la défense espionnée, sinon toute l'armée offensive si elle suffit, sinon le PNJ renonce et retente plus tard.
+- **Après un espionnage raté** : l'intimidation et la frappe à l'aveugle sont réservées aux guerres et aux ripostes. Hors de ces cas, le PNJ réespionne ou passe son tour.
+- **Barbares** : un barbare n'est réespionné qu'au bout de 48 heures de jeu (au lieu de 24).
+- **Rapports des PNJ** : sur un village barbare, seuls restent le dernier renseignement et les pillages qui l'ont suivi ; les rapports plus anciens sont effacés à chaque réflexion. Le tout reste limité à 72 heures.

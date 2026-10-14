@@ -36,6 +36,7 @@ import {
 import type { Db } from '../db';
 import { env } from '../env';
 import { barbarianCap, barbarianTier, growBarbarian } from './barbarians';
+import { relicBonus } from './crusades';
 import { GameError, notFound } from '../errors';
 
 export interface VillageRow {
@@ -52,6 +53,8 @@ export interface VillageRow {
   resources_at: Date;
   loyalty: number;
   points: number;
+  /** « village », ou « citadel » pour la Citadelle d'une croisade. */
+  kind?: string;
 }
 
 const STARTING_ZERO = Object.fromEntries(BUILDING_KEYS.map((k) => [k, 0])) as Buildings;
@@ -117,10 +120,14 @@ export async function computePopulation(c: Db, villageId: number): Promise<numbe
 
 // ---------- Synchronisation dans le temps ----------
 
-function produce(v: VillageRow, from: Date, to: Date) {
+/** Production augmentée d'un bonus (relique d'une croisade : 0,05 = +5 %) ; une consommation négative n'est pas touchée. */
+const boosted = (rates: Resources, bonus: number): Resources =>
+  bonus > 0 ? (Object.fromEntries(RESOURCES.map((r) => [r, rates[r] > 0 ? rates[r] * (1 + bonus) : rates[r]])) as unknown as Resources) : rates;
+
+function produce(v: VillageRow, from: Date, to: Date, bonus = 0) {
   const hours = (to.getTime() - from.getTime()) / 3_600_000;
   if (hours <= 0) return;
-  const rates = productionRates(v.buildings, env.worldSpeed);
+  const rates = boosted(productionRates(v.buildings, env.worldSpeed), bonus);
   const cap = warehouseCapacity(v.buildings.warehouse);
   for (const r of RESOURCES) {
     const next = v[r] + rates[r] * hours;
@@ -137,6 +144,7 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
   const v = await loadVillage(c, id, true);
   if (at.getTime() <= new Date(v.resources_at).getTime()) return v;
   const start = new Date(v.resources_at);
+  const bonus = await relicBonus(c, v.owner_id, at);
 
   const builds = await c.query(
     'SELECT id, building, level, finish_at FROM build_queue WHERE village_id = $1 AND finish_at <= $2 ORDER BY finish_at, id',
@@ -144,13 +152,13 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
   );
   let t = start;
   for (const b of builds.rows) {
-    produce(v, t, b.finish_at);
+    produce(v, t, b.finish_at, bonus);
     const key = b.building as BuildingKey;
     v.buildings[key] = Math.max(v.buildings[key], b.level);
     t = b.finish_at;
   }
   if (builds.rows.length) await c.query('DELETE FROM build_queue WHERE id = ANY($1)', [builds.rows.map((b) => b.id)]);
-  produce(v, t, at);
+  produce(v, t, at, bonus);
 
   const hours = (at.getTime() - start.getTime()) / 3_600_000;
   v.loyalty = Math.min(100, v.loyalty + hours * LOYALTY_REGEN_PER_HOUR * env.worldSpeed);
@@ -165,7 +173,7 @@ export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageR
     else if (fresh > 0) await c.query('UPDATE recruit_queue SET delivered = $2 WHERE id = $1', [r.id, done]);
   }
 
-  if (v.owner_id === null) await regrowBarbarian(c, v, hours);
+  if (v.owner_id === null && v.kind !== 'citadel') await regrowBarbarian(c, v, hours);
 
   v.resources_at = at;
   v.points = villagePoints(v.buildings);
@@ -383,7 +391,8 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     points: v.points,
     loyalty: Math.floor(v.loyalty),
     resources: resourcesOf(v),
-    rates: productionRates(v.buildings, env.worldSpeed),
+    rates: boosted(productionRates(v.buildings, env.worldSpeed), await relicBonus(c, v.owner_id, new Date())),
+    relicBonus: await relicBonus(c, v.owner_id, new Date()),
     capacity: warehouseCapacity(v.buildings.warehouse),
     syncedAt: new Date(v.resources_at).toISOString(),
     buildings: v.buildings,

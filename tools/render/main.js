@@ -214,7 +214,7 @@ window.renderScene = (name, ...args) => {
   setSeed(42);
   const s = SCENES[name](...args);
   // Le décor du village et son enceinte prennent le même rendu que les bâtiments posés dessus.
-  const res = shoot(s.object, { ...s.view, golden: name === 'village' || name === 'wallRing' });
+  const res = shoot(s.object, { ...s.view, golden: name === 'village' || name === 'wallRing' || name === 'citadel' || name === 'mapCitadel' });
   // Position à l'écran (en % de l'image) des emplacements nommés, pour placer les bâtiments par-dessus.
   const spots = {};
   for (const [k, p] of Object.entries(s.spots ?? {})) {

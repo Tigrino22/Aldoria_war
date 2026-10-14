@@ -12,6 +12,7 @@ import { env } from './env';
 import { register } from './notify';
 import allianceRoutes from './routes/alliances';
 import authRoutes from './routes/auth';
+import crusadeRoutes from './routes/crusade';
 import mapRoutes from './routes/map';
 import adminRoutes from './routes/admin';
 import managerRoutes from './routes/manager';
@@ -76,6 +77,7 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   await app.register(questRoutes);
   await app.register(socialRoutes);
   await app.register(statsRoutes);
+  await app.register(crusadeRoutes);
 
   // En production, le même serveur distribue aussi le site (le client utilise des routes en #, donc
   // tout chemin inconnu hors /api renvoie la page d'accueil).

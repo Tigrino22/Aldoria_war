@@ -13,6 +13,8 @@ import {
   normalizeUnits,
   travelTime,
   warehouseCapacity,
+  resolveCombat,
+  wallDuringCombat,
 } from '@aldoria/shared';
 import { pool, tx, type Db } from '../db';
 import { env } from '../env';
@@ -23,6 +25,7 @@ import { processDueEvents, sendCommand } from './commands';
 import { pickNpcName } from './npc-names';
 import {
   NOBLES_PER_CONQUEST,
+  attackBeats,
   pointRatioOk,
   NPC_PROFILES,
   npcTribeNameCandidates,
@@ -51,6 +54,7 @@ import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, 
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { refreshTribeWars } from './tribe-wars';
 import { raidStep } from './npc-raids';
+import { crusadeHold, crusadeStep } from './npc-crusade';
 import { pickIntel } from './intel';
 import { acceptOffer, cancelOffer, createOffer, expireOffers, freeMerchants } from './market';
 
@@ -76,6 +80,8 @@ const RAID_RADIUS = 20;
 const NOBLE_ESCORT = 2;
 /** Nombre maximal de nobles dans un train. */
 const MAX_TRAIN = 6;
+/** Rayon (en cases) dans lequel un PNJ conquérant choisit le village à prendre. */
+const CONQUEST_RADIUS = 12;
 const DAY_MS = 86_400_000;
 /** Délai minimal (en heures de jeu) entre deux missions d'espionnage d'un même PNJ chez un joueur ou un PNJ (les barbares ne comptent pas). */
 const SCOUT_COOLDOWN_GAME_HOURS = 4;
@@ -325,6 +331,8 @@ interface Candidate {
   enemy: boolean;
   /** Points de tous les villages du propriétaire (0 pour un village barbare). */
   ownerPoints: number;
+  /** Points du village lui-même. */
+  points: number;
   dist: number;
 }
 
@@ -337,8 +345,8 @@ interface Hostiles {
 
 async function candidates(c: Db, npcId: number, from: { id: number; x: number; y: number }, now: Date, hostiles: Hostiles): Promise<Candidate[]> {
   const { rows } = await c.query(
-    `SELECT v.id, v.x, v.y, v.owner_id, p.tribe_id AS owner_tribe, (p.is_npc IS TRUE) AS rival, coalesce((SELECT sum(w.points) FROM villages w WHERE w.owner_id = v.owner_id), 0)::int AS owner_points FROM villages v LEFT JOIN players p ON p.id = v.owner_id
-     WHERE v.id <> $1
+    `SELECT v.id, v.x, v.y, v.points, v.owner_id, p.tribe_id AS owner_tribe, (p.is_npc IS TRUE) AS rival, coalesce((SELECT sum(w.points) FROM villages w WHERE w.owner_id = v.owner_id), 0)::int AS owner_points FROM villages v LEFT JOIN players p ON p.id = v.owner_id
+     WHERE v.id <> $1 AND v.kind = 'village'
        AND ((v.x - $2)^2 + (v.y - $3)^2 <= $5 OR (p.tribe_id = ANY($8::int[]) AND (v.x - $2)^2 + (v.y - $3)^2 <= $9))
        AND (v.owner_id IS NULL
             OR (NOT p.is_npc AND (p.protection_until IS NULL OR p.protection_until <= $4))
@@ -355,6 +363,7 @@ async function candidates(c: Db, npcId: number, from: { id: number; x: number; y
     // Un village de la tribu ennemie en guerre est un ennemi, de PNJ comme de joueur ; la rancune ne vaut qu'entre PNJ.
     enemy: hostiles.warTribes.includes(r.owner_tribe) || (r.rival && hostiles.grudges.includes(r.owner_id)),
     ownerPoints: r.owner_points,
+    points: r.points,
     dist: Math.hypot(r.x - from.x, r.y - from.y),
   }));
 }
@@ -453,9 +462,23 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     offensivePool = [...warPlayers, ...enemyVillages, ...hitSafe, ...rivalVillages.filter((t) => !t.enemy)];
     offensive = offensivePool.length > 0;
   }
-  if (!offensive && pool.length === 0) return;
+  // Conquête réfléchie : un PNJ qui a de quoi former un train de nobles choisit un village à prendre (barbare ou PNJ rival, jamais un joueur),
+  // le plus gros au plus près de chez lui, et s'y tient d'une réflexion à l'autre au lieu de frapper au hasard.
+  let conquest: Candidate | undefined;
+  if (!offensive && !revengePool.length && trainSize() > 0) {
+    const options = all.filter((t) => (t.ownerId === null || t.rival) && t.dist <= CONQUEST_RADIUS);
+    const kept = npcState.conquest?.targetId as number | undefined;
+    conquest = options.find((t) => t.id === kept) ?? options.sort((a, b) => b.points / (1 + b.dist) - a.points / (1 + a.dist))[0];
+    if (conquest && conquest.id !== kept) {
+      await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('conquest', jsonb_build_object('targetId', $2::int)) WHERE id = $1", [npcId, conquest.id]);
+    }
+  }
+  if (!offensive && !conquest && pool.length === 0) return;
   const keptId = offensive ? (npcState.offensive?.targetId as number | undefined) : undefined;
-  const target = (offensive ? offensivePool.find((t) => t.id === keptId) : undefined) ?? (offensive ? offensivePool : pool).map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
+  const target =
+    conquest ??
+    (offensive ? offensivePool.find((t) => t.id === keptId) : undefined) ??
+    (offensive ? offensivePool : pool).map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
   if (offensive) {
     await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text, 'targetId', $3::int)) WHERE id = $1", [npcId, new Date(nextOff!).toISOString(), target.id]);
   }
@@ -489,6 +512,11 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
         let move = afterScoutFailure(scoutFailureRoll());
         // Un joueur déjà frappé par un PNJ pendant la période n'essuie pas de vraie attaque à l'aveugle : seulement de l'intimidation.
         if (move === 'strike' && hostileToPlayer && (await recentlyHit(c, target.ownerId!, now))) move = 'harass';
+        // Hors guerre et hors riposte, intimider ou frapper à l'aveugle ne sert à rien et ne fait que remplir les rapports :
+        // le PNJ réespionne ou passe son tour.
+        const fighting = target.enemy || (hostileToPlayer && grudges.includes(target.ownerId!));
+        if (!fighting && move === 'harass') move = 'wait';
+        if (!fighting && move === 'strike') move = 'rescout';
         if (move === 'wait') return;
         if (move !== 'rescout') {
           const units = move === 'harass' ? harassUnits(attackers) : pickOffensiveUnits(attackers);
@@ -508,8 +536,11 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     // Les troupes dépendent du butin : assez pour gagner et emporter l'essentiel du stock, toute l'armée s'il le faut.
     // Pour se venger ou faire la guerre, un PNJ frappe fort : au moins 70 % de son armée offensive.
     if (offensive) {
-      // Offensive : une part de l'armée part dans tous les cas, même trop faible pour vaincre (elle déstabilise) ; pas de train de nobles ni de seuil de butin.
-      const units = pickOffensiveUnits(attackers);
+      // Offensive : une part de l'armée, seulement si elle bat la défense espionnée (une attaque perdue d'avance ne fait que remplir les rapports).
+      // Sinon, toute l'armée offensive si elle suffit ; sinon le PNJ renonce et retentera plus tard.
+      const share = pickOffensiveUnits(attackers);
+      const wins = (u: UnitCounts | null) => !!u && attackBeats(resolveCombat({ attackers: u, defenders: [intel.troops], wallLevel: wallDuringCombat(intel.wall, u.ram) }));
+      const units = wins(share) ? share : wins(pickOffensiveUnits(attackers, 100)) ? pickOffensiveUnits(attackers, 100) : null;
       if (!units) return void (await finishOffensive(4));
       const arrival = arrivalOf(units, target);
       if (hostileToPlayer && isQuietAt(arrival)) return;
@@ -708,6 +739,8 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   let angry = false;
   // Les villages se partagent entre offensifs et défensifs selon le profil du PNJ (voir npc-roles.ts).
   const roles = villageRoles(profile, villages.length);
+  // Croisade en vue : les villages offensifs d'une tribu engagée gardent leurs troupes pour l'assaut (ni attaque ni pillage).
+  const holdForCrusade = await crusadeHold(c, tribe, now);
   for (const [i, v] of villages.slice(0, 3).entries()) {
     await economyStep(c, npcId, profile, roles[i], v.id, cap, now);
     await marketStep(c, outbox, npcId, profile, v.id, now);
@@ -715,6 +748,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
     // Un PNJ en colère enchaîne jusqu'à trois attaques par réflexion, sur des villages différents de l'agresseur.
     const angryHere = (await grudgesOf(c, npcId, tribe, now)).length > 0;
     angry ||= angryHere;
+    if (holdForCrusade && roles[i] === 'offense') continue;
     for (let k = 0; k < (angryHere ? 3 : 1); k++) {
       // Attaques en route avant et après l'étape (aucune ne peut arriver pendant) : si rien n'est parti, inutile d'insister.
       const openAttacks = async () =>
@@ -726,9 +760,23 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   }
   // Pillage intensif : chaque village (pas seulement les trois premiers) envoie ses pillages vers les villages sans défense qu'il connaît.
   const hostiles = { tribes: [...(tribe?.state.rivals ?? []), ...warEnemiesOf(tribe, now)], npcs: await npcGrudgesOf(c, npcId, tribe, now) };
-  for (const v of villages) await raidStep(c, outbox, npcId, v.id, hostiles, now);
+  for (const [i, v] of villages.entries()) if (!(holdForCrusade && roles[i] === 'offense')) await raidStep(c, outbox, npcId, v.id, hostiles, now);
+  // Croisade : préparation de l'assaut, renforts quand la tribu tient la bannière, contre-attaques sinon (voir npc-crusade.ts).
+  await crusadeStep(c, outbox, npcId, villages.map((v, i) => ({ id: v.id, role: roles[i] })), tribe, now);
   // Les rapports d'un PNJ ne servent qu'à ses décisions récentes et au suivi des guerres de l'administration (72 h au plus).
   await c.query("DELETE FROM reports WHERE player_id = $1 AND created_at < $2", [npcId, new Date(now.getTime() - 3 * DAY_MS)]);
+  // Sur un village barbare, seuls comptent son dernier renseignement (espionnage, ou attaque avec éclaireurs) et les pillages qui ont suivi
+  // (butin estimé, défense vue) : les rapports plus anciens sont effacés. C'est l'essentiel du volume de la table
+  // (des centaines d'espionnages et de pillages de barbares par heure).
+  await c.query(
+    `WITH b AS (
+       SELECT id, created_at, (data->'defender'->'village'->>'id') AS target,
+              (jsonb_typeof(data->'intel') = 'object') AS seen
+       FROM reports WHERE player_id = $1 AND type IN ('scout', 'attack') AND data->'defender'->>'playerName' IS NULL
+     ), last AS (SELECT target, max(created_at) AS at FROM b WHERE seen GROUP BY target)
+     DELETE FROM reports WHERE id IN (SELECT b.id FROM b JOIN last ON last.target = b.target WHERE b.created_at < last.at)`,
+    [npcId],
+  );
   return angry;
 }
 

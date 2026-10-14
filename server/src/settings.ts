@@ -1,4 +1,5 @@
 import { pool } from './db';
+import { parseClock, parseWeekdays } from '@aldoria/shared';
 import { env } from './env';
 
 /**
@@ -7,10 +8,12 @@ import { env } from './env';
  * cours de partie fausserait les files de construction, les trajets en cours et les coordonnées.
  */
 export interface SettingDef {
-  key: 'accountManager' | 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcOffensive' | 'npcOffensiveShare' | 'npcOffensiveHours' | 'npcAttackMargin' | 'npcRaids' | 'npcRaidsPerThink' | 'npcRaidRadius' | 'npcThinkMinutes' | 'npcRecruitBatch' | 'npcRecruitBatches' | 'npcArmyFirst' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone';
+  key: 'accountManager' | 'npcRevenge' | 'npcWars' | 'npcPlayerWars' | 'npcOffensive' | 'npcOffensiveShare' | 'npcOffensiveHours' | 'npcAttackMargin' | 'npcRaids' | 'npcRaidsPerThink' | 'npcRaidRadius' | 'npcThinkMinutes' | 'npcRecruitBatch' | 'npcRecruitBatches' | 'npcArmyFirst' | 'npcDifficulty' | 'npcDaily' | 'npcMax' | 'npcTribeMax' | 'npcQuietStart' | 'npcQuietEnd' | 'npcTimezone' | 'crusades' | 'crusadeDays' | 'crusadeTime' | 'crusadeMinutes' | 'crusadeNoticeHours' | 'crusadeGarrison' | 'crusadeRelicBonus' | 'reportsKeepDays' | 'commandsKeepDays';
   label: string;
   help: string;
   type: 'number' | 'integer' | 'text' | 'boolean';
+  /** Pour un texte : ce qu'il doit contenir (fuseau horaire par défaut). */
+  format?: 'timezone' | 'weekdays' | 'clock';
   min?: number;
   max?: number;
 }
@@ -21,7 +24,7 @@ export const SETTINGS: SettingDef[] = [
   { key: 'npcWars', label: 'Guerres entre tribus de PNJ', help: 'Activées : les tribus de PNJ se déclarent la guerre pour quelques jours, se pillent et cherchent à se conquérir. Désactivées : plus de nouvelle guerre ni de frappe contre une tribu ennemie (les rivalités habituelles restent)', type: 'boolean' },
   { key: 'npcPlayerWars', label: 'Guerres contre les tribus de joueurs', help: 'Activées : une tribu de PNJ peut déclarer la guerre à une tribu de joueurs sans provocation (et accepter celle qu’un chef de tribu lui déclare) ; ses membres frappent alors les villages de cette tribu. Désactivées : ces guerres s’arrêtent et aucune nouvelle ne démarre. Sans lien avec la riposte, qui ne concerne que les joueurs qui attaquent un PNJ. Nécessite aussi l’interrupteur des guerres entre PNJ', type: 'boolean' },
   { key: 'npcOffensive', label: 'Offensives des PNJ', help: 'Activées : de temps en temps, un village offensif de PNJ envoie une vraie attaque (une part de son armée) contre un joueur de sa taille, un ennemi de guerre ou une tribu rivale, après l’avoir espionné ; jamais un joueur sous protection débutant ni pendant les heures calmes. Désactivées : les PNJ reviennent aux pillages habituels', type: 'boolean' },
-  { key: 'npcOffensiveShare', label: 'Part de l’armée engagée dans une offensive (%)', help: '50 = la moitié des épéistes, cavaliers et béliers du village part ; elle part toujours, même si cette part ne bat pas la défense espionnée (le but est de déstabiliser les joueurs)', type: 'integer', min: 10, max: 100 },
+  { key: 'npcOffensiveShare', label: 'Part de l’armée engagée dans une offensive (%)', help: '50 = la moitié des épéistes, cavaliers et béliers du village part ; si cette part ne bat pas la défense espionnée, toute l’armée offensive part à la place, et si même elle ne suffit pas, le PNJ renonce et retentera plus tard', type: 'integer', min: 10, max: 100 },
   { key: 'npcOffensiveHours', label: 'Rythme des offensives (heures de jeu)', help: 'Délai moyen entre deux offensives d’un même PNJ ; un joueur ne subit pas plus d’une offensive par période', type: 'integer', min: 1, max: 168 },
   { key: 'npcAttackMargin', label: 'Marge de sécurité des attaques des PNJ (%)', help: '0 = un PNJ attaque dès que son armée bat l’armée espionnée en face ; 30 = il attend d’être 30 % plus fort que la défense estimée (avant : 30)', type: 'integer', min: 0, max: 200 },
   { key: 'npcRaids', label: 'Pillage intensif des PNJ', help: 'Activé : à chaque réflexion, chaque village de PNJ envoie plusieurs petits pillages vers les villages sans défense qu’il connaît (barbares, villages vides des PNJ rivaux ou en guerre), d’après ses propres rapports, et espionne les barbares inconnus. Jamais contre un joueur. Désactivé : un seul pillage par réflexion, comme avant', type: 'boolean' },
@@ -37,7 +40,16 @@ export const SETTINGS: SettingDef[] = [
   { key: 'npcTribeMax', label: 'Taille maximale d’une tribu de PNJ', help: '0 = les PNJ restent solitaires', type: 'integer', min: 0, max: 20 },
   { key: 'npcQuietStart', label: 'Début des heures calmes (heure)', help: 'Les PNJ ne visent aucun joueur entre ces deux heures', type: 'integer', min: 0, max: 23 },
   { key: 'npcQuietEnd', label: 'Fin des heures calmes (heure)', help: 'Début = fin désactive les heures calmes', type: 'integer', min: 0, max: 23 },
-  { key: 'npcTimezone', label: 'Fuseau horaire des heures calmes', help: 'Par exemple Europe/Paris', type: 'text' },
+  { key: 'npcTimezone', label: 'Fuseau horaire des heures calmes', help: 'Par exemple Europe/Paris. Sert aussi à l’heure des Croisades', type: 'text' },
+  { key: 'crusades', label: 'Croisades', help: 'Activées : une Citadelle est annoncée sur la carte avant chaque croisade, puis ouvre ses portes pour l’assaut aux jours et à l’heure ci-dessous. Désactivées : plus de nouvelle croisade (celle en cours va jusqu’au bout)', type: 'boolean' },
+  { key: 'crusadeDays', label: 'Jours des Croisades', help: 'Numéros des jours séparés par des virgules : 0 = dimanche, 1 = lundi … 6 = samedi. Par défaut 3,6 (mercredi et samedi)', type: 'text', format: 'weekdays' },
+  { key: 'crusadeTime', label: 'Heure d’ouverture des portes', help: 'Par exemple 20:30, dans le fuseau du monde. Gardez la fin avant le début des heures calmes', type: 'text', format: 'clock' },
+  { key: 'crusadeMinutes', label: 'Durée de l’assaut (minutes)', help: 'Temps pendant lequel les portes restent ouvertes : le camp qui tient la bannière à la fermeture gagne', type: 'integer', min: 15, max: 240 },
+  { key: 'crusadeNoticeHours', label: 'Annonce de la Citadelle (heures avant)', help: 'La Citadelle apparaît sur la carte ce nombre d’heures avant l’ouverture, pour laisser le temps de s’organiser', type: 'integer', min: 1, max: 168 },
+  { key: 'crusadeGarrison', label: 'Garnison de la Citadelle (%)', help: 'Population de la garnison en % de l’armée offensive de la tribu la plus forte du monde (au moins 1 500). 60 = il faut plusieurs vagues bien coordonnées', type: 'integer', min: 10, max: 300 },
+  { key: 'crusadeRelicBonus', label: 'Relique du vainqueur (% de production)', help: 'Bonus de production de tous les villages du camp vainqueur pendant 7 jours. 0 = relique seulement honorifique', type: 'integer', min: 0, max: 50 },
+  { key: 'reportsKeepDays', label: 'Durée de conservation des rapports (jours)', help: 'Les rapports des joueurs plus anciens sont supprimés chaque heure, sauf ceux qu’ils ont archivés. 0 = tout garder', type: 'integer', min: 0, max: 365 },
+  { key: 'commandsKeepDays', label: 'Durée de conservation des mouvements terminés (jours)', help: 'Attaques, renforts et retours arrivés depuis plus longtemps sont effacés de la base chaque heure (les rapports restent). Au moins 4 jours : les PNJ s’en servent pour leurs rancunes', type: 'integer', min: 4, max: 60 },
 ];
 
 /** Valeur lue dans l'environnement au démarrage, pour pouvoir rétablir le réglage d'origine. */
@@ -56,6 +68,8 @@ export function parseSetting(def: SettingDef, raw: unknown): { value: number | s
   }
   if (def.type === 'text') {
     const text = String(raw ?? '').trim();
+    if (def.format === 'weekdays') return parseWeekdays(text) ? { value: parseWeekdays(text)!.join(',') } : { error: `${def.label} : numéros de jours de 0 à 6 séparés par des virgules` };
+    if (def.format === 'clock') return parseClock(text) !== null ? { value: text.replace('h', ':') } : { error: `${def.label} : heure attendue, par exemple 20:30` };
     try {
       new Intl.DateTimeFormat('fr-FR', { timeZone: text });
     } catch {
