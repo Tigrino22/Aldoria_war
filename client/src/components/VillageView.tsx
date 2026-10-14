@@ -72,28 +72,31 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
                   .join(', ')}
               </p>
             )}
-            <div className="row">
-              <button className="btn primary" disabled={!reqOk || queueFull || !affordable} onClick={upgrade}>
-                {current === 0 && levels[k] === 0 ? 'Construire' : `Améliorer au niveau ${next}`}
-              </button>
-              {k === 'market' && current > 0 && (
-                <button className="btn" onClick={() => go('marche')}>
-                  Envoyer des ressources
-                </button>
-              )}
-              {k === 'barracks' && current > 0 && (
-                <button className="btn" onClick={() => go('caserne')}>
-                  Recruter
-                </button>
-              )}
-              <button className="btn ghost" onClick={onClose}>
-                Fermer
-              </button>
-            </div>
-            {queueFull && <p className="muted">La file de construction est pleine.</p>}
-            {!affordable && reqOk && !queueFull && <p className="muted">Pas encore assez de ressources.</p>}
           </>
         )}
+        {/* Les raccourcis (Recruter, Envoyer des ressources) restent là même au niveau maximum. */}
+        <div className="row">
+          {!maxed && (
+            <button className="btn primary" disabled={!reqOk || queueFull || !affordable} onClick={upgrade}>
+              {current === 0 && levels[k] === 0 ? 'Construire' : `Améliorer au niveau ${next}`}
+            </button>
+          )}
+          {k === 'market' && current > 0 && (
+            <button className="btn" onClick={() => go('marche')}>
+              Envoyer des ressources
+            </button>
+          )}
+          {k === 'barracks' && current > 0 && (
+            <button className="btn" onClick={() => go('caserne')}>
+              Recruter
+            </button>
+          )}
+          <button className="btn ghost" onClick={onClose}>
+            Fermer
+          </button>
+        </div>
+        {!maxed && queueFull && <p className="muted">La file de construction est pleine.</p>}
+        {!maxed && !affordable && reqOk && !queueFull && <p className="muted">Pas encore assez de ressources.</p>}
       </div>
     </div>
   );
