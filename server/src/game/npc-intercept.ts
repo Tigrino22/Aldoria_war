@@ -7,7 +7,7 @@ import { sendInterception } from './intercept';
 import { getTroops } from './village';
 
 /**
- * Interceptions des PNJ : une armée hostile repérée à portée de vue d'un village de PNJ (3 cases, voir shared/src/armies.ts)
+ * Interceptions des PNJ : une armée hostile repérée à portée de vue d'un village de PNJ (10 cases, voir shared/src/armies.ts)
  * peut être attaquée en chemin, comme le ferait un joueur. Le PNJ intercepte :
  * - les attaques qui visent ses villages, ceux de sa tribu ou d'une tribu alliée ;
  * - les armées (attaque, renfort, retour) de ses ennemis : tribus rivales ou en guerre, joueurs et PNJ à qui il en veut.

@@ -1,11 +1,13 @@
 import {
   ARMY_SIGHT,
   RESOURCES,
+  armyAt,
   carryCapacity,
   emptyUnits,
   hasUnits,
   inSight,
   interceptPoint,
+  interceptWindow,
   sightWindow,
   normalizeUnits,
   populationOf,
@@ -29,7 +31,7 @@ import { getTroops, loadVillage, setTroops, syncVillage } from './village';
 
 /**
  * Interceptions : une armée étrangère repérée à portée de vue de l'un de nos villages (voir shared/src/armies.ts) peut être
- * attaquée en chemin. Nos troupes partent vers le point de rencontre le plus proche dans le temps ; la bataille a lieu en rase
+ * attaquée en chemin ; lancée pendant qu'elle est dans la zone, l'interception la poursuit jusqu'à son arrivée s'il le faut. Nos troupes partent vers le point de rencontre le plus proche dans le temps ; la bataille a lieu en rase
  * campagne (ni muraille ni défense de village) : nos troupes attaquent, l'armée surprise se défend. Ses survivants poursuivent
  * leur route ; si elle est détruite, nos troupes ramassent son butin. Les nôtres rentrent ensuite au village.
  */
@@ -56,12 +58,14 @@ export async function sendInterception(c: Db, outbox: Outbox, playerId: number, 
   if (target.tribe_id && friends.includes(target.tribe_id)) throw new GameError('Cette armée appartient à votre tribu ou à un allié');
   if (target.protection_until && new Date(target.protection_until) > now) throw new GameError('Ce joueur est encore sous protection débutant');
 
-  // La bataille doit avoir lieu pendant que l'armée passe à portée de vue de l'un de nos villages.
+  // L'interception se lance pendant que l'armée passe à portée de vue de l'un de nos villages (ou avant qu'elle n'y entre) ;
+  // lancée alors qu'elle est dans la zone, nos troupes peuvent la poursuivre au-delà, jusqu'à son arrivée.
   const path = pathOf(target);
   const mine = (await c.query('SELECT x, y FROM villages WHERE owner_id = $1', [playerId])).rows as { x: number; y: number }[];
   const w = sightWindow(path.from, path.to, mine);
   const span = w ? ([path.t0 + (path.t1 - path.t0) * w[0], path.t0 + (path.t1 - path.t0) * w[1]] as [number, number]) : null;
-  if (!span || span[1] <= now.getTime())
+  const chase = interceptWindow(span, now.getTime(), path.t1, inSight(armyAt(path, now.getTime()), mine));
+  if (!chase)
     throw new GameError(`Cette armée n'est pas repérée : elle doit passer à ${ARMY_SIGHT} cases ou moins de l'un de vos villages`);
 
   const units = normalizeUnits(input.units);
@@ -71,9 +75,13 @@ export async function sendInterception(c: Db, outbox: Outbox, playerId: number, 
   if (!hasUnits(available, units)) throw new GameError("Vous n'avez pas assez de troupes au village");
 
   const secondsPerTile = (slowestSpeed(units) * 60) / env.worldSpeed;
-  const meet = interceptPoint({ x: origin.x, y: origin.y }, secondsPerTile, path, now.getTime(), span);
-  if (!meet || !inSight(meet, mine))
-    throw new GameError(`Vos troupes n'arriveraient pas à temps : l'armée aura quitté la zone de ${ARMY_SIGHT} cases avant elles`);
+  const meet = interceptPoint({ x: origin.x, y: origin.y }, secondsPerTile, path, now.getTime(), chase.within);
+  if (!meet || (!chase.pursuit && !inSight(meet, mine)))
+    throw new GameError(
+      chase.pursuit
+        ? 'Vos troupes n’arriveraient pas à temps : l’armée aura atteint sa destination avant elles'
+        : `Vos troupes n'arriveraient pas à temps : l'armée aura quitté la zone de ${ARMY_SIGHT} cases avant elles`,
+    );
 
   await chargeAttackWheat(c, playerId, origin, units);
   await c.query('UPDATE players SET protection_until = NULL WHERE id = $1 AND protection_until > $2', [playerId, now]);

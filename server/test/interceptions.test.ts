@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { STARTING_BUILDINGS, emptyUnits, type UnitCounts } from '@aldoria/shared';
+import { ARMY_SIGHT, STARTING_BUILDINGS, emptyUnits, type UnitCounts } from '@aldoria/shared';
 import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
@@ -115,6 +115,32 @@ describe('interception des armées en marche', () => {
     await processDueEvents(new Date(Date.parse(arriveAt) + 1000));
     expect((await reportsOf(s.meId)).at(-1).title).toContain('échappé');
     expect((await pool.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'return' AND NOT processed", [s.meId])).rows[0].n).toBe(1);
+  });
+
+  it("poursuit hors de la zone une armée repérée au lancement, mais pas au-delà de son arrivée", async () => {
+    const s = await setup({ swordsman: 400 });
+    // À 9 cases du village (dans la zone de 10), elle s'en éloigne vers la droite à 30 min par case.
+    const from = await village(s.enemy, s.x + 8, 98);
+    const to = await village(null, s.x + 60, 98);
+    const move = (from: number, to: number, minutesLeft: number) =>
+      pool
+        .query(
+          `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, sent_at, arrive_at)
+           VALUES ('attack', $1, $2, $1, $3, $4, now() - interval '30 minutes', now() + make_interval(mins => $5)) RETURNING id`,
+          [from, to, s.enemy, JSON.stringify(units({ spearman: 100 })), minutesLeft],
+        )
+        .then((r) => r.rows[0].id as number);
+    const leaving = await move(from, to, 1530);
+    const res = await intercept(s, leaving, { swordsman: 300 });
+    expect(res.statusCode).toBe(200);
+    const { meet } = res.json();
+    // Les épéistes (22 min par case) la rattrapent bien après sa sortie de la zone de 10 cases.
+    expect(Math.hypot(meet.x - s.x, meet.y - 100)).toBeGreaterThan(ARMY_SIGHT);
+
+    // Si elle arrive avant d'être rattrapée, l'interception est refusée.
+    // Arrivée à (x+15) dans 70 min, alors que nos troupes mettraient près de trois heures.
+    const arriving = await move(await village(s.enemy, s.x + 5, 98), await village(null, s.x + 15, 98), 70);
+    expect((await intercept(s, arriving, { swordsman: 10 })).json().error).toMatch(/atteint sa destination/);
   });
 
   it("refuse une armée trop loin, une armée amie et des éclaireurs seuls", async () => {

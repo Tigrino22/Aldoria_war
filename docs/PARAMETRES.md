@@ -351,8 +351,8 @@ Les mouvements de troupes se voient sur la carte : une petite colonne de soldats
 | Qui voit quoi | |
 |---|---|
 | Ses propres mouvements, ceux de sa tribu et des tribus alliées | Trajet complet, taille, nom du joueur |
-| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur ; composition cachée (taille moyenne affichée) tant qu'elle n'est pas repérée, à 3 cases ou moins de l'un de ses villages |
-| Toute autre armée | Seulement pendant qu'elle passe à 3 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille et sa composition, ni origine, ni destination, ni propriétaire |
+| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur ; composition cachée (taille moyenne affichée) tant qu'elle n'est pas repérée, à 10 cases ou moins de l'un de ses villages |
+| Toute autre armée | Seulement pendant qu'elle passe à 10 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille et sa composition, ni origine, ni destination, ni propriétaire |
 
 ### Interception
 
@@ -360,7 +360,7 @@ Une armée ennemie repérée (attaque, renfort ou retour d'un joueur hors de sa 
 
 | Règle | Valeur |
 |---|---|
-| Où | La rencontre doit avoir lieu pendant que l'armée passe à 3 cases ou moins de l'un de vos villages ; sinon l'envoi est refusé |
+| Où | L'interception se lance pendant que l'armée est à 10 cases ou moins de l'un de vos villages (ou avant qu'elle n'y entre). Lancée pendant qu'elle est dans la zone, vos troupes la poursuivent même si elle en sort, jusqu'à son arrivée ; lancée avant, la rencontre doit avoir lieu dans la zone |
 | Départ | Le village actif, à la vitesse de l'unité la plus lente ; pas d'éclaireurs seuls ; rations comme une attaque ; fin de la protection débutant |
 | Bataille | En rase campagne : ni muraille ni défense de base ; nos troupes attaquent, l'armée surprise défend (`resolveCombat`, `baseDefense: 0`) |
 | Après | Les survivants adverses poursuivent leur route ; une armée détruite laisse son butin, que nos survivants rapportent (dans la limite de ce qu'ils portent) ; nos troupes rentrent depuis le champ de bataille |

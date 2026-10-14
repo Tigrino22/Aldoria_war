@@ -519,8 +519,8 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           mais son contenu est caché jusque-là). Touchez une armée pour ouvrir sa fiche.
         </p>
         <p>
-          <b>Interception :</b> une armée ennemie repérée peut être attaquée en chemin. Choisissez vos troupes dans sa fiche : le point et l'heure de rencontre s'affichent, et la bataille doit avoir
-          lieu tant qu'elle passe à {ARMY_SIGHT} cases de vos villages. On s'y bat en rase campagne, sans muraille ; les survivants adverses poursuivent leur route, et une armée détruite laisse
+          <b>Interception :</b> une armée ennemie repérée peut être attaquée en chemin. Choisissez vos troupes dans sa fiche : le point et l'heure de rencontre s'affichent. Lancez-la pendant qu'elle passe à {ARMY_SIGHT} cases
+          ou moins de vos villages : vos troupes la poursuivent alors même si elle sort de la zone, jusqu'à son arrivée. On s'y bat en rase campagne, sans muraille ; les survivants adverses poursuivent leur route, et une armée détruite laisse
           son butin à vos troupes. L'envoi coûte des rations comme une attaque. Attention : les PNJ font de même, et peuvent attaquer en chemin vos armées
           qui passent près de leurs villages.
         </p>
