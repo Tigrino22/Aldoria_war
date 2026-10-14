@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Application, Assets, BitmapText, Container, Graphics, GraphicsContext, Sprite, TextStyle, Texture, TilingSprite } from 'pixi.js';
-import type { MapMovement, MapRelations, MapVillage } from '@aldoria/shared';
+import type { MapArmy, MapMovement, MapRelations, MapVillage } from '@aldoria/shared';
 import { api } from '../api';
 import { MAP_IMG } from '../assets';
 import { useGame } from '../game';
 import SendTroops from './SendTroops';
 import MapVillageCard from './MapVillageCard';
 import MapColors from './MapColors';
+import { CrusadeMapHud } from './CrusadeBanner';
 import { PlayerLink } from '../ui';
 import { REL_COLORS, hash, hexToNum, makeColorContext, readMarks, styleOf, terrainAt, terrainCanvas, writeMarks, type ColorContext, type Mark } from './mapStyle';
+import { ARMY_COLORS, ARMY_LABELS, drawArmies, pickArmy } from './mapArmies';
+import ArmyCard from './ArmyCard';
 import './map.css';
 
 const TILE = 64;
@@ -22,7 +25,7 @@ const NAME_ZOOM = 0.6;
 const NO_RELATIONS: MapRelations = { warTribeIds: [], allyTribeIds: [] };
 
 /** Dernière carte reçue : la rouvrir s'affiche tout de suite, la mise à jour arrive ensuite. */
-let cache: { villages: MapVillage[]; relations: MapRelations; movements: MapMovement[] } | null = null;
+let cache: { villages: MapVillage[]; relations: MapRelations; movements: MapMovement[]; armies: MapArmy[] } | null = null;
 
 /** Préférences d'affichage de la carte, gardées dans le navigateur. */
 function readPref(key: string, fallback: boolean): boolean {
@@ -51,7 +54,7 @@ interface Scene {
   strongGrid: Container;
   overlay: Graphics;
   textures: Record<string, Texture>;
-  shapes: { ring: GraphicsContext; shadow: GraphicsContext; attack: GraphicsContext; threat: GraphicsContext; support: GraphicsContext };
+  shapes: { ring: GraphicsContext; relic: GraphicsContext; shadow: GraphicsContext; attack: GraphicsContext; threat: GraphicsContext; support: GraphicsContext };
   /** Sprites de décor par case, masqués sous les villages. */
   decoAt: Map<string, Sprite[]>;
   /** Villages déjà dessinés, avec la signature de leur apparence pour ne redessiner que ce qui change. */
@@ -60,6 +63,14 @@ interface Scene {
   dotsFor: { v: MapVillage; st: ReturnType<typeof styleOf> }[];
   dotsScale: number;
   request: () => void;
+  /** Animations en cours (Citadelle : halo de l'assaut, étendard au vent), jouées à petite cadence seulement quand il y en a. */
+  anims: Set<(t: number) => void>;
+  /** Mises à jour de position (armées en marche) : jouées aussi quand l'animation est réduite, une fois par seconde. */
+  ticks: Set<(t: number) => void>;
+  /** L'appareil demande moins d'animations : les armées glissent sans balancer. */
+  still: boolean;
+  /** Calque des armées en marche (au-dessus des villages). */
+  armyLayer: Container;
   centerOn: (x: number, y: number) => void;
   zoomBy: (factor: number) => void;
 }
@@ -73,6 +84,7 @@ export default function MapView({ focus }: { focus?: string }) {
   const [villages, setVillages] = useState<MapVillage[]>(cache?.villages ?? []);
   const [relations, setRelations] = useState<MapRelations>(cache?.relations ?? NO_RELATIONS);
   const [movements, setMovements] = useState<MapMovement[]>(cache?.movements ?? []);
+  const [armies, setArmies] = useState<MapArmy[]>(cache?.armies ?? []);
   const [marks, setMarks] = useState<Mark[]>(() => readMarks(me.player.id));
   const [selected, setSelected] = useState<MapVillage | null>(null);
   const [hovered, setHovered] = useState<MapVillage | null>(null);
@@ -82,10 +94,24 @@ export default function MapView({ focus }: { focus?: string }) {
   const [panel, setPanel] = useState(false);
   const [showGrid, setShowGrid] = useState(() => readPref('grid', true));
   const [showMini, setShowMini] = useState(() => readPref('mini', true));
+  const [showArmies, setShowArmies] = useState(() => readPref('armies', true));
   const scene = useRef<Scene | null>(null);
   const villagesRef = useRef<Map<string, MapVillage>>(new Map());
+  const [armySel, setArmySel] = useState<MapArmy | null>(null);
   const selectRef = useRef<(v: MapVillage | null) => void>(() => undefined);
-  selectRef.current = (v) => setSelected(v);
+  selectRef.current = (v) => {
+    setSelected(v);
+    setArmySel(null);
+  };
+  // Une armée sous le doigt passe avant le village de la case.
+  const pickArmyRef = useRef<(fx: number, fy: number, scale: number) => boolean>(() => false);
+  pickArmyRef.current = (fx, fy, scale) => {
+    const a = showArmies ? pickArmy(armies, fx, fy, scale) : null;
+    if (!a) return false;
+    setArmySel(a);
+    setSelected(null);
+    return true;
+  };
   const hoverRef = useRef<(v: MapVillage | null, c: { x: number; y: number } | null) => void>(() => undefined);
   hoverRef.current = (v, c) => {
     setHovered(v);
@@ -106,23 +132,31 @@ export default function MapView({ focus }: { focus?: string }) {
   const load = useCallback(
     () =>
       run(async () => {
-        const [list, rel, moves] = await Promise.all([
+        const [list, rel, moves, marching] = await Promise.all([
           api<MapVillage[]>('/api/map'),
           api<MapRelations>('/api/map/relations').catch(() => NO_RELATIONS),
           api<MapMovement[]>('/api/map/movements').catch(() => []),
+          api<MapArmy[]>('/api/map/armies').catch(() => []),
         ]);
-        cache = { villages: list, relations: rel, movements: moves };
+        cache = { villages: list, relations: rel, movements: moves, armies: marching };
         setVillages(list);
         setRelations(rel);
         setMovements(moves);
+        setArmies(marching);
+        // La fiche ouverte suit l'armée rechargée (composition dévoilée en approchant) ou se ferme si elle est arrivée.
+        setArmySel((cur) => (cur ? (marching.find((a) => a.id === cur.id) ?? null) : null));
       }),
     [run],
   );
+  // Pendant l'assaut d'une croisade, la carte se met à jour toutes les 10 secondes (sinon toutes les 30).
+  const assault = villages.some((v) => v.crusade && Date.now() >= Date.parse(v.crusade.opensAt) - 60_000);
   useEffect(() => {
     load();
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, assault ? 10_000 : 30_000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, assault]);
+
+  const citadel = villages.find((v) => v.kind === 'citadel' && v.crusade);
 
   const updateMarks = (next: Mark[]) => {
     setMarks(next);
@@ -284,6 +318,8 @@ export default function MapView({ focus }: { focus?: string }) {
       const villageChunks: Container[] = [];
       for (let i = 0; i < n * n; i++) villageLayer.addChild((villageChunks[i] = new Container()));
       worldC.addChild(villageLayer);
+      const armyLayer = new Container();
+      worldC.addChild(armyLayer);
       const overlay = new Graphics();
       worldC.addChild(overlay);
 
@@ -297,6 +333,12 @@ export default function MapView({ focus }: { focus?: string }) {
           .fill({ color: 0xffffff, alpha: 0.3 })
           .ellipse(TILE / 2, TILE * 0.74, TILE * 0.47, TILE * 0.2)
           .stroke({ width: 2.5, color: 0xffffff, alpha: 0.95 }),
+        // Liseré doré des villages dont le camp détient la relique d'une croisade.
+        relic: new GraphicsContext()
+          .ellipse(TILE / 2, TILE * 0.74, TILE * 0.52, TILE * 0.24)
+          .stroke({ width: 2, color: 0xf1cc63, alpha: 0.95 })
+          .ellipse(TILE / 2, TILE * 0.74, TILE * 0.58, TILE * 0.28)
+          .stroke({ width: 1, color: 0xf1cc63, alpha: 0.45 }),
         shadow: new GraphicsContext().ellipse(TILE / 2, TILE * 0.76, TILE * 0.38, TILE * 0.14).fill({ color: 0x000000, alpha: 0.3 }),
         attack: swordsBadge(false),
         threat: swordsBadge(true),
@@ -325,11 +367,12 @@ export default function MapView({ focus }: { focus?: string }) {
           sc0.dotsScale = sc;
           dots.clear();
           for (const { v, st } of sc0.dotsFor) {
-            const px = !v.ownerId ? 2.2 : st.rel === 'own' || st.rel === 'active' || st.mark ? 5 : 3.8;
+            const citadel = v.kind === 'citadel';
+            const px = citadel ? 7 : !v.ownerId ? 2.2 : st.rel === 'own' || st.rel === 'active' || st.mark ? 5 : 3.8;
             const cx = (v.x + 0.5) * TILE;
             const cy = (v.y + 0.5) * TILE;
-            dots.circle(cx, cy, (px + 1.2) / sc).fill({ color: 0x140e08, alpha: v.ownerId ? 0.75 : 0.4 });
-            dots.circle(cx, cy, px / sc).fill({ color: hexToNum(st.color) });
+            dots.circle(cx, cy, (px + 1.2) / sc).fill({ color: 0x140e08, alpha: v.ownerId || citadel ? 0.75 : 0.4 });
+            dots.circle(cx, cy, px / sc).fill({ color: citadel ? 0xf1cc63 : hexToNum(st.color) });
           }
         }
         fineGrid.visible = sc >= LOD_ZOOM;
@@ -356,6 +399,28 @@ export default function MapView({ focus }: { focus?: string }) {
       };
       app.renderer.on('resize', request);
       cleanups.push(() => cancelAnimationFrame(frameReq));
+      // La carte ne se redessine qu'à la demande. Seuls la Citadelle et les armées en marche s'animent, à 12 images par seconde ;
+      // si l'appareil demande moins d'animations, les armées avancent une fois par seconde et la Citadelle reste immobile.
+      const anims = new Set<(t: number) => void>();
+      const ticks = new Set<(t: number) => void>();
+      const still = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      let lastTick = 0;
+      const animTimer = window.setInterval(() => {
+        if (document.hidden) return;
+        const t = performance.now() / 1000;
+        let dirty = false;
+        if (!still && anims.size) {
+          for (const f of anims) f(t);
+          dirty = true;
+        }
+        if (ticks.size && t - lastTick >= 1) {
+          lastTick = t;
+          for (const f of ticks) f(t);
+          dirty = true;
+        }
+        if (dirty) request();
+      }, 80);
+      cleanups.push(() => window.clearInterval(animTimer));
 
       const clampView = () => {
         // On garde au moins un quart d'écran de carte visible.
@@ -396,6 +461,10 @@ export default function MapView({ focus }: { focus?: string }) {
         dotsFor: [],
         dotsScale: 0,
         request,
+        anims,
+        ticks,
+        still,
+        armyLayer,
         centerOn,
         zoomBy,
       };
@@ -479,8 +548,14 @@ export default function MapView({ focus }: { focus?: string }) {
         pointers.delete(e.pointerId);
         if (pointers.size < 2) pinchDist = 0;
         if (wasTap) {
-          const c = toCell(e.clientX, e.clientY);
-          selectRef.current(villagesRef.current.get(`${c.x},${c.y}`) ?? null);
+          const r = canvas.getBoundingClientRect();
+          const sc = worldC.scale.x;
+          const fx = (e.clientX - r.left - worldC.x) / (TILE * sc);
+          const fy = (e.clientY - r.top - worldC.y) / (TILE * sc);
+          if (!pickArmyRef.current(fx, fy, sc)) {
+            const c = toCell(e.clientX, e.clientY);
+            selectRef.current(villagesRef.current.get(`${c.x},${c.y}`) ?? null);
+          }
         }
         if (e.pointerType === 'mouse') {
           lastCell = '';
@@ -557,16 +632,22 @@ export default function MapView({ focus }: { focus?: string }) {
       s.decoAt.get(`${v.x},${v.y}`)?.forEach((sp) => (sp.visible = false));
       const st = styleOf(v, colors);
       const chunk = Math.floor(v.y / CHUNK) * n + Math.floor(v.x / CHUNK);
-      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${st.color}|${st.rel}|${mv ? `${+mv.attack}${+mv.support}${+mv.threat}` : ''}`;
+      const cz = v.crusade;
+      const czSig = cz ? `${cz.wall}|${cz.holderTribeId}|${cz.holderPlayerId}|${cz.attacks}|${cz.supports}|${+(Date.now() >= Date.parse(cz.opensAt))}` : '';
+      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${v.holderTag ?? ''}|${czSig}|${+!!v.relic}|${st.color}|${st.rel}|${mv ? `${+mv.attack}${+mv.support}${+mv.threat}` : ''}`;
       const prev = s.drawn.get(v.id);
       if (prev && prev.sig === sig && prev.chunk === chunk) continue;
-      if (prev) prev.node.destroy({ children: true });
-      const node = drawVillage(s, v, st.color, st.rel === 'active' || st.rel === 'own', mv);
+      if (prev) {
+        (prev.node as Container & { stopAnim?: () => void }).stopAnim?.();
+        prev.node.destroy({ children: true });
+      }
+      const node = drawVillage(s, v, st.color, st.rel === 'active' || st.rel === 'own', mv, holderColor(v, colors));
       s.villageChunks[chunk].addChild(node);
       s.drawn.set(v.id, { node, sig, chunk });
     }
     for (const [id, d] of s.drawn) {
       if (!seen.has(id)) {
+        (d.node as Container & { stopAnim?: () => void }).stopAnim?.();
         d.node.destroy({ children: true });
         s.drawn.delete(id);
       }
@@ -632,6 +713,13 @@ export default function MapView({ focus }: { focus?: string }) {
     s.request();
   }, [hovered, cell, selected, ready]);
 
+  // Armées en marche : redessinées à chaque rechargement de la carte, puis animées sur place sans rien demander au serveur.
+  useEffect(() => {
+    const s = scene.current;
+    if (!s || !showArmies) return;
+    return drawArmies(s, armies);
+  }, [armies, showArmies, ready]);
+
   useEffect(() => {
     const s = scene.current;
     if (!s) return;
@@ -674,7 +762,7 @@ export default function MapView({ focus }: { focus?: string }) {
 
   return (
     <div className="map-page">
-      <div ref={stageRef} className={`map-stage ${selected ? 'has-popup' : ''}`}>
+      <div ref={stageRef} className={`map-stage ${selected || armySel ? 'has-popup' : ''}`}>
         <div className="map-canvas" ref={hostRef} />
         <div className="map-vignette" />
         {!ready && (
@@ -710,6 +798,10 @@ export default function MapView({ focus }: { focus?: string }) {
             <span aria-hidden>▣</span>
             <span className="lbl">Mini-map</span>
           </button>
+          <button className={`map-btn ${showArmies ? 'on' : ''}`} aria-pressed={showArmies} onClick={() => (writePref('armies', !showArmies), setShowArmies(!showArmies))} title="Armées en marche">
+            <span aria-hidden>⚑</span>
+            <span className="lbl">Armées</span>
+          </button>
           <button className={`map-btn ${panel ? 'on' : ''}`} aria-pressed={panel} onClick={() => setPanel(!panel)} title="Couleurs et repères">
             <span className="map-swatches" aria-hidden>
               <i style={{ background: REL_COLORS.own }} />
@@ -727,6 +819,13 @@ export default function MapView({ focus }: { focus?: string }) {
               {l}
             </span>
           ))}
+          {showArmies &&
+            (['threat', 'seen'] as const).filter((rel) => armies.some((a) => a.rel === rel)).map((rel) => (
+              <span key={`army-${rel}`} className="legend-army">
+                <i style={{ background: ARMY_COLORS[rel] }} />
+                {ARMY_LABELS[rel]}
+              </span>
+            ))}
           {marks.map((m) => (
             <span key={`${m.kind}${m.id}`}>
               <i style={{ background: m.color }} />
@@ -734,6 +833,17 @@ export default function MapView({ focus }: { focus?: string }) {
             </span>
           ))}
         </div>
+
+        {citadel && (
+          <CrusadeMapHud
+            citadel={citadel}
+            holderColor={holderColor(citadel, colors)}
+            onShow={() => {
+              centerOn(citadel.x, citadel.y);
+              setSelected(citadel);
+            }}
+          />
+        )}
 
         <div className="map-zoom">
           <button className="map-btn" onClick={() => scene.current?.zoomBy(1.4)} aria-label="Zoomer">
@@ -769,6 +879,20 @@ export default function MapView({ focus }: { focus?: string }) {
           />
         )}
 
+        {armySel && !selected && (
+          <aside className="map-popup">
+            <button className="map-close" onClick={() => setArmySel(null)} aria-label="Fermer">
+              ✕
+            </button>
+            <ArmyCard
+              army={armySel}
+              onSent={() => {
+                setArmySel(null);
+                load();
+              }}
+            />
+          </aside>
+        )}
         {selected && (
           <aside className="map-popup">
             <button className="map-close" onClick={() => setSelected(null)} aria-label="Fermer">
@@ -812,22 +936,43 @@ function rank(rel: string) {
 }
 
 /** Un village : ombre, socle à la couleur de la relation, bâtiments, bannière et nom. */
-function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?: MapMovement): Container {
+/** Couleur du camp qui tient la bannière de la Citadelle, avec les couleurs fixes de la carte (vous, tribu, alliés, guerre, autres). */
+function holderColor(v: MapVillage, ctx: ColorContext): string | null {
+  const c = v.crusade;
+  if (!c || (!c.holderTribeId && !c.holderPlayerId)) return null;
+  if (c.holderTribeId) {
+    if (c.holderTribeId === ctx.tribeId) return REL_COLORS.tribe;
+    if (ctx.allies.has(c.holderTribeId)) return REL_COLORS.ally;
+    if (ctx.wars.has(c.holderTribeId)) return REL_COLORS.war;
+    return REL_COLORS.other;
+  }
+  return c.holderPlayerId === ctx.playerId ? REL_COLORS.own : REL_COLORS.other;
+}
+
+function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?: MapMovement, holder?: string | null): Container {
   const c = new Container();
   c.position.set(v.x * TILE, v.y * TILE);
   const tint = hexToNum(color);
   c.addChild(new Graphics(s.shapes.shadow));
+  const citadel = v.kind === 'citadel';
   const ring = new Graphics(s.shapes.ring);
-  ring.tint = tint;
-  ring.alpha = v.ownerId ? 1 : 0.45;
+  // La Citadelle garde son socle doré, quel que soit le camp qui tient sa bannière ; un camp qui détient la relique a un socle doré lui aussi.
+  ring.tint = citadel ? 0xf1cc63 : tint;
+  ring.alpha = v.ownerId || citadel ? 1 : 0.45;
+  if (citadel) ring.scale.set(1.25), ring.position.set(-TILE * 0.125, -TILE * 0.2);
   c.addChild(ring);
-  // Hameau, bourg puis cité fortifiée selon les points du village.
-  const tex = !v.ownerId ? s.textures.barbarian : v.points < 120 ? s.textures.village1 : v.points < 600 ? s.textures.village2 : s.textures.village3;
+  if (v.relic) {
+    const halo = new Graphics(s.shapes.relic);
+    c.addChild(halo);
+  }
+  // Hameau, bourg puis cité fortifiée selon les points du village ; la Citadelle déborde de sa case.
+  const tex = citadel ? s.textures.citadel : !v.ownerId ? s.textures.barbarian : v.points < 120 ? s.textures.village1 : v.points < 600 ? s.textures.village2 : s.textures.village3;
   const sp = new Sprite(tex);
-  const scale = v.ownerId ? 1.12 : 0.95;
+  const scale = citadel ? 1.6 : v.ownerId ? 1.12 : 0.95;
   sp.width = sp.height = TILE * scale;
-  sp.position.set((TILE - sp.width) / 2, (TILE - sp.height) / 2 - 4);
+  sp.position.set((TILE - sp.width) / 2, (TILE - sp.height) / 2 - (citadel ? 14 : 4));
   c.addChild(sp);
+  if (citadel && v.crusade) drawCitadelLive(s, c, v.crusade, holder ?? null);
   if (v.ownerId) {
     const f = new Sprite(s.textures.flag);
     f.width = TILE * (mine ? 0.34 : 0.3);
@@ -850,25 +995,93 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?:
   }
   // Étiquette : pastille sombre, point de couleur et nom (texte bitmap partagé, bien plus léger qu'un texte par village).
   const label = new Container();
-  label.label = 'name';
+  label.label = citadel ? 'name-fixed' : 'name';
   const text = new BitmapText({
-    text: v.tribeTag ? `[${v.tribeTag}] ${v.name}` : v.name,
+    text: citadel ? (v.holderTag ? `${v.name} · bannière ${v.holderTag}` : v.name) : v.tribeTag ? `[${v.tribeTag}] ${v.name}` : v.name,
     style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '600', fill: 0xf7efdc },
   });
-  const maxW = TILE * 1.7;
+  const maxW = TILE * (citadel ? 3 : 1.7);
   if (text.width > maxW) text.scale.set(maxW / text.width);
   const w = text.width + 18;
   const pill = new Graphics()
     .roundRect(-w / 2, 0, w, 16, 8)
-    .fill({ color: 0x17110b, alpha: 0.78 })
+    .fill({ color: citadel ? 0x3a2a12 : 0x17110b, alpha: citadel ? 0.92 : 0.78 })
     .circle(-w / 2 + 8, 8, 3.2)
-    .fill({ color: tint });
+    .fill({ color: citadel ? 0xf1cc63 : tint });
+  if (citadel) pill.roundRect(-w / 2, 0, w, 16, 8).stroke({ width: 1, color: 0xf1cc63, alpha: 0.9 });
   text.position.set(-w / 2 + 14, 8 - text.height / 2);
   label.addChild(pill, text);
   label.position.set(TILE / 2, TILE - 6);
-  label.visible = s.world.scale.x >= NAME_ZOOM;
+  // Le nom de la Citadelle reste lisible même de loin.
+  label.visible = citadel || s.world.scale.x >= NAME_ZOOM;
   c.addChild(label);
   return c;
+}
+
+/**
+ * Citadelle en direct : halo doré qui pulse pendant l'assaut, étendard au vent aux couleurs du camp qui tient la bannière,
+ * jauge de la muraille et nombre d'armées en marche (attaques en rouge, renforts en vert ; jamais leur origine).
+ */
+function drawCitadelLive(s: Scene, c: Container, cz: NonNullable<MapVillage['crusade']>, holder: string | null) {
+  const open = Date.now() >= Date.parse(cz.opensAt);
+  const stops: (() => void)[] = [];
+  const animate = (f: (t: number) => void) => {
+    s.anims.add(f);
+    stops.push(() => s.anims.delete(f));
+  };
+  if (open) {
+    const aura = new Graphics()
+      .ellipse(0, 0, TILE * 0.95, TILE * 0.42)
+      .stroke({ width: 3, color: 0xf1cc63, alpha: 0.9 })
+      .ellipse(0, 0, TILE * 1.1, TILE * 0.5)
+      .stroke({ width: 1.5, color: 0xf1cc63, alpha: 0.5 });
+    aura.position.set(TILE / 2, TILE * 0.72);
+    c.addChildAt(aura, 1);
+    animate((t) => {
+      const k = (Math.sin(t * 3) + 1) / 2;
+      aura.scale.set(0.92 + k * 0.14);
+      aura.alpha = 0.35 + k * 0.6;
+    });
+  }
+  // Étendard du camp qui tient la Citadelle, planté au sommet du donjon.
+  if (holder) {
+    const pole = new Graphics().rect(0, 0, 2, TILE * 0.62).fill({ color: 0x2b2018 });
+    pole.position.set(TILE * 0.53, -TILE * 0.78);
+    const flag = new Sprite(s.textures.flag);
+    flag.tint = hexToNum(holder);
+    flag.width = TILE * 0.5;
+    flag.height = TILE * 0.62;
+    flag.position.set(TILE * 0.54, -TILE * 0.8);
+    c.addChild(pole, flag);
+    if (open) {
+      const w = flag.width;
+      animate((t) => {
+        flag.width = w * (0.86 + 0.14 * Math.sin(t * 5));
+        flag.skew.y = 0.08 * Math.sin(t * 5 + 1);
+      });
+    }
+  }
+  // Jauge de la muraille : 20 crans, dorés tant qu'ils tiennent.
+  const segW = (TILE * 1.2) / 20;
+  const gauge = new Graphics().roundRect(-2, -2, segW * 20 + 3, 7, 3).fill({ color: 0x17110b, alpha: 0.85 });
+  for (let i = 0; i < 20; i++) gauge.rect(i * segW, 0, segW - 1, 3).fill({ color: i < cz.wall ? 0xf1cc63 : 0x5a4228 });
+  gauge.position.set(TILE / 2 - (segW * 20) / 2, TILE - 14);
+  c.addChild(gauge);
+  // Armées en marche vers la Citadelle.
+  const counts: [number, GraphicsContext][] = [
+    [cz.attacks, s.shapes.threat],
+    [cz.supports, s.shapes.support],
+  ];
+  counts
+    .filter(([n]) => n > 0)
+    .forEach(([n, ctx], i) => {
+      const b = new Graphics(ctx);
+      b.position.set(TILE * 1.25, TILE * (0.05 + i * 0.36));
+      const txt = new BitmapText({ text: `${n}`, style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: 0xfbf3df } });
+      txt.position.set(TILE * 1.25 + 12, TILE * (0.05 + i * 0.36) - txt.height / 2);
+      c.addChild(b, txt);
+    });
+  (c as Container & { stopAnim?: () => void }).stopAnim = () => stops.forEach((f) => f());
 }
 
 /** Médaillon des icônes de mouvement (charte : disque de bois sombre cerclé d'or), centré sur l'origine. */

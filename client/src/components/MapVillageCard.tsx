@@ -33,15 +33,25 @@ export default function MapVillageCard({
             {v.tribeTag && <span className="mvc-tag">[{v.tribeTag}]</span>} {v.name}
           </b>
           <span className="mvc-sub">
-            {ownerSlot ?? v.ownerName ?? 'Village barbare'} · {v.x}|{v.y}
+            {v.kind === 'citadel' ? 'Citadelle des Croisades' : (ownerSlot ?? v.ownerName ?? 'Village barbare')} · {v.x}|{v.y}
           </span>
         </div>
       </div>
       <div className="mvc-facts">
-        <span className="mvc-chip" style={{ borderColor: color }}>
-          {tag}
-        </span>
-        <span className="mvc-chip">{fmt(v.points)} pts</span>
+        {v.kind === 'citadel' ? (
+          <>
+            <span className="mvc-chip gold">{v.holderTag ? `Bannière : ${v.holderTag}` : 'Bannière à prendre'}</span>
+            <a className="mvc-chip gold" href="#/croisade">Voir la croisade</a>
+          </>
+        ) : (
+          <>
+            <span className="mvc-chip" style={{ borderColor: color }}>
+              {tag}
+            </span>
+            <span className="mvc-chip">{fmt(v.points)} pts</span>
+            {v.relic && <span className="mvc-chip gold">Relique de croisade</span>}
+          </>
+        )}
         {from && dist > 0 && <span className="mvc-chip">{dist.toFixed(1)} cases</span>}
         {v.protected && <span className="mvc-chip warn">Protection débutant</span>}
       </div>

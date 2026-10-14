@@ -36,6 +36,8 @@ export const env = {
   npcOffensive: count('NPC_OFFENSIVE', 1) > 0 ? 1 : 0,
   npcOffensiveShare: count('NPC_OFFENSIVE_SHARE', 50),
   npcOffensiveHours: count('NPC_OFFENSIVE_HOURS', 24),
+  /** Interceptions des armées hostiles repérées par les PNJ (1 = activées), modifiables à chaud. */
+  npcIntercept: count('NPC_INTERCEPT', 1) > 0 ? 1 : 0,
   /** Pillage intensif des PNJ (1 = activé) : pillages par village et par réflexion, rayon (cases) ; modifiables à chaud. */
   /** Marge de sécurité des attaques des PNJ, en % de la défense estimée (0 = ils attaquent dès que leur armée bat celle d'en face) ; modifiable à chaud. */
   npcAttackMargin: count('NPC_ATTACK_MARGIN', 0),
@@ -51,6 +53,18 @@ export const env = {
   /** Gestionnaire de compte (1 = activé sur le monde), modifiable à chaud depuis l'administration. */
   accountManager: count('ACCOUNT_MANAGER', 1) > 0 ? 1 : 0,
   npcMax: count('NPC_MAX', 200),
+  /** Croisades (1 = activées) : jours (0 = dimanche … 6 = samedi), heure d'ouverture, durée (minutes), annonce (heures avant),
+   *  garnison (% de l'armée offensive de la tribu la plus forte) et bonus de production de la relique (%) ; modifiables à chaud. */
+  crusades: count('CRUSADES', 1) > 0 ? 1 : 0,
+  crusadeDays: process.env.CRUSADE_DAYS || '3,6',
+  crusadeTime: process.env.CRUSADE_TIME || '20:30',
+  crusadeMinutes: count('CRUSADE_MINUTES', 60),
+  crusadeNoticeHours: count('CRUSADE_NOTICE_HOURS', 48),
+  crusadeGarrison: count('CRUSADE_GARRISON', 150),
+  crusadeRelicBonus: count('CRUSADE_RELIC_BONUS', 5),
+  /** Ménage : rapports des joueurs gardés (jours, hors archives ; 0 = tous) et mouvements terminés gardés (jours). */
+  reportsKeepDays: count('REPORTS_KEEP_DAYS', 30),
+  commandsKeepDays: count('COMMANDS_KEEP_DAYS', 4),
   npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',
   npcQuietStart: count('NPC_QUIET_START', 22),

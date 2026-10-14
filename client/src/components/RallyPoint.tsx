@@ -12,21 +12,28 @@ import './troops.css';
 import { NavIcon } from './NavIcon';
 import { PageBanner } from './PageBanner';
 
-const TYPE_LABEL = { attack: 'Attaque', support: 'Renfort', return: 'Retour', trade: 'Marchands', trade_return: 'Retour des marchands' } as const;
+const TYPE_LABEL = { attack: 'Attaque', support: 'Renfort', return: 'Retour', trade: 'Marchands', trade_return: 'Retour des marchands', intercept: 'Interception' } as const;
 
 function Movement({ c, direction, onCancel }: { c: CommandView; direction: 'in' | 'out'; onCancel?: () => void }) {
   const other = direction === 'in' ? c.origin : c.target;
   const hostile = direction === 'in' && c.type === 'attack';
-  const kind = hostile ? 'attack' : c.type === 'trade' || c.type === 'trade_return' ? 'trade' : c.type;
+  const kind = hostile || c.type === 'intercept' ? 'attack' : c.type === 'trade' || c.type === 'trade_return' ? 'trade' : c.type;
+  const meet = c.type === 'intercept' && c.meet ? { x: Math.floor(c.meet.x), y: Math.floor(c.meet.y) } : null;
   return (
     <li className={`ta-card kind-${kind}`}>
       <div className="ta-main">
         <span className="ta-kind">{hostile ? 'Attaque ennemie' : TYPE_LABEL[c.type]}</span>
-        <span className="ta-route">
-          <span className="muted small">{direction === 'in' ? 'de' : 'vers'}</span>{' '}
-          <a href={`#/carte/${other.x},${other.y}`}>{other.name} ({other.x}|{other.y})</a>
-          {other.ownerName && <span className="muted small"> · {other.ownerTag && `[${other.ownerTag}] `}<PlayerLink name={other.ownerName} /></span>}
-        </span>
+        {meet ? (
+          <span className="ta-route">
+            <span className="muted small">en rase campagne près de</span> <a href={`#/carte/${meet.x},${meet.y}`}>({meet.x}|{meet.y})</a>
+          </span>
+        ) : (
+          <span className="ta-route">
+            <span className="muted small">{direction === 'in' ? 'de' : 'vers'}</span>{' '}
+            <a href={`#/carte/${other.x},${other.y}`}>{other.name} ({other.x}|{other.y})</a>
+            {other.ownerName && <span className="muted small"> · {other.ownerTag && `[${other.ownerTag}] `}<PlayerLink name={other.ownerName} /></span>}
+          </span>
+        )}
         {c.units && <UnitList units={c.units} empty="" />}
       </div>
       <div className="mv-time">

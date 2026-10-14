@@ -100,6 +100,7 @@ function BuildingPanel({ v, k, onClose }: { v: VillageState; k: BuildingKey; onC
 }
 
 import IncomingDetail from './IncomingDetail';
+import { CrusadeBanner } from './CrusadeBanner';
 
 /** Bas de l'étiquette sous le centre d'un emplacement, en % de la hauteur du décor (emplacement carré, décor en 800 × 560). */
 const LABEL_DY = SPOT_WIDTH * (800 / 560) * (0.5 - 0.12);
@@ -311,8 +312,14 @@ export default function VillageView() {
               <span className={`vv-pill ${v.loyalty < 100 ? 'warn' : ''}`}>Loyauté {Math.round(v.loyalty)}</span>
               <span className="vv-pill">Vitesse x{world.speed}</span>
               {protectedUntil && <span className="vv-pill ok">Protégé jusqu'au {clockTime(protectedUntil)}</span>}
+              {(v.relicBonus ?? 0) > 0 && (
+                <span className="vv-pill gold" title="Votre camp a remporté une croisade : la relique augmente la production de vos villages">
+                  Relique +{Math.round((v.relicBonus ?? 0) * 100)} %
+                </span>
+              )}
             </div>
           </div>
+          <CrusadeBanner className="vv-crusade" />
           {enemyIncoming.length > 0 && (
             <div className="vv-war" role="alert">
               <span className="vv-war-icon">

@@ -1,0 +1,81 @@
+/* Page Croisade : thème « Heure dorée » (docs/CHARTE-GRAPHIQUE.md). Tout est sous .app .pg.crusade. */
+
+/* Grande carte de la Citadelle : rendu 3D sur un ciel de fin de journée, compte à rebours en Cinzel. */
+.app .pg.crusade .cz-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 30% 20%, rgb(255 214 140 / 0.55), transparent 60%),
+    linear-gradient(180deg, #f7d9a0 0%, #e8b878 45%, #8a5a2e 100%);
+  border-color: #a77a14;
+}
+.app .pg.crusade .cz-art { position: relative; display: grid; place-items: end center; min-height: 240px; }
+.app .pg.crusade .cz-art img { width: 100%; max-width: 520px; height: auto; display: block; filter: drop-shadow(0 18px 18px rgb(43 32 24 / 0.45)); }
+.app .pg.crusade .cz-flag {
+  position: absolute; top: 14px; left: 14px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px; font: 700 12px var(--body); letter-spacing: 0.06em;
+  background: linear-gradient(180deg, #4a2a6a, #2c1640); color: #f6dc8c; border: 1px solid #e0b23c;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
+}
+.app .pg.crusade .cz-hero-txt {
+  display: flex; flex-direction: column; gap: 8px; padding: 22px 22px 22px 0; color: #2b2018;
+}
+.app .pg.crusade .cz-label { font: 700 12px var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: #6b4a12; }
+.app .pg.crusade .cz-clock { font: 700 clamp(34px, 5vw, 52px) var(--display); font-variant-numeric: tabular-nums; color: #2b2018; line-height: 1; text-shadow: 0 1px 0 rgb(255 240 200 / 0.6); }
+.app .pg.crusade .cz-clock .countdown { color: inherit; }
+.app .pg.crusade .cz-window { margin: 0; font-size: 14px; color: #3d2c1a; max-width: 52ch; }
+.app .pg.crusade .cz-wall { display: flex; flex-direction: column; gap: 4px; max-width: 360px; }
+.app .pg.crusade .cz-wall .pg-progress { background: rgb(43 32 24 / 0.25); height: 8px; }
+.app .pg.crusade .cz-wall .muted { color: #5a4228; font-size: 12px; }
+.app .pg.crusade .cz-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.app .pg.crusade .cz-actions .btn:not(.gold) { background: rgb(255 248 230 / 0.7); border-color: #a77a14; color: #2b2018; }
+
+/* Tableau de gloire. */
+.app .pg.crusade .cz-title {
+  display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  color: #8a6410; border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.app .pg.crusade .cz-feats { display: inline-flex; align-items: center; gap: 8px; color: var(--gold); }
+.app .pg.crusade .cz-feats span { display: inline-flex; align-items: center; gap: 2px; font-weight: 700; color: var(--ink); }
+.app .pg.crusade .cz-feats svg { color: var(--gold); }
+
+/* Chronique : une ligne par événement, icône dorée, heure à droite. */
+.app .pg.crusade .cz-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.app .pg.crusade .cz-log li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.app .pg.crusade .cz-log li:last-child { border-bottom: 0; }
+.app .pg.crusade .cz-log-ico {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--gold);
+  background: radial-gradient(circle at 35% 30%, #4a3826, #1c140d 70%); box-shadow: inset 0 0 0 1px rgb(224 178 60 / 0.55);
+}
+.app .pg.crusade .cz-log li.k-win .cz-log-ico, .app .pg.crusade .cz-log li.k-capture .cz-log-ico { background: linear-gradient(180deg, #f1cc63, #a77a14); color: #2b2018; }
+.app .pg.crusade .cz-log li.k-fall .cz-log-ico { box-shadow: inset 0 0 0 1px rgb(224 72 72 / 0.7); color: #ff8a7a; }
+.app .pg.crusade .cz-log-txt { font-size: 14px; }
+.app .pg.crusade .cz-log time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Règles et récompenses. */
+.app .pg.crusade .cz-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.app .pg.crusade .cz-steps li::marker { color: var(--gold); font-weight: 700; }
+.app .pg.crusade .cz-rewards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.app .pg.crusade .cz-rewards li { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; }
+.app .pg.crusade .cz-rw-ico {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--gold);
+  background: radial-gradient(circle at 35% 30%, #4a3826, #1c140d 70%); box-shadow: inset 0 0 0 1px rgb(224 178 60 / 0.55);
+}
+
+/* Historique des vainqueurs. */
+.app .pg.crusade .cz-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.app .pg.crusade .cz-history li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.app .pg.crusade .cz-history li:last-child { border-bottom: 0; }
+.app .pg.crusade .cz-winner { color: var(--gold); font-weight: 700; text-align: right; }
+
+@media (max-width: 760px) {
+  .app .pg.crusade .cz-hero { grid-template-columns: 1fr; gap: 0; }
+  .app .pg.crusade .cz-art { min-height: 0; }
+  .app .pg.crusade .cz-art img { max-width: 360px; }
+  .app .pg.crusade .cz-hero-txt { padding: 0 16px 18px; }
+  .app .pg.crusade .cz-hide-sm { display: none; }
+}

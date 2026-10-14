@@ -79,6 +79,7 @@ const SETTING_LABEL: Record<string, string> = {
   npcOffensive: 'Offensives des PNJ',
   npcOffensiveShare: 'Part de l’armée engagée',
   npcOffensiveHours: 'Rythme des offensives',
+  npcIntercept: 'Interceptions des PNJ',
   npcAttackMargin: 'Marge de sécurité des attaques',
   npcRaids: 'Pillage intensif',
   npcThinkMinutes: 'Rythme de réflexion des PNJ',
@@ -103,6 +104,7 @@ export default function Admin() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [showNpc, setShowNpc] = useState(true);
   const [fill, setFill] = useState(50);
+  const [crusadeIn, setCrusadeIn] = useState(10);
 
   const load = useCallback(
     () =>
@@ -136,6 +138,17 @@ export default function Admin() {
     run(async () => {
       const r = await api<{ villages: number; changed: number }>('/api/admin/npc/fill', { method: 'POST', body: { percent: fill } });
       toast(`Entrepôts remplis à ${fill} % : ${r.changed} village${r.changed > 1 ? 's' : ''} sur ${r.villages}`);
+    });
+
+  const startCrusade = () =>
+    run(async () => {
+      await api('/api/admin/crusade/start', { method: 'POST', body: { inMinutes: crusadeIn } });
+      toast(`Citadelle annoncée : les portes s'ouvrent dans ${crusadeIn} minutes`);
+    });
+  const endCrusadeNow = () =>
+    run(async () => {
+      await api('/api/admin/crusade/end', { method: 'POST', body: {} });
+      toast('Croisade terminée : vainqueur, gloire, relique et trésor attribués');
     });
 
   const tabs: [Tab, string][] = [
@@ -399,6 +412,24 @@ export default function Admin() {
           <div className="admin-kpis">
             {world && Object.entries(world.totals).map(([k, v]) => <Kpi key={k} label={TOTAL_LABEL[k.toLowerCase()] ?? k} value={v} />)}
           </div>
+          <Panel title="Croisade d'essai">
+            <p className="muted small">
+              Annonce tout de suite une Citadelle dont les portes s'ouvrent dans le délai choisi, sans attendre les jours prévus. Terminer clôt la croisade en cours comme à la fermeture des portes : le camp qui tient la bannière gagne.
+            </p>
+            <div className="admin-fill">
+              <label htmlFor="crusade-in" className="small">
+                Ouverture dans
+              </label>
+              <input id="crusade-in" type="number" min={1} max={10080} value={crusadeIn} onChange={(e) => setCrusadeIn(Math.max(1, Number(e.target.value) || 1))} style={{ width: 90 }} />
+              <span className="small">minutes</span>
+              <button className="btn primary" onClick={startCrusade}>
+                Annoncer
+              </button>
+              <button className="btn danger" onClick={endCrusadeNow}>
+                Terminer la croisade en cours
+              </button>
+            </div>
+          </Panel>
           <Panel
             title="Réglages du monde"
             actions={

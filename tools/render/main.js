@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { BUILDERS } from './buildings.js';
 import { SCENES } from './scenes.js';
-import { ICONS } from './icons.js';
+import { ICONS, MODELS } from './icons.js';
+import { FIGURES, setGait } from './figures.js';
 import { setSeed, texture, WORLD } from './textures.js';
 
 export const YAW = THREE.MathUtils.degToRad(32);
@@ -214,7 +215,7 @@ window.renderScene = (name, ...args) => {
   setSeed(42);
   const s = SCENES[name](...args);
   // Le décor du village et son enceinte prennent le même rendu que les bâtiments posés dessus.
-  const res = shoot(s.object, { ...s.view, golden: name === 'village' || name === 'wallRing' });
+  const res = shoot(s.object, { ...s.view, golden: name === 'village' || name === 'wallRing' || name === 'citadel' || name === 'mapCitadel' });
   // Position à l'écran (en % de l'image) des emplacements nommés, pour placer les bâtiments par-dessus.
   const spots = {};
   for (const [k, p] of Object.entries(s.spots ?? {})) {
@@ -229,6 +230,58 @@ window.renderIconLarge = (name, frame, centerY) => {
   const s = ICONS[name]();
   if (frame) return shoot(s.object, { ...s.view, px: 512, frame, centerY }).png;
   return trim(shoot(s.object, { ...s.view, px: 768 }).png, 512);
+};
+
+/**
+ * Images de marche pour la carte : l'unité de profil (tournée vers la droite de l'écran, un peu vers nous), vue d'en haut
+ * comme les villages, en `frames` temps de foulée côte à côte sur une même bande. Toutes les images partagent le même cadrage.
+ */
+const MARCH = {
+  foot: { build: () => FIGURES.spearman(), frame: 3.2, centerY: 1.0 },
+  noble: { build: () => FIGURES.noble(), frame: 3.2, centerY: 1.0 },
+  horse: { build: () => FIGURES.cavalry(), frame: 4.4, centerY: 1.2 },
+  scout: { build: () => FIGURES.scout(), frame: 4.2, centerY: 1.1 },
+  ram: { build: () => MODELS.ram(), frame: 4.6, centerY: 0.8 },
+};
+window.renderMarch = async (kind, frames, px = 160) => {
+  const m = MARCH[kind];
+  const shots = [];
+  for (let i = 0; i < frames; i++) {
+    setSeed(7);
+    setGait(frames > 1 ? (i / frames) * Math.PI * 2 : null, 0.55);
+    const obj = m.build();
+    obj.rotation.y = YAW + Math.PI / 2 - 0.35;
+    const img = new Image();
+    img.src = shoot(obj, { frame: m.frame, centerY: m.centerY, px, golden: true, ground: 'none' }).png;
+    await img.decode();
+    shots.push(img);
+  }
+  setGait(null, 1);
+  // Cadre commun : la zone dessinée sur l'ensemble des images, pour que l'animation ne saute pas.
+  const c = document.createElement('canvas');
+  c.width = c.height = px;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  let x0 = px, y0 = px, x1 = 0, y1 = 0;
+  for (const img of shots) {
+    ctx.clearRect(0, 0, px, px);
+    ctx.drawImage(img, 0, 0);
+    const { data } = ctx.getImageData(0, 0, px, px);
+    for (let y = 0; y < px; y++)
+      for (let x = 0; x < px; x++)
+        if (data[(y * px + x) * 4 + 3] > 24) {
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+          y0 = Math.min(y0, y);
+          y1 = Math.max(y1, y);
+        }
+  }
+  const w = x1 - x0 + 3, h = y1 - y0 + 3;
+  const sheet = document.createElement('canvas');
+  sheet.width = w * frames;
+  sheet.height = h;
+  const o = sheet.getContext('2d');
+  shots.forEach((img, i) => o.drawImage(img, x0 - 1, y0 - 1, w, h, i * w, 0, w, h));
+  return { png: sheet.toDataURL('image/png'), w, h };
 };
 
 window.renderIcon = (name) => {

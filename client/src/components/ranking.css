@@ -84,3 +84,7 @@
 .app .pg.ranking .rank-table td:nth-child(2) a:hover { color: var(--gold); }
 .app .pg.ranking .rank-table td:last-child { font-weight: 700; }
 .app .pg .wr-card.me { outline-color: var(--gold); }
+
+/* Classement de gloire (Croisades) */
+.gl-title { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #8a6410; border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent); vertical-align: middle; }
+.gl-table .num { text-align: right; font-variant-numeric: tabular-nums; }

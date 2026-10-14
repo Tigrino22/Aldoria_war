@@ -21,8 +21,8 @@ import { getTroops, loadVillage } from './village';
 export const FARM_MIN_LOOT = 100;
 /** Éclaireurs envoyés au plus par village et par réflexion vers des barbares inconnus (ou à revoir). */
 const SCOUTS_PER_THINK = 2;
-/** Au-delà de cet âge (heures de jeu), le dernier espionnage d'un barbare est trop vieux pour estimer son butin : on y retourne. */
-const RESCOUT_GAME_HOURS = 24;
+/** Au-delà de cet âge (heures de jeu), le dernier renseignement sur un barbare est trop vieux pour estimer son butin : on y retourne (un pillage récent compte aussi). */
+const RESCOUT_GAME_HOURS = 48;
 /** Un village de PNJ hostile n'est pillé sans espionnage récent que si on l'a vu vide il y a moins de 6 heures de jeu. */
 const HOSTILE_INTEL_GAME_HOURS = 6;
 /** Ordre de remplissage d'un pillage : les cavaliers (rapides, gros sacs), puis lanciers, épéistes et hallebardiers. */
@@ -108,7 +108,7 @@ export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: 
   const { rows } = await c.query(
     `SELECT v.id, (v.owner_id IS NULL) AS barbarian, sqrt((v.x - $2)^2 + (v.y - $3)^2) AS dist
      FROM villages v LEFT JOIN players p ON p.id = v.owner_id
-     WHERE v.id <> $1 AND (v.x - $2)^2 + (v.y - $3)^2 <= $4
+     WHERE v.id <> $1 AND v.kind = 'village' AND (v.x - $2)^2 + (v.y - $3)^2 <= $4
        AND (v.owner_id IS NULL OR (p.is_npc AND v.owner_id <> $5 AND (p.tribe_id = ANY($6::int[]) OR p.id = ANY($7::int[]))))
        AND NOT EXISTS (SELECT 1 FROM commands cm WHERE cm.target_village_id = v.id AND NOT cm.processed AND cm.type = 'attack')
      ORDER BY dist, v.id LIMIT 60`,

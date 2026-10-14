@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { reportTone, type PlayerProfile } from '@aldoria/shared';
+import { CRUSADE_TITLES, reportTone, type CrusadeTitleKey, type PlayerProfile } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
@@ -358,7 +358,7 @@ export default async function socialRoutes(app: FastifyInstance) {
     const { name } = z.object({ name: z.string().trim().min(1).max(60) }).parse(req.params);
     const p = (
       await pool.query(
-        `SELECT p.id, p.username, p.is_npc, p.created_at, p.protection_until, p.kills_attack::float8 AS kills_attack, p.kills_defense::float8 AS kills_defense, t.id AS tribe_id, t.tag, t.name AS tribe_name
+        `SELECT p.id, p.username, p.is_npc, p.created_at, p.protection_until, p.kills_attack::float8 AS kills_attack, p.kills_defense::float8 AS kills_defense, p.title, t.id AS tribe_id, t.tag, t.name AS tribe_name
          FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE lower(p.username) = lower($1)`,
         [name],
       )
@@ -397,7 +397,10 @@ export default async function socialRoutes(app: FastifyInstance) {
       killsDefense: p.kills_defense,
       tribe: p.tribe_id ? { id: p.tribe_id, tag: p.tag, name: p.tribe_name } : null,
       villages,
-    };
+      title: p.title ? CRUSADE_TITLES[p.title as CrusadeTitleKey] : null,
+      titles: (await pool.query('SELECT title FROM player_titles WHERE player_id = $1 ORDER BY earned_at', [p.id])).rows.map((r) => CRUSADE_TITLES[r.title as CrusadeTitleKey]).filter(Boolean),
+      glory: (await pool.query('SELECT coalesce(sum(glory), 0)::int AS g FROM crusade_scores WHERE player_id = $1', [p.id])).rows[0].g as number,
+    } satisfies PlayerProfile;
   });
 
   // ---------- Classements ----------

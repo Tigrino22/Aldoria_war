@@ -24,6 +24,17 @@ const M = {
   gold: () => mat('steel', { color: 0xe0b040, rough: 0.25, metal: 1 }),
 };
 
+// ---------- Allure (images de marche de la carte) ----------
+
+/** Phase de la foulée (radians) pour les images de marche, ou null pour la pose debout habituelle. */
+let gait = null;
+/** Finesse des maillages : 1 pour les icônes, moins pour les petites images de la carte (rendu bien plus rapide). */
+let detail = 1;
+export function setGait(phase, fineness = 1) {
+  gait = phase;
+  detail = fineness;
+}
+
 // ---------- Squelette ----------
 
 /**
@@ -43,6 +54,16 @@ function skeleton({ hands, elbows = {}, seated = false } = {}) {
     toe: { l: [-0.135, 0.04, 0.16], r: [0.16, 0.04, 0.14] },
     hand: { l: hands?.l ?? [-0.24, 0.92, 0.04], r: hands?.r ?? [0.24, 0.92, 0.04] },
   };
+  if (gait !== null && !seated) {
+    // En marche : une jambe avance pendant que l'autre recule, le pied qui revient vers l'avant se lève.
+    for (const [side, sign] of [['l', 1], ['r', -1]]) {
+      const swing = Math.sin(gait) * sign;
+      const lift = Math.max(0, Math.cos(gait) * sign) * 0.11;
+      s.knee[side] = [s.knee[side][0], s.knee[side][1] + lift * 0.6, s.knee[side][2] + swing * 0.17];
+      s.ankle[side] = [s.ankle[side][0], s.ankle[side][1] + lift, s.ankle[side][2] + swing * 0.32];
+      s.toe[side] = [s.toe[side][0], s.toe[side][1] + lift, s.toe[side][2] + swing * 0.32];
+    }
+  }
   if (seated) {
     // Cuisses vers l'avant et écartées autour du dos du cheval, jambes pendantes.
     s.knee = { l: [-0.3, 0.78, 0.28], r: [0.3, 0.78, 0.28] };
@@ -150,7 +171,12 @@ function skirt(s, bottom, rTop = 0.17, rBottom = 0.24, folds = 0.008) {
 /** Rend un ensemble de couches { shape, material, tex } en maillages. */
 function layers(list, opts) {
   const all = union(...list.map((l) => l.shape));
-  return group(...list.map((l) => sdfMesh(l.shape, l.material, { ...opts, ...(l.box ?? {}), tex: l.tex, ao: all })));
+  return group(
+    ...list.map((l) => {
+      const o = { ...opts, ...(l.box ?? {}) };
+      return sdfMesh(l.shape, l.material, { ...o, res: Math.max(40, Math.round(o.res * detail)), tex: l.tex, ao: all });
+    }),
+  );
 }
 
 /** Découpe une couche en deux : la tête, maillée bien plus finement (visage), et le reste. */
@@ -354,16 +380,23 @@ function horseShapes({ seatY = 1.42 } = {}) {
     limb([0.045, 2.02, 0.94], [0.055, 2.13, 0.93], 0.024, 0.006),
   );
   const nostrils = union(sphere([-0.04, 1.65, 1.36], 0.014), sphere([0.04, 1.65, 1.36], 0.014));
-  const legs = union(
+  // Au trot (images de marche), les jambes vont par paires diagonales : antérieur gauche avec postérieur droit.
+  const stride = (phase, [y, z], k) => {
+    if (gait === null) return [y, z];
+    const a = gait + phase;
+    return [y + Math.max(0, Math.cos(a)) * 0.12 * k, z + Math.sin(a) * 0.17 * k];
+  };
+  const LEGS = [
     // Antérieurs : l'un droit, l'autre légèrement avancé.
-    leg(-0.14, [1.15, 0.5], [0.95, 0.52], [0.52, 0.55], [0.2, 0.56], [0.03, 0.6], 0.09, 0.045),
-    leg(0.14, [1.15, 0.5], [0.95, 0.5], [0.53, 0.44], [0.2, 0.4], [0.03, 0.43], 0.09, 0.045),
+    [-0.14, 0, [1.15, 0.5], [0.95, 0.52], [0.52, 0.55], [0.2, 0.56], [0.03, 0.6], 0.09, 0.045],
+    [0.14, Math.PI, [1.15, 0.5], [0.95, 0.5], [0.53, 0.44], [0.2, 0.4], [0.03, 0.43], 0.09, 0.045],
     // Postérieurs : jarret coudé vers l'arrière.
-    leg(-0.15, [1.2, -0.52], [0.85, -0.5], [0.58, -0.68], [0.2, -0.62], [0.03, -0.58], 0.12, 0.05),
-    leg(0.15, [1.2, -0.52], [0.85, -0.52], [0.58, -0.72], [0.2, -0.68], [0.03, -0.65], 0.12, 0.05),
-  );
+    [-0.15, Math.PI, [1.2, -0.52], [0.85, -0.5], [0.58, -0.68], [0.2, -0.62], [0.03, -0.58], 0.12, 0.05],
+    [0.15, 0, [1.2, -0.52], [0.85, -0.52], [0.58, -0.72], [0.2, -0.68], [0.03, -0.65], 0.12, 0.05],
+  ].map(([x, ph, top, elbow, knee, fetlock, hoof, rTop, rKnee]) => [x, top, elbow, stride(ph, knee, 0.5), stride(ph, fetlock, 1), stride(ph, hoof, 1), rTop, rKnee]);
+  const legs = union(...LEGS.map((l) => leg(...l)));
   const coat = carve(blend(0.07, body, neck, head, legs), nostrils, 0.01);
-  const hooves = union(...[[-0.14, 0.6], [0.14, 0.43], [-0.15, -0.58], [0.15, -0.65]].map(([x, z]) => cylY([x, 0, z], 0, 0.08, 0.06, 0.048)));
+  const hooves = union(...LEGS.map(([x, , , , , , hoof]) => cylY([x, hoof[0] - 0.03, hoof[1]], hoof[0] - 0.03, hoof[0] + 0.05, 0.06, 0.048)));
   const crest = (p) => 1.6 + (p[2] - 0.55) * 1.15;
   const mane = displace(intersect(shell(inflate(neck, 0.02), 0.035), (p) => -(p[1] - crest(p) - 0.08)), (p) => Math.sin(p[2] * 90 + p[1] * 30) * 0.01);
   const forelock = limb([0, 2.03, 0.98], [0, 1.95, 1.06], 0.03, 0.02);

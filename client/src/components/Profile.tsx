@@ -75,13 +75,28 @@ export default function Profile({ name }: { name: string }) {
             {' · '}inscrit le {clockTime(profile.createdAt)}
           </>
         }
-        chips={profile.protected && <span className="pg-pill ally">Sous protection débutant</span>}
+        chips={
+          (profile.protected || profile.title || (profile.titles?.length ?? 0) > 0) && (
+            <>
+              {profile.title && <span className="pg-pill gold">{profile.title}</span>}
+              {profile.titles
+                ?.filter((t) => t !== profile.title)
+                .map((t) => (
+                  <span key={t} className="pg-pill">
+                    {t}
+                  </span>
+                ))}
+              {profile.protected && <span className="pg-pill ally">Sous protection débutant</span>}
+            </>
+          )
+        }
         actions={actions}
         stats={[
           { value: `#${profile.rank}`, label: 'Rang', tone: 'gold' },
           { value: profile.points, label: 'Points' },
           { value: profile.killsAttack, label: 'Battus en attaque', tone: 'red' },
           { value: profile.killsDefense, label: 'Battus en défense', tone: 'sky' },
+          ...(profile.glory ? [{ value: profile.glory, label: 'Gloire des croisades', tone: 'gold' as const }] : []),
         ]}
       />
       <section className="panel">

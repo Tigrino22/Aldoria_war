@@ -6,6 +6,7 @@ import {
   logPile, box, cyl, cone, flag, mat, palisade, crenels, roundCrenels,
 } from './kit.js';
 import { BUILDERS } from './buildings.js';
+import { citadel } from './citadel.js';
 
 const YAW = THREE.MathUtils.degToRad(32);
 const RIGHT = [Math.cos(YAW), -Math.sin(YAW)];
@@ -142,6 +143,9 @@ export const SCENES = {
   mapBarbarian: () => mapItem(barbarian()),
   mapTrees: () => mapItem(group(pineTree(1.1, -1.6, 0, -1), deciduousTree(1, 1.6, 0, -0.6), pineTree(0.9, 0.2, 0, 1.6), bush(0.8, -2, 0, 1.8))),
   mapHill: () => mapItem(hill()),
+  // La Citadelle des Croisades : en grand pour sa page, et en vignette pour la carte (un peu plus grande qu'un village).
+  citadel: () => ({ object: citadel(), view: { frame: 38, px: 1200, aspect: 1.3, ground: 'shadow', centerY: 8.6 } }),
+  mapCitadel: () => ({ object: citadel(), view: { frame: 31, px: 384, aspect: 1, ground: 'shadow', centerY: 7 } }),
 };
 
 // Tracé de l'enceinte : un « super-ellipse » (rectangle aux coins arrondis) en coordonnées écran,

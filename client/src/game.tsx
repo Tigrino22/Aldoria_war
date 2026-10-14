@@ -68,6 +68,8 @@ function coalesce(fn: () => Promise<void>): () => Promise<void> {
 
 /** Heure du serveur, rafraîchie chaque seconde. */
 let serverOffset = 0;
+/** Heure du serveur (le décalage avec l'horloge locale est mesuré au chargement du monde). */
+export const serverNow = () => Date.now() + serverOffset;
 
 // Une seule horloge par intervalle pour toute la page, au lieu d'un minuteur par compte à rebours affiché :
 // tous les composants abonnés se mettent à jour dans le même rendu.

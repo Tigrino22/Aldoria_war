@@ -66,6 +66,9 @@ if (want('village')) {
 for (const stage of [1, 2, 3])
   for (const part of ['back', 'front'])
     if (want(`wall-ring-${stage}`)) save(`${out}/wall-ring-${stage}-${part}.png`, (await page.evaluate(([s, p]) => window.renderScene('wallRing', s, p), [stage, part])).png);
+// La citadelle prend le rendu Heure dorée, comme le village.
+if (want('citadel')) save(`${out}/citadel.png`, (await page.evaluate(() => window.renderScene('citadel'))).png);
+if (want('mapCitadel')) save(`${out}/map/citadel.png`, (await page.evaluate(() => window.renderScene('mapCitadel'))).png);
 const MAP = { mapVillage1: 'village-1', mapVillage2: 'village-2', mapVillage3: 'village-3', mapBarbarian: 'barbarian', mapTrees: 'trees', mapHill: 'hill' };
 for (const [scene, file] of Object.entries(MAP))
   if (want(scene)) save(`${out}/map/${file}.png`, (await page.evaluate((n) => window.renderScene(n), scene)).png);
@@ -73,6 +76,19 @@ for (const r of ['wood', 'clay', 'iron', 'wheat'])
   if (want(r)) save(`${out}/resources/${r}.png`, await page.evaluate((n) => window.renderIcon(n), r));
 for (const u of ['spearman', 'halberdier', 'swordsman', 'scout', 'cavalry', 'ram', 'noble'])
   if (want(u)) save(`${out}/units/${u}.png`, await page.evaluate((n) => window.renderIcon(n), u));
+// Armées en marche sur la carte : une bande d'images de foulée par genre d'unité, et leur taille dans un fichier commun.
+const MARCH_FRAMES = { foot: 4, noble: 4, horse: 4, scout: 4, ram: 1 };
+if (Object.keys(MARCH_FRAMES).some((k) => want(`march-${k}`))) {
+  const metaFile = `${out}/map/march.json`;
+  const meta = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')) : {};
+  for (const [kind, frames] of Object.entries(MARCH_FRAMES)) {
+    if (!want(`march-${kind}`)) continue;
+    const r = await page.evaluate(([k, f]) => window.renderMarch(k, f), [kind, frames]);
+    save(`${out}/map/march-${kind}.png`, r.png);
+    meta[kind] = { frames, w: r.w, h: r.h };
+  }
+  fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2) + '\n');
+}
 // Herbe de la carte en JPEG : pas de transparence utile, dix fois plus léger, la carte s'ouvre plus vite.
 if (want('ground')) save(`${out}/map/ground.jpg`, await page.evaluate(() => window.exportTexture('grass', 'image/jpeg', 0.82)));
 

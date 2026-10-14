@@ -41,6 +41,6 @@ describe('pillage intensif des PNJ', () => {
   });
 
   it('retourne espionner un barbare dont le rapport est trop ancien', () => {
-    expect(farmPlan({ barbarian: true }, [scoutRow(60 * 30)], NOW, 1)).toEqual({ action: 'scout' });
+    expect(farmPlan({ barbarian: true }, [scoutRow(60 * 60)], NOW, 1)).toEqual({ action: 'scout' });
   });
 });

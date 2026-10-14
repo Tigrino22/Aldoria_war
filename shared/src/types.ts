@@ -62,7 +62,7 @@ export interface TroopGroup {
   units: UnitCounts;
 }
 
-export type CommandType = 'attack' | 'support' | 'return' | 'trade' | 'trade_return';
+export type CommandType = 'attack' | 'support' | 'return' | 'trade' | 'trade_return' | 'intercept';
 
 export interface CommandView {
   id: number;
@@ -74,6 +74,8 @@ export interface CommandView {
   /** Butin au retour d'une attaque, ou cargaison d'un convoi de marchands. */
   loot: Resources | null;
   merchants: number;
+  /** Point de rencontre d'une interception (ou point de départ du retour qui en revient). */
+  meet?: { x: number; y: number } | null;
   sentAt: string;
   arriveAt: string;
 }
@@ -97,6 +99,8 @@ export interface VillageState {
   loyalty: number;
   resources: Resources;
   rates: Resources;
+  /** Bonus de production de la relique d'une croisade (0,05 = +5 %), déjà compris dans `rates`. */
+  relicBonus?: number;
   capacity: number;
   syncedAt: string;
   buildings: Buildings;
@@ -129,6 +133,22 @@ export interface MapVillage {
   tribeTag: string | null;
   /** Le propriétaire est sous protection débutant (attaques impossibles). */
   protected: boolean;
+  /** Citadelle des Croisades (absent pour un village ordinaire). */
+  kind?: 'citadel';
+  /** Pour une Citadelle : tag de la tribu qui tient la bannière. */
+  holderTag?: string | null;
+  /** Pour une Citadelle : état en direct de la croisade (armées en marche : nombre seulement, ni l'origine ni les troupes). */
+  crusade?: {
+    opensAt: string;
+    closesAt: string;
+    wall: number;
+    holderTribeId: number | null;
+    holderPlayerId: number | null;
+    attacks: number;
+    supports: number;
+  };
+  /** Le village appartient à un camp qui détient la relique d'une croisade (bannière dorée sur la carte). */
+  relic?: boolean;
 }
 
 /** Mouvements de troupes connus du joueur vers un village : les siens, et ceux qui visent ses villages (icônes de la carte). */
@@ -202,6 +222,8 @@ export interface AttackReportData {
   wallDamage?: { before: number; after: number } | null;
   /** Ce que les éclaireurs survivants ont vu. */
   intel?: Intel | null;
+  /** Bataille en rase campagne (interception) : lieu de la rencontre, en cases. */
+  field?: { x: number; y: number } | null;
 }
 
 export interface Intel {
@@ -264,6 +286,10 @@ export interface PlayerProfile {
   /** « can » : le chef de tribu qui consulte peut inviter ce joueur ; « pending » : invitation déjà envoyée ; sinon « none ». */
   invite: 'none' | 'can' | 'pending';
   villages: { id: number; name: string; x: number; y: number; points: number }[];
+  /** Titre de croisade affiché à côté du nom, titres gagnés et gloire de toutes les croisades. */
+  title?: string | null;
+  titles?: string[];
+  glory?: number;
 }
 
 /** Offre publique du marché : « je donne X contre Y ». */

@@ -28,8 +28,8 @@ export const parseNextOffensive = (state: { offensive?: { nextAt?: string } } | 
 export const offensiveDue = (nextAt: number | null, now: Date) => !!env.npcOffensive && nextAt !== null && nextAt <= now.getTime();
 
 /**
- * La part voulue de l'armée offensive (celle du village : épéistes, cavaliers, béliers), qu'elle batte la défense espionnée ou non : une offensive
- * sert aussi à déstabiliser les joueurs, elle n'est jamais annulée pour cause d'armée trop faible. Null seulement s'il n'y a rien à envoyer.
+ * La part voulue de l'armée offensive (celle du village : épéistes, cavaliers, béliers). L'appelant vérifie qu'elle bat la défense espionnée
+ * (sinon il essaie toute l'armée, puis renonce). Null seulement s'il n'y a rien à envoyer.
  */
 export function pickOffensiveUnits(available: UnitCounts, shareOverride?: number): UnitCounts | null {
   const share = (shareOverride ?? env.npcOffensiveShare) / 100;

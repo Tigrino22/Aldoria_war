@@ -51,6 +51,7 @@ votre tribu `#2f6fdc`, alliés `#62c8ff`, guerre déclarée `#ff2b2b`, autres jo
 - **Bouton or** : `linear-gradient(180deg, #e2b43a, #b8871a)`, bord `#8a6410`, encre `#2b2018`.
 - **Barre d'avancement** : 6 px, fond `rgb(0 0 0 / 0.25)`, remplissage `linear-gradient(90deg, #a77a14, #f1cc63)` avec halo.
 - **Bandeau de guerre** : icône ronde qui pulse doucement, titre blanc, sous-titre rose pâle, compte à rebours en gras.
+- **Bandeau de croisade** (`CrusadeBanner.tsx`) : bois sombre bordé d'or, médaillon or plein (il pulse pendant l'assaut), compte à rebours en or. Sur la carte, la Citadelle garde un socle doré ; la relique ajoute un double liseré doré sous les villages du camp vainqueur.
 - **Blason de tribu** : `TribeCrest.tsx` (bouclier généré depuis l'identifiant).
 - Animations lentes et discrètes uniquement, toutes coupées par `prefers-reduced-motion`.
 

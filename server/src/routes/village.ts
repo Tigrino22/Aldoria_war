@@ -8,6 +8,7 @@ import { GameError, forbidden } from '../errors';
 import { pickIntel } from '../game/intel';
 import { cancelOrder, placeOrder, plannedOrders } from '../game/orders';
 import { cancelCommand, disbandTroops, recallTroops, sendCommand, sendTrade } from '../game/commands';
+import { sendInterception } from '../game/intercept';
 import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -153,6 +154,17 @@ export default async function villageRoutes(app: FastifyInstance) {
     return act(async (c, outbox, now) => {
       await sendCommand(c, outbox, playerId, id, body, now);
       return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  // Interception d'une armée repérée en chemin (bataille en rase campagne).
+  app.post('/api/villages/:id/intercept', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const body = z.object({ commandId: z.number().int().positive(), units: unitsSchema }).parse(req.body);
+    return act(async (c, outbox, now) => {
+      const sent = await sendInterception(c, outbox, playerId, id, body, now);
+      return { ...sent, village: await villageState(c, await syncVillage(c, id, now), playerId) };
     });
   });
 

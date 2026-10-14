@@ -283,7 +283,7 @@ Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaq
 
 ### Marge de sécurité des attaques des PNJ
 
-Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes et aux opérations de tribu. Les offensives occasionnelles n'en tiennent pas compte : elles partent toujours avec leur part d'armée (« Part de l'armée engagée dans une offensive »), même si elle ne bat pas la défense espionnée, car leur but est de déstabiliser les joueurs.
+Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes et aux opérations de tribu. Les offensives occasionnelles partent avec leur part d'armée (« Part de l'armée engagée dans une offensive ») si cette part bat la défense espionnée ; sinon avec toute l'armée offensive si elle suffit ; sinon le PNJ renonce et retente plus tard. Une attaque perdue d'avance ne faisait que remplir les rapports.
 
 ### Recrutement accéléré des PNJ
 
@@ -321,3 +321,66 @@ Migration 014 : compteurs `conquests`, `villages_lost`, `attack_wins`, `defense_
 | Classement | Onglet « Guerre » de la page Classement (`GET /api/ranking/war/players`, `/tribes`, `/feed`) : podium, tableau, dernières conquêtes, guerres de tribus en cours. Seuls les scores > 0 figurent au tableau |
 | Statistiques du monde | Page `#/monde` (`GET /api/world/stats`, `server/src/game/world-stats.ts`, partagée avec l'onglet Statistiques de l'administration) : totaux et moyennes uniquement, aucun nom de joueur ni village précis |
 
+
+## Croisades : la Citadelle
+
+Migration 020, règles pures dans `shared/src/crusade.ts`, serveur dans `server/src/game/crusades.ts`, route `server/src/routes/crusade.ts`, tests dans `server/test/croisades.test.ts`.
+
+| Élément | Règle |
+|---|---|
+| Calendrier | Deux soirs par semaine (mercredi et samedi par défaut), à 20 h 30, pendant 60 minutes, dans le fuseau `NPC_TIMEZONE`. La Citadelle est annoncée 48 heures avant l'ouverture |
+| Emplacement | Un quart de la carte différent à chaque croisade, sur une case libre. La Citadelle est un village sans propriétaire (`villages.kind = 'citadel'`), muraille 20, que ni les pillages ni la repousse des barbares ne touchent |
+| Garnison | 150 % de l'armée offensive de la tribu la plus forte (entre 4 000 et 250 000 places) : 40 % lanciers, 40 % hallebardiers, 20 % épéistes. En place dès l'annonce |
+| Garde | Toutes les 15 minutes de l'assaut, tant qu'aucune bannière ne flotte, 15 % de la garnison de départ (même composition) rejoint la Citadelle. Une vague tombée pendant qu'un camp tient la bannière est perdue. Code : `guardWaves` dans `server/src/game/crusades.ts` |
+| Fenêtre d'assaut | Attaques et renforts doivent arriver entre l'ouverture et la fermeture ; les éclaireurs peuvent partir dès l'annonce. Une arrivée hors de la fenêtre fait demi-tour |
+| Bannière | Une attaque qui vide la Citadelle avec un noble survivant plante la bannière de son camp (tribu et tribus alliées, ou joueur seul) ; ses survivants restent en garnison. Seul ce camp peut envoyer des renforts ; une attaque de ce camp devient un renfort |
+| Victoire | Le camp qui tient la bannière à la fermeture des portes gagne. Les troupes rentrent, les ordres programmés non partis sont annulés et remboursés |
+| Gloire | 1 par 10 places ennemies tuées, +100 pour la brèche, +150 par prise de bannière, +300 pour chaque membre du camp vainqueur qui a combattu (×0,75 par victoire consécutive de la même tribu). Saison de 28 jours |
+| Relique | Le camp vainqueur gagne +5 % de production pendant 7 jours |
+| Trésor | 2 × la population de la garnison par ressource, partagé au prorata de la gloire, livré au plus ancien village de chacun |
+| Titres | Croisé, Briseur de murailles, Porte-étendard, Champion de la Croisade, Gardien de la Citadelle, Héros de la saison : à afficher à côté de son nom (Profil) |
+
+Sur la carte, la Citadelle se suit en direct : pendant l'annonce et l'assaut, un étendard flotte aux couleurs du détenteur (les mêmes que la légende de la carte : vous, tribu, alliés, guerre, autres), une jauge de 20 crans montre la muraille, deux pastilles comptent les attaques et les renforts en route (sans révéler leur origine), et un panneau donne le compte à rebours et le dernier événement de la chronique. La carte se recharge toutes les 10 secondes pendant l'assaut. Code : `server/src/routes/map.ts` (champ `crusade` de la Citadelle), `client/src/components/MapView.tsx` (`drawCitadelLive`), `CrusadeMapHud` dans `client/src/components/CrusadeBanner.tsx`.
+
+Réglages à chaud (Administration > Monde) : `CRUSADES` (0 pour couper), `CRUSADE_DAYS` (« 3,6 », 0 = dimanche), `CRUSADE_TIME` (« 20:30 »), `CRUSADE_MINUTES`, `CRUSADE_NOTICE_HOURS`, `CRUSADE_GARRISON` (%), `CRUSADE_RELIC_BONUS` (%). L'administration peut lancer une croisade de test ou terminer la croisade en cours.
+
+## Armées en marche sur la carte
+
+Les mouvements de troupes se voient sur la carte : une petite colonne de soldats rendus en 3D (fantassins, cavaliers, éclaireurs, noble, bélier, selon ce que contient l'armée) marche au pas derrière le fanion de son camp, en soulevant un peu de poussière, le long d'un chemin en pointillés. Le fanion ondule et dit le genre du mouvement (queue d'aronde : attaque, carré : renfort, triangle : retour ou inconnu) ; le nombre de soldats dit sa taille (1 : moins de 100 places, 3 : jusqu'à 2 000, 5 : au-delà) ; une attaque qui vous vise est cerclée de rouge. Les images de marche sont rendues par `node tools/render/render.mjs march-` (quatre temps de foulée par unité, `client/src/assets/map/march-*.png` et `march.json`).
+
+| Qui voit quoi | |
+|---|---|
+| Ses propres mouvements, ceux de sa tribu et des tribus alliées | Trajet complet, taille, nom du joueur |
+| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur ; composition cachée (taille moyenne affichée) tant qu'elle n'est pas repérée, à 3 cases ou moins de l'un de ses villages |
+| Toute autre armée | Seulement pendant qu'elle passe à 3 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille et sa composition, ni origine, ni destination, ni propriétaire |
+
+### Interception
+
+Une armée ennemie repérée (attaque, renfort ou retour d'un joueur hors de sa tribu et de ses alliés, PNJ compris) peut être attaquée en chemin : on la touche sur la carte, on choisit ses troupes et la fiche annonce le point et l'heure de rencontre (`interceptPoint`). Règles :
+
+| Règle | Valeur |
+|---|---|
+| Où | La rencontre doit avoir lieu pendant que l'armée passe à 3 cases ou moins de l'un de vos villages ; sinon l'envoi est refusé |
+| Départ | Le village actif, à la vitesse de l'unité la plus lente ; pas d'éclaireurs seuls ; rations comme une attaque ; fin de la protection débutant |
+| Bataille | En rase campagne : ni muraille ni défense de base ; nos troupes attaquent, l'armée surprise défend (`resolveCombat`, `baseDefense: 0`) |
+| Après | Les survivants adverses poursuivent leur route ; une armée détruite laisse son butin, que nos survivants rapportent (dans la limite de ce qu'ils portent) ; nos troupes rentrent depuis le champ de bataille |
+| Armée disparue | Si elle est arrivée, annulée ou détruite avant la rencontre, nos troupes rentrent bredouilles |
+| PNJ | Ils interceptent aussi, quand ils sont sûrs de gagner (voir docs/PNJ.md, interrupteur `NPC_INTERCEPT`) |
+| Protection | Jamais l'armée d'un joueur sous protection débutant |
+| Rapports | Un rapport d'attaque pour l'intercepteur, de défense pour l'armée interceptée, avec le lieu de la bataille |
+
+Côté serveur, l'interception est un mouvement de type `intercept` (migration 022 : `target_command_id`, point de rencontre `meet_x`/`meet_y`), traité dans l'ordre chronologique avec les autres (`server/src/game/intercept.ts`).
+
+Coût serveur : une requête (`GET /api/map/armies`, 600 mouvements au plus) à chaque rechargement de la carte (30 s, 10 s pendant un assaut de croisade) ; le navigateur calcule seul la position entre deux rechargements. Pour une armée aperçue, le serveur n'envoie que la portion de trajet à portée de vue (`sightWindow` dans `shared/src/armies.ts`), pour qu'on ne puisse pas lire sa destination. Le bouton « Armées » de la carte les masque. Les animations s'arrêtent quand l'onglet est caché ; avec « réduire les animations », les armées avancent une fois par seconde sans balancer.
+
+Code : `server/src/routes/map.ts` (`/api/map/armies`), `client/src/components/mapArmies.ts`. Base des futures interceptions en rase campagne.
+
+## Ménage des rapports et des mouvements
+
+`server/src/game/housekeeping.ts`, une fois par heure (et une minute après le démarrage), par lots de 5 000 :
+
+| Élément | Règle |
+|---|---|
+| Mouvements terminés | Supprimés après `COMMANDS_KEEP_DAYS` jours (4 par défaut, jamais moins) |
+| Rapports des joueurs | Supprimés après `REPORTS_KEEP_DAYS` jours (30 par défaut), sauf les rapports archivés |
+| Rapports des PNJ | 72 heures au plus, et un seul renseignement par village barbare (voir PNJ.md) |

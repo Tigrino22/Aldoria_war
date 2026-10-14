@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BUILDINGS, BUILDING_KEYS, RESOURCES, UNIT_KEYS, type AttackReportData, type Intel, type Resources, type ReportSummary, type ScoutReportData, type TradeReportData, type UnitCounts } from '@aldoria/shared';
+import { BUILDINGS, BUILDING_KEYS, RELIC_DAYS, RESOURCES, UNIT_KEYS, type AttackReportData, type Intel, type Resources, type ReportSummary, type ScoutReportData, type TradeReportData, type UnitCounts } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame, useRoute } from '../game';
@@ -104,18 +104,55 @@ function TradeReport({ d }: { d: TradeReportData }) {
   );
 }
 
+/** Compte rendu d'une croisade (fin de l'assaut) ou troupes refoulées aux portes de la Citadelle. */
+function CrusadeReport({ d }: { d: any }) {
+  if (!d.crusadeId) {
+    return (
+      <div className="stack">
+        <p>
+          {d.citadel} : {d.reason}. Vos troupes rentrent au village.
+        </p>
+        {d.units && <UnitList units={d.units} />}
+      </div>
+    );
+  }
+  return (
+    <div className="stack">
+      <p className={`verdict ${d.won ? 'win' : 'loss'}`}>{d.won ? 'Votre camp remporte la croisade !' : d.winner ? `${d.winner} remporte la croisade` : 'La Citadelle a tenu'}</p>
+      <p>
+        Vous finissez <b>{d.rank === 1 ? '1er' : `${d.rank}e`}</b> avec <b>{fmt(d.glory)}</b> de gloire.
+        {d.won && ` La relique augmente la production de vos villages pendant ${RELIC_DAYS} jours.`}
+      </p>
+      {d.treasure > 0 && (
+        <p>
+          Votre part du trésor : <b>{fmt(d.treasure)}</b> de chaque ressource, livrée à votre plus ancien village
+          {d.delivered < d.treasure * 4 ? ' (ce qui dépassait la capacité de l’entrepôt a été perdu)' : ''}.
+        </p>
+      )}
+      <p>
+        <a href="#/croisade">Voir la chronique</a> · <a href="#/compte">Choisir mon titre</a>
+      </p>
+    </div>
+  );
+}
+
 function AttackReport({ d }: { d: AttackReportData }) {
   return (
     <div className="stack">
       <p className={`verdict ${d.attackerWins ? 'win' : 'loss'}`}>
-        {d.conquered ? 'Le village a été conquis !' : d.attackerWins ? "L'attaquant l'emporte" : 'Le défenseur tient bon'}
+        {d.conquered ? 'Le village a été conquis !' : d.field ? (d.attackerWins ? "L'armée interceptée est détruite" : "L'armée interceptée force le passage") : d.attackerWins ? "L'attaquant l'emporte" : 'Le défenseur tient bon'}
       </p>
+      {d.field && (
+        <p>
+          Bataille en rase campagne près de <a href={`#/carte/${Math.floor(d.field.x)},${Math.floor(d.field.y)}`}>({Math.floor(d.field.x)}|{Math.floor(d.field.y)})</a>, sans muraille. Ci-dessous, les villages d'où viennent les deux armées.
+        </p>
+      )}
       <h3>
-        Attaquant : {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <a href={`#/carte/${d.attacker.village.x},${d.attacker.village.y}`}>{d.attacker.village.name} ({d.attacker.village.x}|{d.attacker.village.y})</a>
+        {d.field ? 'Intercepteur' : 'Attaquant'} : {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <a href={`#/carte/${d.attacker.village.x},${d.attacker.village.y}`}>{d.attacker.village.name} ({d.attacker.village.x}|{d.attacker.village.y})</a>
       </h3>
       <TroopTable units={d.attacker.units} losses={d.attacker.losses} />
       <h3>
-        Défenseur : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · <a href={`#/carte/${d.defender.village.x},${d.defender.village.y}`}>{d.defender.village.name} ({d.defender.village.x}|{d.defender.village.y})</a>
+        {d.field ? 'Armée interceptée' : 'Défenseur'} : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · <a href={`#/carte/${d.defender.village.x},${d.defender.village.y}`}>{d.defender.village.name} ({d.defender.village.x}|{d.defender.village.y})</a>
       </h3>
       <TroopTable units={d.defender.units} losses={d.defender.losses} />
       {d.wall !== null && <p>Muraille : niveau {d.wall}</p>}
@@ -183,6 +220,8 @@ export default function Reports({ id }: { id?: number }) {
             <ScoutReport d={report.data} />
           ) : report.type === 'trade' ? (
             <TradeReport d={report.data} />
+          ) : report.type === 'crusade' ? (
+            <CrusadeReport d={report.data} />
           ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
             <AttackReport d={report.data} />
           ) : (
@@ -206,6 +245,7 @@ const CATEGORIES: { key: string; label: string }[] = [
   { key: 'scout', label: 'Espionnage' },
   { key: 'trade', label: 'Livraisons' },
   { key: 'support', label: 'Renforts' },
+  { key: 'crusade', label: 'Croisades' },
 ];
 
 const LEGEND: { tone: string; label: string }[] = [

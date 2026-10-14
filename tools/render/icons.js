@@ -310,3 +310,6 @@ export const ICONS = {
   scout: () => ({ object: place(FIGURES.scout(), 0, 0, 0, YAW - 1.15), view: { frame: 4.4, centerY: 1.4, env: true, pitch: PORTRAIT } }),
   ram: () => ({ object: place(ram(), 0, 0, 0, YAW - 1.1), view: { frame: 4.8, centerY: 0.9, env: true, pitch: PORTRAIT } }),
 };
+
+/** Modèles bruts (sans pose de caméra), pour les images de marche de la carte. */
+export const MODELS = { ram };

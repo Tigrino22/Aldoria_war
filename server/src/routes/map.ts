@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { RESOURCES, UNIT_KEYS, type MapMovement, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
+import { ARMY_SIGHT, RESOURCES, UNIT_KEYS, armyKinds, armySize, normalizeUnits, populationOf, sightWindow, totalUnits, type MapArmy, type MapMovement, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { forbidden } from '../errors';
 import { env } from '../env';
 import { estimateLoot, pickIntel } from '../game/intel';
+import { pathOf } from '../game/intercept';
 import { allyTribeIdsOf } from '../game/tribe-alliances';
 
 export default async function mapRoutes(app: FastifyInstance) {
@@ -20,11 +21,39 @@ export default async function mapRoutes(app: FastifyInstance) {
       })
       .parse(req.query);
     const { rows } = await pool.query(
-      `SELECT v.id, v.name, v.x, v.y, v.points, v.owner_id, p.username, p.protection_until > now() AS protected, t.id AS tribe_id, t.tag
+      `SELECT v.id, v.name, v.x, v.y, v.points, v.owner_id, v.kind, p.username, p.protection_until > now() AS protected, t.id AS tribe_id, t.tag,
+              (p.relic_until > now() OR t.relic_until > now()) AS relic,
+              (SELECT coalesce(ht.tag, hp.username) FROM crusades cr LEFT JOIN tribes ht ON ht.id = cr.holder_tribe_id LEFT JOIN players hp ON hp.id = cr.holder_player_id
+               WHERE cr.village_id = v.id AND cr.status <> 'ended' AND (cr.holder_tribe_id IS NOT NULL OR cr.holder_player_id IS NOT NULL)) AS holder
        FROM villages v LEFT JOIN players p ON p.id = v.owner_id LEFT JOIN tribes t ON t.id = p.tribe_id
-       WHERE v.x BETWEEN $1 AND $3 AND v.y BETWEEN $2 AND $4`,
+       WHERE v.x BETWEEN $1 AND $3 AND v.y BETWEEN $2 AND $4
+         AND (v.kind = 'village' OR EXISTS (SELECT 1 FROM crusades cr WHERE cr.village_id = v.id AND cr.status <> 'ended'))`,
       [q.x0, q.y0, q.x1, q.y1],
     );
+    // Citadelle d'une croisade : état en direct pour la carte (bannière, muraille, armées en marche, fenêtre d'assaut).
+    const citadelIds = rows.filter((r) => r.kind === 'citadel').map((r) => r.id as number);
+    const live = new Map<number, NonNullable<MapVillage['crusade']>>();
+    if (citadelIds.length) {
+      const { rows: crs } = await pool.query(
+        `SELECT cr.village_id, cr.opens_at, cr.closes_at, cr.holder_tribe_id, cr.holder_player_id, (v.buildings->>'wall')::int AS wall,
+                (SELECT count(*)::int FROM commands cm WHERE cm.target_village_id = cr.village_id AND NOT cm.processed AND cm.type = 'attack'
+                   AND coalesce((cm.units->>'scout')::int, 0) < (SELECT sum(value::int) FROM jsonb_each_text(cm.units))) AS attacks,
+                (SELECT count(*)::int FROM commands cm WHERE cm.target_village_id = cr.village_id AND NOT cm.processed AND cm.type = 'support') AS supports
+         FROM crusades cr JOIN villages v ON v.id = cr.village_id WHERE cr.village_id = ANY($1::int[]) AND cr.status <> 'ended'`,
+        [citadelIds],
+      );
+      for (const c of crs) {
+        live.set(c.village_id, {
+          opensAt: new Date(c.opens_at).toISOString(),
+          closesAt: new Date(c.closes_at).toISOString(),
+          wall: c.wall ?? 0,
+          holderTribeId: c.holder_tribe_id,
+          holderPlayerId: c.holder_player_id,
+          attacks: c.attacks,
+          supports: c.supports,
+        });
+      }
+    }
     return rows.map(
       (r): MapVillage => ({
         id: r.id,
@@ -37,6 +66,8 @@ export default async function mapRoutes(app: FastifyInstance) {
         tribeId: r.tribe_id,
         tribeTag: r.tag,
         protected: r.protected === true,
+        ...(r.kind === 'citadel' ? { kind: 'citadel' as const, holderTag: r.holder ?? null, crusade: live.get(r.id) } : {}),
+        ...(r.relic ? { relic: true } : {}),
       }),
     );
   });
@@ -58,6 +89,74 @@ export default async function mapRoutes(app: FastifyInstance) {
       [playerId],
     );
     return rows.map((r) => ({ villageId: r.id, attack: r.attack, support: r.support, threat: r.threat }));
+  });
+
+  /**
+   * Armées en marche que le joueur peut voir sur la carte : les siennes, celles de sa tribu et de ses alliés, celles qui visent
+   * ses villages, et les autres seulement pendant qu'elles passent à portée de vue de l'un de ses villages (ni origine ni destination).
+   * Une seule requête par rechargement de la carte : le client anime le trajet tout seul entre deux rechargements.
+   */
+  app.get('/api/map/armies', async (req): Promise<MapArmy[]> => {
+    const playerId = await requirePlayer(req);
+    const tribeId = ((await pool.query('SELECT tribe_id FROM players WHERE id = $1', [playerId])).rows[0]?.tribe_id ?? null) as number | null;
+    const allies = await allyTribeIdsOf(pool, tribeId);
+    const mine = (await pool.query('SELECT x, y FROM villages WHERE owner_id = $1', [playerId])).rows as { x: number; y: number }[];
+    const { rows } = await pool.query(
+      `SELECT c.id, c.type, c.player_id, c.units, c.sent_at, c.arrive_at, c.meet_x, c.meet_y, o.x AS ox, o.y AS oy, t.x AS tx, t.y AS ty,
+              t.owner_id AS t_owner, pp.tribe_id, pp.username
+       FROM commands c JOIN villages o ON o.id = c.origin_village_id JOIN villages t ON t.id = c.target_village_id LEFT JOIN players pp ON pp.id = c.player_id
+       WHERE NOT c.processed AND c.arrive_at > now() AND (
+         c.player_id = $1
+         OR pp.tribe_id = ANY($2::int[])
+         OR (t.owner_id = $1 AND c.type IN ('attack', 'support'))
+         OR EXISTS (SELECT 1 FROM villages m WHERE m.owner_id = $1
+                    AND m.x BETWEEN least(o.x, t.x, coalesce(c.meet_x, o.x)) - $3 AND greatest(o.x, t.x, coalesce(c.meet_x, o.x)) + $3
+                    AND m.y BETWEEN least(o.y, t.y, coalesce(c.meet_y, o.y)) - $3 AND greatest(o.y, t.y, coalesce(c.meet_y, o.y)) + $3))
+       ORDER BY c.arrive_at LIMIT 600`,
+      [playerId, tribeId ? [tribeId, ...allies] : [], ARMY_SIGHT],
+    );
+    const now = Date.now();
+    const iso = (t: number) => new Date(t).toISOString();
+    const out: MapArmy[] = [];
+    for (const r of rows) {
+      const units = normalizeUnits(r.units);
+      const scouts = units.scout > 0 && units.scout === totalUnits(units);
+      const path = pathOf(r);
+      const at = (u: number) => path.t0 + (path.t1 - path.t0) * u;
+      const pos = (u: number) => ({ x: path.from.x + (path.to.x - path.from.x) * u + 0.5, y: path.from.y + (path.to.y - path.from.y) * u + 0.5 });
+      // Période où l'armée passe à portée de vue de nos villages : on ne voit sa composition qu'à ce moment-là.
+      const w = sightWindow(path.from, path.to, mine);
+      const spot = w && at(w[1]) > now ? [at(w[0]), at(w[1])] : null;
+      const spotted = !!spot && spot[0] <= now;
+      const army = (rel: MapArmy['rel'], seeUnits: boolean, owner: string | null, u0 = 0, u1 = 1): MapArmy => ({
+        id: r.id,
+        type: r.type,
+        rel,
+        interceptable: false,
+        spotFrom: spot ? iso(spot[0]) : null,
+        spotTo: spot ? iso(spot[1]) : null,
+        from: pos(u0),
+        to: pos(u1),
+        fromAt: iso(at(u0)),
+        toAt: iso(at(u1)),
+        size: seeUnits ? armySize(populationOf(units)) : 2,
+        scouts: seeUnits && scouts,
+        kinds: seeUnits ? armyKinds(units) : ['foot'],
+        owner,
+      });
+      const hostile = ['attack', 'support', 'return'].includes(r.type);
+      if (r.player_id === playerId) out.push(army('own', true, r.username));
+      else if (tribeId && r.tribe_id === tribeId) out.push(army('tribe', true, r.username));
+      else if (r.tribe_id && allies.includes(r.tribe_id)) out.push(army('ally', true, r.username));
+      // Ce qui vise nos villages : le trajet reste visible de bout en bout, la composition seulement une fois repérée.
+      else if (r.t_owner === playerId && r.type === 'attack') out.push({ ...army('threat', spotted, r.username), interceptable: !!spot });
+      else if (r.t_owner === playerId && r.type === 'support') out.push(army('guest', spotted, r.username));
+      else if (w && spot) {
+        // Armée aperçue : seule la portion du trajet à portée de vue est envoyée.
+        out.push({ ...army('seen', true, null, w[0], w[1]), type: 'unknown', interceptable: hostile });
+      }
+    }
+    return out;
   });
 
   /** Tribus en guerre avec celle du joueur et tribus alliées, pour les couleurs de la carte. */
@@ -82,7 +181,7 @@ export default async function mapRoutes(app: FastifyInstance) {
     if (!home) throw forbidden("Ce village n'est pas à vous");
     const { rows } = await pool.query(
       `SELECT id, name, x, y, points, sqrt((x - $1)^2 + (y - $2)^2) AS dist FROM villages
-       WHERE owner_id IS NULL AND (x - $1)^2 + (y - $2)^2 <= $3 ORDER BY dist, id LIMIT 200`,
+       WHERE owner_id IS NULL AND kind = 'village' AND (x - $1)^2 + (y - $2)^2 <= $3 ORDER BY dist, id LIMIT 200`,
       [home.x, home.y, radius * radius],
     );
     const ids = rows.map((r) => r.id as number);
