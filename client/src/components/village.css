@@ -91,7 +91,8 @@
 .app .vv .spot.selected img { filter: drop-shadow(0 0 6px rgb(255 230 150 / 0.9)) drop-shadow(0 0 2px #f2c230); }
 
 /* ---------- Heure dorée : décor en grand, lumière de fin de journée, titre et file posés sur le décor ---------- */
-.app .vv .vv-stage { position: relative; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #120d08, 0 0 0 2px rgb(224 178 60 / 0.4), 0 20px 50px rgb(0 0 0 / 0.45); }
+/* isolation : les calques du décor (étiquettes, lumière, file) restent sous la fiche du bâtiment, collée en bas de l'écran sur mobile. */
+.app .vv .vv-stage { position: relative; isolation: isolate; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 1px #120d08, 0 0 0 2px rgb(224 178 60 / 0.4), 0 20px 50px rgb(0 0 0 / 0.45); }
 .app .vv .scene { max-width: none; border: 0; border-radius: 0; }
 .app .vv .vv-light {
   position: absolute; inset: 0; pointer-events: none; z-index: 100;
