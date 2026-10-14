@@ -25,7 +25,7 @@ export default async function mapRoutes(app: FastifyInstance) {
               (p.relic_until > now() OR t.relic_until > now()) AS relic,
               (SELECT coalesce(ht.tag, hp.username) FROM crusades cr LEFT JOIN tribes ht ON ht.id = cr.holder_tribe_id LEFT JOIN players hp ON hp.id = cr.holder_player_id
                WHERE cr.village_id = v.id AND cr.status <> 'ended' AND (cr.holder_tribe_id IS NOT NULL OR cr.holder_player_id IS NOT NULL)) AS holder,
-              pr.id AS province_id, pt.tag AS province_holder
+              pr.id AS province_id, pr.kind AS province_kind, pr.holder_tribe_id AS province_holder_id, pt.tag AS province_holder
        FROM villages v LEFT JOIN provinces pr ON pr.bastion_village_id = v.id LEFT JOIN tribes pt ON pt.id = pr.holder_tribe_id LEFT JOIN players p ON p.id = v.owner_id LEFT JOIN tribes t ON t.id = p.tribe_id
        WHERE v.x BETWEEN $1 AND $3 AND v.y BETWEEN $2 AND $4
          AND (v.kind IN ('village', 'bastion') OR EXISTS (SELECT 1 FROM crusades cr WHERE cr.village_id = v.id AND cr.status <> 'ended'))`,
@@ -68,7 +68,7 @@ export default async function mapRoutes(app: FastifyInstance) {
         tribeTag: r.tag,
         protected: r.protected === true,
         ...(r.kind === 'citadel' ? { kind: 'citadel' as const, holderTag: r.holder ?? null, crusade: live.get(r.id) } : {}),
-        ...(r.kind === 'bastion' ? { kind: 'bastion' as const, holderTag: r.province_holder ?? null, provinceId: r.province_id ?? undefined } : {}),
+        ...(r.kind === 'bastion' ? { kind: 'bastion' as const, holderTag: r.province_holder ?? null, holderTribeId: r.province_holder_id ?? null, provinceId: r.province_id ?? undefined, holy: r.province_kind === 'holy' } : {}),
         ...(r.relic ? { relic: true } : {}),
       }),
     );

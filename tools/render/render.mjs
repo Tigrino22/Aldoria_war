@@ -69,6 +69,8 @@ for (const stage of [1, 2, 3])
 // La citadelle prend le rendu Heure dorée, comme le village.
 if (want('citadel')) save(`${out}/citadel.png`, (await page.evaluate(() => window.renderScene('citadel'))).png);
 if (want('mapCitadel')) save(`${out}/map/citadel.png`, (await page.evaluate(() => window.renderScene('mapCitadel'))).png);
+if (want('mapBastion')) save(`${out}/map/bastion.png`, (await page.evaluate(() => window.renderScene('mapBastion'))).png);
+if (want('mapSanctuary')) save(`${out}/map/sanctuary.png`, (await page.evaluate(() => window.renderScene('mapSanctuary'))).png);
 const MAP = { mapVillage1: 'village-1', mapVillage2: 'village-2', mapVillage3: 'village-3', mapBarbarian: 'barbarian', mapTrees: 'trees', mapHill: 'hill' };
 for (const [scene, file] of Object.entries(MAP))
   if (want(scene)) save(`${out}/map/${file}.png`, (await page.evaluate((n) => window.renderScene(n), scene)).png);

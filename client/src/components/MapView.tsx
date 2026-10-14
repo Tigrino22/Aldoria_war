@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Application, Assets, BitmapText, Container, Graphics, GraphicsContext, Sprite, TextStyle, Texture, TilingSprite } from 'pixi.js';
-import type { MapArmy, MapMovement, MapRelations, MapVillage } from '@aldoria/shared';
+import { PROVINCE_BONUS_LABEL, provinceGrid, type MapArmy, type MapMovement, type MapRelations, type MapVillage, type ProvincesState } from '@aldoria/shared';
 import { api } from '../api';
 import { MAP_IMG } from '../assets';
 import { useGame } from '../game';
@@ -25,7 +25,7 @@ const NAME_ZOOM = 0.6;
 const NO_RELATIONS: MapRelations = { warTribeIds: [], allyTribeIds: [] };
 
 /** Dernière carte reçue : la rouvrir s'affiche tout de suite, la mise à jour arrive ensuite. */
-let cache: { villages: MapVillage[]; relations: MapRelations; movements: MapMovement[]; armies: MapArmy[] } | null = null;
+let cache: { villages: MapVillage[]; relations: MapRelations; movements: MapMovement[]; armies: MapArmy[]; provinces: ProvincesState | null } | null = null;
 
 /** Préférences d'affichage de la carte, gardées dans le navigateur. */
 function readPref(key: string, fallback: boolean): boolean {
@@ -71,6 +71,8 @@ interface Scene {
   still: boolean;
   /** Calque des armées en marche (au-dessus des villages). */
   armyLayer: Container;
+  /** Provinces : teinte des provinces tenues, frontières (fines de près, épaisses en vue d'ensemble) et noms. */
+  provinceLayer: { root: Container; fill: Graphics; near: Graphics; far: Graphics; labels: Container };
   centerOn: (x: number, y: number) => void;
   zoomBy: (factor: number) => void;
 }
@@ -95,6 +97,8 @@ export default function MapView({ focus }: { focus?: string }) {
   const [showGrid, setShowGrid] = useState(() => readPref('grid', true));
   const [showMini, setShowMini] = useState(() => readPref('mini', true));
   const [showArmies, setShowArmies] = useState(() => readPref('armies', true));
+  const [showProvinces, setShowProvinces] = useState(() => readPref('provinces', true));
+  const [provinces, setProvinces] = useState<ProvincesState | null>(cache?.provinces ?? null);
   const scene = useRef<Scene | null>(null);
   const villagesRef = useRef<Map<string, MapVillage>>(new Map());
   const [armySel, setArmySel] = useState<MapArmy | null>(null);
@@ -132,13 +136,15 @@ export default function MapView({ focus }: { focus?: string }) {
   const load = useCallback(
     () =>
       run(async () => {
-        const [list, rel, moves, marching] = await Promise.all([
+        const [list, rel, moves, marching, prov] = await Promise.all([
           api<MapVillage[]>('/api/map'),
           api<MapRelations>('/api/map/relations').catch(() => NO_RELATIONS),
           api<MapMovement[]>('/api/map/movements').catch(() => []),
           api<MapArmy[]>('/api/map/armies').catch(() => []),
+          api<ProvincesState>('/api/provinces').catch(() => null),
         ]);
-        cache = { villages: list, relations: rel, movements: moves, armies: marching };
+        cache = { villages: list, relations: rel, movements: moves, armies: marching, provinces: prov };
+        setProvinces(prov);
         setVillages(list);
         setRelations(rel);
         setMovements(moves);
@@ -311,6 +317,11 @@ export default function MapView({ focus }: { focus?: string }) {
       strongGrid.visible = showGridRef.current;
       worldC.addChild(strongGrid);
 
+      // Provinces : sous les villages, au-dessus du décor.
+      const provinceLayer = { root: new Container(), fill: new Graphics(), near: new Graphics(), far: new Graphics(), labels: new Container() };
+      provinceLayer.root.addChild(provinceLayer.fill, provinceLayer.near, provinceLayer.far, provinceLayer.labels);
+      worldC.addChild(provinceLayer.root);
+
       const dots = new Graphics();
       dots.visible = false;
       worldC.addChild(dots);
@@ -368,14 +379,22 @@ export default function MapView({ focus }: { focus?: string }) {
           dots.clear();
           for (const { v, st } of sc0.dotsFor) {
             const citadel = v.kind === 'citadel';
-            const px = citadel ? 7 : !v.ownerId ? 2.2 : st.rel === 'own' || st.rel === 'active' || st.mark ? 5 : 3.8;
+            const bastion = v.kind === 'bastion';
+            const px = citadel ? 7 : bastion ? (v.holy ? 7 : 5.5) : !v.ownerId ? 2.2 : st.rel === 'own' || st.rel === 'active' || st.mark ? 5 : 3.8;
             const cx = (v.x + 0.5) * TILE;
             const cy = (v.y + 0.5) * TILE;
-            dots.circle(cx, cy, (px + 1.2) / sc).fill({ color: 0x140e08, alpha: v.ownerId || citadel ? 0.75 : 0.4 });
-            dots.circle(cx, cy, px / sc).fill({ color: citadel ? 0xf1cc63 : hexToNum(st.color) });
+            dots.circle(cx, cy, (px + 1.2) / sc).fill({ color: 0x140e08, alpha: v.ownerId || citadel || bastion ? 0.75 : 0.4 });
+            if (bastion) dots.rect(cx - px / sc, cy - px / sc, (2 * px) / sc, (2 * px) / sc).fill({ color: 0xc9a24a }).stroke({ width: 1.5 / sc, color: 0x140e08 });
+            else dots.circle(cx, cy, px / sc).fill({ color: citadel ? 0xf1cc63 : hexToNum(st.color) });
           }
         }
         fineGrid.visible = sc >= LOD_ZOOM;
+        provinceLayer.near.visible = !lod;
+        provinceLayer.far.visible = lod;
+        // Noms des provinces : à taille lisible quel que soit le zoom, cachés de tout près (les noms des villages prennent le relais).
+        provinceLayer.labels.visible = sc < 0.75;
+        const k = Math.min(7, Math.max(1, 0.85 / sc));
+        for (const l of provinceLayer.labels.children) l.scale.set(k);
         const names = sc >= NAME_ZOOM;
         if (names !== nameState) {
           nameState = names;
@@ -465,6 +484,7 @@ export default function MapView({ focus }: { focus?: string }) {
         ticks,
         still,
         armyLayer,
+        provinceLayer,
         centerOn,
         zoomBy,
       };
@@ -634,7 +654,7 @@ export default function MapView({ focus }: { focus?: string }) {
       const chunk = Math.floor(v.y / CHUNK) * n + Math.floor(v.x / CHUNK);
       const cz = v.crusade;
       const czSig = cz ? `${cz.wall}|${cz.holderTribeId}|${cz.holderPlayerId}|${cz.attacks}|${cz.supports}|${+(Date.now() >= Date.parse(cz.opensAt))}` : '';
-      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${v.holderTag ?? ''}|${czSig}|${+!!v.relic}|${st.color}|${st.rel}|${mv ? `${+mv.attack}${+mv.support}${+mv.threat}` : ''}`;
+      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${v.holderTag ?? ''}|${holderColor(v, colors) ?? ''}|${czSig}|${+!!v.relic}|${st.color}|${st.rel}|${mv ? `${+mv.attack}${+mv.support}${+mv.threat}` : ''}`;
       const prev = s.drawn.get(v.id);
       if (prev && prev.sig === sig && prev.chunk === chunk) continue;
       if (prev) {
@@ -692,6 +712,109 @@ export default function MapView({ focus }: { focus?: string }) {
     s.request();
   }, [villages, movements, colors, world.mapSize, miniTerrain, ready]);
 
+  // Provinces : découpage recalculé une fois à partir des points (identique au serveur), teinte et frontières redessinées
+  // quand une bannière change de camp.
+  const seedsKey = provinces?.provinces.map((p) => `${p.id},${p.x},${p.y},${p.weight}`).join(';') ?? '';
+  const grid = useMemo(
+    () => (provinces?.provinces.length ? provinceGrid(world.mapSize, provinces.provinces) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [seedsKey, world.mapSize],
+  );
+  useEffect(() => {
+    const s = scene.current;
+    if (!s) return;
+    const { fill, near, far, labels } = s.provinceLayer;
+    fill.clear();
+    near.clear();
+    far.clear();
+    labels.removeChildren().forEach((c) => c.destroy());
+    s.provinceLayer.root.visible = showProvinces;
+    if (!grid || !provinces) return s.request();
+    const size = world.mapSize;
+    const list = provinces.provinces;
+    const holyIdx = list.findIndex((p) => p.kind === 'holy');
+    // Teinte : la couleur fixe de la tribu qui tient la bannière (plus marquée une fois la province contrôlée), or pâle pour la Terre sainte.
+    const tints = list.map((p) => {
+      const c = p.holder ? tribeColor(p.holder.tribeId, colors) : null;
+      if (c) return { color: hexToNum(c), alpha: p.controlled ? 0.16 : 0.08 };
+      return p.kind === 'holy' ? { color: 0xf1cc63, alpha: 0.1 } : null;
+    });
+    for (let y = 0; y < size; y++) {
+      let x = 0;
+      while (x < size) {
+        const i = grid[y * size + x];
+        let end = x + 1;
+        while (end < size && grid[y * size + end] === i) end++;
+        const t = tints[i];
+        if (t) fill.rect(x * TILE, y * TILE, (end - x) * TILE, TILE).fill(t);
+        x = end;
+      }
+    }
+    // Frontières : un segment sur chaque bord de case entre deux provinces ; celles de la Terre sainte plus épaisses.
+    const plain: number[][] = [];
+    const holy: number[][] = [];
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const a = grid[y * size + x];
+        if (x + 1 < size && grid[y * size + x + 1] !== a) {
+          const b = grid[y * size + x + 1];
+          (a === holyIdx || b === holyIdx ? holy : plain).push([(x + 1) * TILE, y * TILE, (x + 1) * TILE, (y + 1) * TILE]);
+        }
+        if (y + 1 < size && grid[(y + 1) * size + x] !== a) {
+          const b = grid[(y + 1) * size + x];
+          (a === holyIdx || b === holyIdx ? holy : plain).push([x * TILE, (y + 1) * TILE, (x + 1) * TILE, (y + 1) * TILE]);
+        }
+      }
+    }
+    const stroke = (g: Graphics, segs: number[][], width: number, color: number, alpha: number) => {
+      if (!segs.length) return;
+      for (const [x0, y0, x1, y1] of segs) g.moveTo(x0, y0).lineTo(x1, y1);
+      g.stroke({ width, color, alpha, cap: 'round' });
+    };
+    stroke(near, plain, 7, 0x140e08, 0.28);
+    stroke(near, plain, 3, 0xe0b23c, 0.6);
+    stroke(near, holy, 11, 0x140e08, 0.3);
+    stroke(near, holy, 5, 0xf1cc63, 0.9);
+    stroke(far, plain, 18, 0x140e08, 0.3);
+    stroke(far, plain, 9, 0xe0b23c, 0.65);
+    stroke(far, holy, 26, 0x140e08, 0.3);
+    stroke(far, holy, 14, 0xf1cc63, 0.95);
+    // Noms au centre de chaque province (moyenne de ses cases), avec le bonus ou la bannière.
+    const sums = list.map(() => ({ x: 0, y: 0, n: 0 }));
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) {
+        const m = sums[grid[y * size + x]];
+        m.x += x + 0.5;
+        m.y += y + 0.5;
+        m.n++;
+      }
+    list.forEach((p, i) => {
+      const m = sums[i];
+      if (!m.n) return;
+      const box = new Container();
+      const title = new BitmapText({
+        text: p.name.toUpperCase(),
+        style: { fontFamily: 'Cinzel, serif', fontSize: 15, fontWeight: '700', fill: p.kind === 'holy' ? 0xf7d778 : 0xf3e2b3, stroke: { color: 0x140e08, width: 4 }, letterSpacing: 1 },
+      });
+      title.anchor.set(0.5, 1);
+      const sub = new BitmapText({
+        text: p.holder ? `[${p.holder.tag}]${p.controlled ? '' : ' · bannière'}` : p.kind === 'holy' ? 'Victoire du monde' : p.bonus ? `${PROVINCE_BONUS_LABEL[p.bonus]} +${provinces.bonusPercent} %` : '',
+        style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: p.holder ? hexToNum(tribeColor(p.holder.tribeId, colors) ?? '#f3e2b3') : 0xe9dcc0, stroke: { color: 0x140e08, width: 3 } },
+      });
+      sub.anchor.set(0.5, 0);
+      sub.y = 2;
+      box.addChild(title, sub);
+      box.position.set((m.x / m.n) * TILE, (m.y / m.n) * TILE);
+      box.alpha = 0.92;
+      labels.addChild(box);
+    });
+    s.dotsScale = 0;
+    // Échelle des noms selon le zoom actuel.
+    const k = Math.min(7, Math.max(1, 0.85 / s.world.scale.x));
+    for (const l of labels.children) l.scale.set(k);
+    s.request();
+  }, [grid, provinces, colors, showProvinces, world.mapSize, ready]);
+
   // Village choisi et case survolée : un simple calque par-dessus.
   useEffect(() => {
     const s = scene.current;
@@ -747,6 +870,8 @@ export default function MapView({ focus }: { focus?: string }) {
         from={v.id === villageId ? null : from}
         worldSpeed={world.speed}
         ownerSlot={interactive && v.ownerName ? <PlayerLink name={v.ownerName} /> : undefined}
+        province={v.provinceId ? provinces?.provinces.find((p) => p.id === v.provinceId) : undefined}
+        bonusPercent={provinces?.bonusPercent}
       />
     );
   };
@@ -802,6 +927,17 @@ export default function MapView({ focus }: { focus?: string }) {
             <span aria-hidden>⚑</span>
             <span className="lbl">Armées</span>
           </button>
+          {provinces && provinces.provinces.length > 0 && (
+            <button
+              className={`map-btn ${showProvinces ? 'on' : ''}`}
+              aria-pressed={showProvinces}
+              onClick={() => (writePref('provinces', !showProvinces), setShowProvinces(!showProvinces))}
+              title="Provinces"
+            >
+              <span aria-hidden>⬡</span>
+              <span className="lbl">Provinces</span>
+            </button>
+          )}
           <button className={`map-btn ${panel ? 'on' : ''}`} aria-pressed={panel} onClick={() => setPanel(!panel)} title="Couleurs et repères">
             <span className="map-swatches" aria-hidden>
               <i style={{ background: REL_COLORS.own }} />
@@ -935,9 +1071,18 @@ function rank(rel: string) {
   return ['barbarian', 'other', 'war', 'ally', 'tribe', 'own', 'active'].indexOf(rel);
 }
 
-/** Un village : ombre, socle à la couleur de la relation, bâtiments, bannière et nom. */
-/** Couleur du camp qui tient la bannière de la Citadelle, avec les couleurs fixes de la carte (vous, tribu, alliés, guerre, autres). */
+/** Couleur fixe d'une tribu sur la carte (la vôtre, alliée, en guerre, autre). */
+function tribeColor(tribeId: number | null | undefined, ctx: ColorContext): string | null {
+  if (!tribeId) return null;
+  if (tribeId === ctx.tribeId) return REL_COLORS.tribe;
+  if (ctx.allies.has(tribeId)) return REL_COLORS.ally;
+  if (ctx.wars.has(tribeId)) return REL_COLORS.war;
+  return REL_COLORS.other;
+}
+
+/** Couleur du camp qui tient la bannière de la Citadelle ou d'un bastion, avec les couleurs fixes de la carte (vous, tribu, alliés, guerre, autres). */
 function holderColor(v: MapVillage, ctx: ColorContext): string | null {
+  if (v.kind === 'bastion') return tribeColor(v.holderTribeId, ctx);
   const c = v.crusade;
   if (!c || (!c.holderTribeId && !c.holderPlayerId)) return null;
   if (c.holderTribeId) {
@@ -955,24 +1100,37 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?:
   const tint = hexToNum(color);
   c.addChild(new Graphics(s.shapes.shadow));
   const citadel = v.kind === 'citadel';
+  const bastion = v.kind === 'bastion';
   const ring = new Graphics(s.shapes.ring);
   // La Citadelle garde son socle doré, quel que soit le camp qui tient sa bannière ; un camp qui détient la relique a un socle doré lui aussi.
-  ring.tint = citadel ? 0xf1cc63 : tint;
-  ring.alpha = v.ownerId || citadel ? 1 : 0.45;
+  ring.tint = citadel ? 0xf1cc63 : bastion ? (holder ? hexToNum(holder) : 0xc9a24a) : tint;
+  ring.alpha = v.ownerId || citadel || bastion ? 1 : 0.45;
   if (citadel) ring.scale.set(1.25), ring.position.set(-TILE * 0.125, -TILE * 0.2);
+  if (bastion) ring.scale.set(v.holy ? 1.25 : 1.1), ring.position.set(-TILE * (v.holy ? 0.125 : 0.05), -TILE * (v.holy ? 0.2 : 0.1));
   c.addChild(ring);
   if (v.relic) {
     const halo = new Graphics(s.shapes.relic);
     c.addChild(halo);
   }
   // Hameau, bourg puis cité fortifiée selon les points du village ; la Citadelle déborde de sa case.
-  const tex = citadel ? s.textures.citadel : !v.ownerId ? s.textures.barbarian : v.points < 120 ? s.textures.village1 : v.points < 600 ? s.textures.village2 : s.textures.village3;
+  const tex = citadel ? s.textures.citadel : bastion ? (v.holy ? s.textures.sanctuary : s.textures.bastion) : !v.ownerId ? s.textures.barbarian : v.points < 120 ? s.textures.village1 : v.points < 600 ? s.textures.village2 : s.textures.village3;
   const sp = new Sprite(tex);
-  const scale = citadel ? 1.6 : v.ownerId ? 1.12 : 0.95;
+  const scale = citadel ? 1.6 : bastion ? (v.holy ? 1.6 : 1.35) : v.ownerId ? 1.12 : 0.95;
   sp.width = sp.height = TILE * scale;
-  sp.position.set((TILE - sp.width) / 2, (TILE - sp.height) / 2 - (citadel ? 14 : 4));
+  sp.position.set((TILE - sp.width) / 2, (TILE - sp.height) / 2 - (citadel || bastion ? 12 : 4));
   c.addChild(sp);
   if (citadel && v.crusade) drawCitadelLive(s, c, v.crusade, holder ?? null);
+  // Bastion tenu : l'étendard de la tribu au sommet du donjon.
+  if (bastion && holder) {
+    const flag = new Sprite(s.textures.flag);
+    flag.tint = hexToNum(holder);
+    flag.width = TILE * 0.42;
+    flag.height = TILE * 0.52;
+    flag.position.set(TILE * 0.52, -TILE * (v.holy ? 0.72 : 0.6));
+    const pole = new Graphics().rect(0, 0, 2, TILE * 0.55).fill({ color: 0x2b2018 });
+    pole.position.set(TILE * 0.51, -TILE * (v.holy ? 0.7 : 0.58));
+    c.addChild(pole, flag);
+  }
   if (v.ownerId) {
     const f = new Sprite(s.textures.flag);
     f.width = TILE * (mine ? 0.34 : 0.3);
@@ -995,25 +1153,26 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?:
   }
   // Étiquette : pastille sombre, point de couleur et nom (texte bitmap partagé, bien plus léger qu'un texte par village).
   const label = new Container();
-  label.label = citadel ? 'name-fixed' : 'name';
+  const special = citadel || bastion;
+  label.label = special ? 'name-fixed' : 'name';
   const text = new BitmapText({
-    text: citadel ? (v.holderTag ? `${v.name} · bannière ${v.holderTag}` : v.name) : v.tribeTag ? `[${v.tribeTag}] ${v.name}` : v.name,
+    text: special ? (v.holderTag ? `${v.name} · [${v.holderTag}]` : v.name) : v.tribeTag ? `[${v.tribeTag}] ${v.name}` : v.name,
     style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '600', fill: 0xf7efdc },
   });
-  const maxW = TILE * (citadel ? 3 : 1.7);
+  const maxW = TILE * (special ? 3 : 1.7);
   if (text.width > maxW) text.scale.set(maxW / text.width);
   const w = text.width + 18;
   const pill = new Graphics()
     .roundRect(-w / 2, 0, w, 16, 8)
-    .fill({ color: citadel ? 0x3a2a12 : 0x17110b, alpha: citadel ? 0.92 : 0.78 })
+    .fill({ color: special ? 0x3a2a12 : 0x17110b, alpha: special ? 0.92 : 0.78 })
     .circle(-w / 2 + 8, 8, 3.2)
-    .fill({ color: citadel ? 0xf1cc63 : tint });
-  if (citadel) pill.roundRect(-w / 2, 0, w, 16, 8).stroke({ width: 1, color: 0xf1cc63, alpha: 0.9 });
+    .fill({ color: citadel ? 0xf1cc63 : bastion ? (holder ? hexToNum(holder) : 0xc9a24a) : tint });
+  if (special) pill.roundRect(-w / 2, 0, w, 16, 8).stroke({ width: 1, color: 0xf1cc63, alpha: 0.9 });
   text.position.set(-w / 2 + 14, 8 - text.height / 2);
   label.addChild(pill, text);
   label.position.set(TILE / 2, TILE - 6);
-  // Le nom de la Citadelle reste lisible même de loin.
-  label.visible = citadel || s.world.scale.x >= NAME_ZOOM;
+  // Le nom de la Citadelle et des bastions reste lisible même de loin.
+  label.visible = special || s.world.scale.x >= NAME_ZOOM;
   c.addChild(label);
   return c;
 }

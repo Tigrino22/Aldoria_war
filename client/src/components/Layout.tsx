@@ -35,6 +35,7 @@ const PAGES = {
   Admin: () => import('./Admin'),
   Raid: () => import('./Raid'),
   Crusade: () => import('./Crusade'),
+  Provinces: () => import('./Provinces'),
 };
 const Messages = lazy(PAGES.Messages);
 const RallyPage = lazy(PAGES.RallyPage);
@@ -52,6 +53,7 @@ const WorldWars = lazy(PAGES.WorldWars);
 const Admin = lazy(PAGES.Admin);
 const Raid = lazy(PAGES.Raid);
 const Crusade = lazy(PAGES.Crusade);
+const Provinces = lazy(PAGES.Provinces);
 
 interface NavItem {
   path: string;
@@ -80,6 +82,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'ralliement', label: 'Point de ralliement', icon: 'ralliement' },
       { path: 'pillage', label: 'Assistant de pillage', icon: 'pillage' },
       { path: 'croisade', label: 'Croisades', icon: 'croisade' },
+      { path: 'provinces', label: 'Provinces', icon: 'province' },
       { path: 'carte', label: 'Carte', icon: 'carte' },
     ],
   },
@@ -297,6 +300,7 @@ export default function Layout() {
           {page === 'ralliement' && <RallyPage focus={route[1]} />}
           {page === 'pillage' && <Raid />}
           {page === 'croisade' && <Crusade />}
+          {page === 'provinces' && <Provinces />}
           {page === 'carte' && (
             <Suspense fallback={<p className="muted">Chargement de la carte…</p>}>
               <MapView focus={route[1]} />

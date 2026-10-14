@@ -384,3 +384,17 @@ Code : `server/src/routes/map.ts` (`/api/map/armies`), `client/src/components/ma
 | Mouvements terminés | Supprimés après `COMMANDS_KEEP_DAYS` jours (4 par défaut, jamais moins) |
 | Rapports des joueurs | Supprimés après `REPORTS_KEEP_DAYS` jours (30 par défaut), sauf les rapports archivés |
 | Rapports des PNJ | 72 heures au plus, et un seul renseignement par village barbare (voir PNJ.md) |
+
+## Provinces et Terre sainte
+
+La carte est découpée en provinces de taille et de forme variables (environ une pour 450 cases), avec la Terre sainte au centre. Le découpage est calculé à l'identique par le serveur et le navigateur à partir des points stockés (`shared/src/provinces.ts`, `provinceGrid`). Chaque province a un bastion (village sans propriétaire, `kind = 'bastion'`) ; la Terre sainte a son Sanctuaire. La Citadelle des croisades reste à part.
+
+| Réglage (admin) | Variable | Défaut | Effet |
+|---|---|---|---|
+| Provinces | `PROVINCES` | 1 | 0 : plus de bonus ni de prise de bastion |
+| Tenue d'un bastion avant contrôle | `PROVINCE_HOLD_HOURS` | 12 h | Temps de bannière sans interruption pour contrôler la province |
+| Bonus d'une province | `PROVINCE_BONUS` | 10 % | Production de sa ressource, ou vitesse de recrutement, pour toute la tribu |
+| Provinces voisines exigées | `HOLY_ACCESS` | 2 | Provinces bordant la Terre sainte à contrôler pour attaquer le Sanctuaire (0 = libre) |
+| Tenue de la Terre sainte | `HOLY_HOLD_DAYS` | 3 j | Tenue du Sanctuaire pour gagner le monde (titre « Maître d'Aldoria ») |
+
+Règles : garde neutre de 2 500 places de population et muraille 10 (Sanctuaire : 8 000 et muraille 20). Une attaque victorieuse avec un noble survivant plante la bannière de la tribu de l'attaquant et ses survivants restent en garnison ; sans noble, elle abat la bannière. Seuls la tribu qui tient le bastion et ses alliés peuvent le renforcer. Code : `server/src/game/provinces.ts` (migration 023), page `client/src/components/Provinces.tsx`, `GET /api/provinces`.

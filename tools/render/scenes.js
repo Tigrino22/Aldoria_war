@@ -7,6 +7,7 @@ import {
 } from './kit.js';
 import { BUILDERS } from './buildings.js';
 import { citadel } from './citadel.js';
+import { bastion, sanctuary } from './bastion.js';
 
 const YAW = THREE.MathUtils.degToRad(32);
 const RIGHT = [Math.cos(YAW), -Math.sin(YAW)];
@@ -146,6 +147,9 @@ export const SCENES = {
   // La Citadelle des Croisades : en grand pour sa page, et en vignette pour la carte (un peu plus grande qu'un village).
   citadel: () => ({ object: citadel(), view: { frame: 38, px: 1200, aspect: 1.3, ground: 'shadow', centerY: 8.6 } }),
   mapCitadel: () => ({ object: citadel(), view: { frame: 31, px: 384, aspect: 1, ground: 'shadow', centerY: 7 } }),
+  // Bastion d'une province et Sanctuaire de la Terre sainte, pour la carte.
+  mapBastion: () => ({ object: bastion(), view: { frame: 21, px: 320, aspect: 1, ground: 'shadow', centerY: 4.6 } }),
+  mapSanctuary: () => ({ object: sanctuary(), view: { frame: 25, px: 384, aspect: 1, ground: 'shadow', centerY: 5.6 } }),
 };
 
 // Tracé de l'enceinte : un « super-ellipse » (rectangle aux coins arrondis) en coordonnées écran,

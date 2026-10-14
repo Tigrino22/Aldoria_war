@@ -139,8 +139,10 @@ export interface MapVillage {
   protected: boolean;
   /** Citadelle des Croisades (absent pour un village ordinaire). */
   kind?: 'citadel' | 'bastion';
-  /** Pour un bastion : province dont il est le fort. */
+  /** Pour un bastion : province dont il est le fort, tribu dont la bannière y flotte, et s'il s'agit du Sanctuaire de la Terre sainte. */
   provinceId?: number;
+  holderTribeId?: number | null;
+  holy?: boolean;
   /** Pour une Citadelle ou un bastion : tag de la tribu qui tient la bannière. */
   holderTag?: string | null;
   /** Pour une Citadelle : état en direct de la croisade (armées en marche : nombre seulement, ni l'origine ni les troupes). */

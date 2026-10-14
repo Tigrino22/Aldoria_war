@@ -1,5 +1,5 @@
-import { UNITS, UNIT_KEYS, distance, emptyUnits, travelTime, type MapVillage } from '@aldoria/shared';
-import { duration, fmt } from '../format';
+import { PROVINCE_BONUS_LABEL, UNITS, UNIT_KEYS, distance, emptyUnits, travelTime, type MapVillage, type ProvinceView } from '@aldoria/shared';
+import { clockTime, duration, fmt } from '../format';
 import { UnitIcon } from '../ui';
 import { REL_LABELS, type Mark, type Relation } from './mapStyle';
 
@@ -12,6 +12,8 @@ export default function MapVillageCard({
   from,
   worldSpeed,
   ownerSlot,
+  province,
+  bonusPercent = 10,
 }: {
   v: MapVillage;
   rel: Relation;
@@ -21,6 +23,9 @@ export default function MapVillageCard({
   worldSpeed: number;
   /** Nom du propriétaire, cliquable dans la fenêtre ; simple texte au survol. */
   ownerSlot?: React.ReactNode;
+  /** Pour un bastion : sa province (bonus, bannière, contrôle). */
+  province?: ProvinceView;
+  bonusPercent?: number;
 }) {
   const dist = from ? distance(from, v) : 0;
   const tag = mark ? `Repère : ${mark.name}` : REL_LABELS[rel];
@@ -33,7 +38,12 @@ export default function MapVillageCard({
             {v.tribeTag && <span className="mvc-tag">[{v.tribeTag}]</span>} {v.name}
           </b>
           <span className="mvc-sub">
-            {v.kind === 'citadel' ? 'Citadelle des Croisades' : (ownerSlot ?? v.ownerName ?? 'Village barbare')} · {v.x}|{v.y}
+            {v.kind === 'citadel'
+              ? 'Citadelle des Croisades'
+              : v.kind === 'bastion'
+                ? (province?.name ?? (v.holy ? 'Terre sainte' : 'Bastion de province'))
+                : (ownerSlot ?? v.ownerName ?? 'Village barbare')}{' '}
+            · {v.x}|{v.y}
           </span>
         </div>
       </div>
@@ -42,6 +52,25 @@ export default function MapVillageCard({
           <>
             <span className="mvc-chip gold">{v.holderTag ? `Bannière : ${v.holderTag}` : 'Bannière à prendre'}</span>
             <a className="mvc-chip gold" href="#/croisade">Voir la croisade</a>
+          </>
+        ) : v.kind === 'bastion' ? (
+          <>
+            {province?.bonus && (
+              <span className="mvc-chip gold">
+                {PROVINCE_BONUS_LABEL[province.bonus]} +{bonusPercent} %
+              </span>
+            )}
+            {v.holy && <span className="mvc-chip gold">Victoire du monde</span>}
+            <span className="mvc-chip" style={{ borderColor: color }}>
+              {v.holderTag
+                ? province?.controlled
+                  ? `Contrôlé par [${v.holderTag}]`
+                  : `Bannière [${v.holderTag}]${province?.controlAt ? ` · contrôle ${clockTime(province.controlAt)}` : ''}`
+                : 'Bannière à prendre'}
+            </span>
+            <a className="mvc-chip gold" href="#/provinces">
+              Provinces
+            </a>
           </>
         ) : (
           <>

@@ -320,6 +320,11 @@ export default function VillageView() {
                   Relique +{Math.round((v.relicBonus ?? 0) * 100)} %
                 </span>
               )}
+              {provinceChips(v).map((c) => (
+                <a key={c} className="vv-pill gold" href="#/provinces" title="Bonus des provinces que contrôle votre tribu">
+                  {c}
+                </a>
+              ))}
             </div>
           </div>
           <CrusadeBanner className="vv-crusade" />
@@ -347,4 +352,16 @@ export default function VillageView() {
       <BuildingTiles v={v} onPick={setSelected} selected={selected} />
     </div>
   );
+}
+
+/** Bonus des provinces contrôlées par la tribu, en pastilles : « Bois +10 % », « Recrutement +10 % ». */
+function provinceChips(v: { provinceBonus?: Record<'wood' | 'clay' | 'iron' | 'wheat', number>; recruitBonus?: number }): string[] {
+  const out: string[] = [];
+  const labels = { wood: 'Bois', clay: 'Argile', iron: 'Fer', wheat: 'Blé' } as const;
+  for (const r of ['wood', 'clay', 'iron', 'wheat'] as const) {
+    const b = v.provinceBonus?.[r] ?? 0;
+    if (b > 0) out.push(`${labels[r]} +${Math.round(b * 100)} %`);
+  }
+  if ((v.recruitBonus ?? 0) > 0) out.push(`Recrutement +${Math.round((v.recruitBonus ?? 0) * 100)} %`);
+  return out;
 }

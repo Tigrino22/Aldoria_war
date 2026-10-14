@@ -179,6 +179,12 @@ export default function SendTroops({ target, protectedTarget, onSent }: { target
         </button>
       </div>
       {protectedTarget && !ownTarget && <p className="warn small">Ce joueur est encore sous protection débutant.</p>}
+      {target.kind === 'bastion' && (
+        <p className="muted small">
+          {target.holy ? 'Sanctuaire de la Terre sainte : seules les tribus qui contrôlent assez de provinces voisines peuvent l’attaquer. ' : ''}
+          Pour planter la bannière de votre tribu, un noble doit survivre à l'attaque qui vide le bastion ; vos survivants restent pour le garder.
+        </p>
+      )}
       {units.noble > 0 && <p className="muted small">Les nobles font baisser la loyauté du village si l'attaque est victorieuse.</p>}
       {units.scout > 0 && units.scout === total && <p className="muted small">Envoyés seuls, les éclaireurs espionnent le village sans combattre.</p>}
       {units.ram > 0 && <p className="muted small">Les béliers abaissent la muraille pendant le combat et l'abîment après une victoire.</p>}

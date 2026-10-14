@@ -168,6 +168,15 @@ const PATHS = {
       <path d="M12 3.5h5l-1.5 2 1.5 2h-5" />
     </>
   ),
+  // Provinces : un territoire découpé, avec la bannière plantée sur l'une d'elles.
+  province: (
+    <>
+      <path d="M3 6.5 8.5 4l6 2.5L21 4v13.5L14.5 20l-6-2.5L3 20z" />
+      <path d="M8.5 4v13.5M14.5 6.5V20" />
+      <path d="M11.5 14V8.2" />
+      <path d="M11.5 8.5h3l-.9 1.2.9 1.2h-3" />
+    </>
+  ),
   muraille: (
     <>
       <path d="M3 6h18v14H3z" />

@@ -2,6 +2,10 @@ import { useState, type ReactNode } from 'react';
 import {
   ARMY_SIGHT,
   BASE_VILLAGE_DEFENSE,
+  BASTION_GARRISON,
+  BASTION_WALL,
+  HOLY_GARRISON,
+  HOLY_WALL,
   BEGINNER_PROTECTION_HOURS,
   BUILDINGS,
   BUILDING_KEYS,
@@ -73,6 +77,7 @@ const SECTIONS = [
   { id: 'conquete', title: 'Nobles et conquête' },
   { id: 'renforts', title: 'Renforts' },
   { id: 'croisades', title: 'Croisades et Citadelle' },
+  { id: 'provinces', title: 'Provinces et Terre sainte' },
   { id: 'marche', title: 'Marché et marchands' },
   { id: 'carte', title: 'Carte et villages barbares' },
   { id: 'social', title: 'Rapports, messages, tribus, classement' },
@@ -451,6 +456,35 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           <b>Les PNJ aussi :</b> les tribus de PNJ espionnent la Citadelle dès l'annonce, s'engagent si leur armée est assez forte, gardent leurs troupes en réserve et programment des vagues échelonnées, puis
           renforcent ou contre-attaquent selon le camp qui tient la bannière.
         </p>
+      </>
+    ),
+    provinces: (
+      <>
+        <p>
+          Le monde est découpé en <b>provinces</b> de tailles et de formes variées, avec la <b>Terre sainte</b> en son centre. Leurs frontières dorées se voient sur la carte (bouton « Provinces » pour
+          les masquer) ; la <a href="#/provinces">page Provinces</a> montre qui tient quoi, le bonus de chaque province et les valeurs de ce monde.
+        </p>
+        <ul>
+          <li>
+            <b>Bastion :</b> chaque province a un fort, gardé au départ par une garnison neutre de {fmt(BASTION_GARRISON)} places de population derrière une muraille {BASTION_WALL}. Il est ouvert jour et nuit.
+          </li>
+          <li>
+            <b>Bannière :</b> l'attaque qui vide le bastion doit compter un {U('noble')} survivant pour planter la bannière de votre tribu ; vos survivants restent pour le garder. Sans tribu, pas de
+            bannière. Votre tribu et ses alliées peuvent le renforcer, et leurs attaques deviennent des renforts.
+          </li>
+          <li>
+            <b>Contrôle :</b> après la durée de tenue (12 heures par défaut) sans perdre la bannière, la province est contrôlée : son bonus (+10 % de bois, d'argile, de fer ou de blé, ou recrutement plus
+            rapide) s'applique à tous les villages de la tribu. Les provinces s'additionnent.
+          </li>
+          <li>
+            <b>Perte :</b> une attaque victorieuse avec un noble remplace la bannière, sans noble elle l'abat ; la tribu qui la tenait perd le bonus tout de suite.
+          </li>
+          <li>
+            <b>Terre sainte :</b> son Sanctuaire ({fmt(HOLY_GARRISON)} places de garnison, muraille {HOLY_WALL}) ne peut être attaqué que par une tribu qui contrôle assez de provinces qui la bordent (2 par défaut) ;
+            les {U('scout')} y vont librement. La tribu qui y garde sa bannière assez longtemps (3 jours par défaut) <b>gagne le monde</b> : ses membres reçoivent le titre « Maître d’Aldoria ».
+          </li>
+        </ul>
+        <p>La Citadelle des Croisades reste un événement à part : elle ne donne pas accès à la Terre sainte.</p>
       </>
     ),
     renforts: (
