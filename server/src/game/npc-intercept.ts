@@ -68,7 +68,7 @@ export async function interceptStep(c: Db, outbox: Outbox, npcId: number, villag
     const available = await getTroops(c, villageId, villageId);
     const units = SHARES.map((s) => interceptUnits(available, s)).find((u) => winsInField(u, theirs));
     if (!units) continue;
-    // L'envoi vérifie le reste (armée repérée, rencontre possible dans la zone, rations) : un refus n'est pas une erreur.
+    // L'envoi vérifie le reste (armée repérée, rencontre possible, rations) : un refus n'est pas une erreur.
     await c.query('SAVEPOINT interception');
     try {
       await sendInterception(c, outbox, npcId, villageId, { commandId: r.id, units }, now);

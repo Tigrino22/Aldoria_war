@@ -2,7 +2,7 @@
  * Armées en marche sur la carte. Chacun voit ses propres mouvements, ceux de sa tribu et de ses alliés, et le trajet des
  * attaques et renforts qui visent ses villages. Une armée étrangère n'est repérée qu'à 10 cases ou moins de l'un de ses
  * villages : on voit alors sa composition, et on peut l'intercepter (bataille en rase campagne). Une interception lancée
- * pendant que l'armée est dans la zone peut la poursuivre au-delà, jusqu'à son arrivée.
+ * pendant qu'elle est repérée la poursuit jusqu'à la rattraper, même si elle sort ensuite de la zone.
  */
 
 /** Portée de vue d'un village, en cases : en deçà, une armée étrangère est repérée (composition visible, interception possible). */
@@ -143,15 +143,4 @@ export function interceptPoint(
     prev = t;
   }
   return null;
-}
-
-/**
- * Instants entre lesquels une interception lancée à `now` peut rencontrer l'armée. Si l'armée est déjà dans la zone de
- * vue, les troupes la poursuivent jusqu'à son arrivée (`pursuit`) ; sinon la rencontre doit avoir lieu pendant son passage
- * dans la zone (`spot`). Null si l'armée n'est plus interceptable.
- */
-export function interceptWindow(spot: [number, number] | null, now: number, arrival: number, spottedNow: boolean): { within: [number, number]; pursuit: boolean } | null {
-  if (spottedNow) return arrival > now ? { within: [now, arrival], pursuit: true } : null;
-  if (!spot || spot[1] <= now) return null;
-  return { within: spot, pursuit: false };
 }

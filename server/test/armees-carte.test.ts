@@ -61,11 +61,11 @@ describe('armées en marche sur la carte', () => {
     const byId = new Map((res.json() as MapArmy[]).map((a) => [a.id, a]));
     expect(byId.get(own)).toMatchObject({ rel: 'own', type: 'attack', size: 3, owner: 'Vigie', kinds: ['foot'] });
     expect(byId.get(mate)).toMatchObject({ rel: 'tribe', type: 'support', size: 1 });
-    // Une attaque qui vise notre village : on voit tout son trajet, mais pas ce qu'elle contient tant qu'elle est hors de vue.
+    // Une attaque qui vise notre village : on voit tout son trajet, mais pas ce qu'elle contient tant qu'elle est à plus de 10 cases.
     const t = byId.get(threat)!;
     expect(t).toMatchObject({ rel: 'threat', type: 'attack', size: 2, owner: 'Inconnu', kinds: ['foot'], interceptable: true, from: { x: home.x + 40.5, y: home.y + 40.5 } });
     expect(Date.parse(t.spotFrom!)).toBeGreaterThan(Date.now());
-    // Repérée à portée de vue : sa composition apparaît.
+    // Repérée à 10 cases ou moins : sa composition apparaît.
     expect(byId.get(close)).toMatchObject({ rel: 'threat', kinds: ['horse', 'noble'], interceptable: true });
     expect(byId.has(hidden)).toBe(false);
     // Armée aperçue : ni origine, ni destination, ni propriétaire, seulement la portion à portée de vue.
