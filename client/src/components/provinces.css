@@ -15,4 +15,7 @@
 .app .pg.provinces .prov-victory { border-color: #a77a14; background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 22%, var(--panel)), var(--panel)); }
 @media (max-width: 1000px) {
   .app .pg.provinces .prov-grid { grid-template-columns: minmax(0, 1fr); }
+  /* Sur mobile, la carte des provinces passe en haut, au-dessus de la liste. */
+  .app .pg.provinces .prov-grid > .stack { display: contents; }
+  .app .pg.provinces .prov-map-card { order: -1; }
 }
