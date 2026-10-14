@@ -27,6 +27,7 @@ const LOG_ICON: Record<CrusadeLogEntry['kind'], NavIconName> = {
   fall: 'caserne',
   win: 'couronne',
   hold: 'bouclier',
+  guard: 'troupes',
 };
 
 /**
@@ -236,7 +237,7 @@ export default function Crusade() {
             <CardTitle icon="croisade">Comment gagner</CardTitle>
             <ol className="cz-steps">
               <li>
-                <b>Espionnez</b> la Citadelle : sa garnison (lanciers, hallebardiers, épéistes) se règle sur la plus forte tribu du monde.
+                <b>Espionnez</b> la Citadelle : sa garnison (lanciers, hallebardiers, épéistes) vaut une fois et demie l'armée offensive de la plus forte tribu du monde, et la Garde la regarnit toutes les 15 minutes tant qu'aucune bannière ne flotte.
               </li>
               <li>
                 <b>Programmez</b> vos assauts au point de ralliement pour qu'ils arrivent pendant la fenêtre, avec des béliers pour la muraille.

@@ -330,7 +330,8 @@ Migration 020, règles pures dans `shared/src/crusade.ts`, serveur dans `server/
 |---|---|
 | Calendrier | Deux soirs par semaine (mercredi et samedi par défaut), à 20 h 30, pendant 60 minutes, dans le fuseau `NPC_TIMEZONE`. La Citadelle est annoncée 48 heures avant l'ouverture |
 | Emplacement | Un quart de la carte différent à chaque croisade, sur une case libre. La Citadelle est un village sans propriétaire (`villages.kind = 'citadel'`), muraille 20, que ni les pillages ni la repousse des barbares ne touchent |
-| Garnison | 60 % de l'armée offensive de la tribu la plus forte (entre 1 500 et 250 000 places) : 40 % lanciers, 40 % hallebardiers, 20 % épéistes |
+| Garnison | 150 % de l'armée offensive de la tribu la plus forte (entre 4 000 et 250 000 places) : 40 % lanciers, 40 % hallebardiers, 20 % épéistes. En place dès l'annonce |
+| Garde | Toutes les 15 minutes de l'assaut, tant qu'aucune bannière ne flotte, 15 % de la garnison de départ (même composition) rejoint la Citadelle. Une vague tombée pendant qu'un camp tient la bannière est perdue. Code : `guardWaves` dans `server/src/game/crusades.ts` |
 | Fenêtre d'assaut | Attaques et renforts doivent arriver entre l'ouverture et la fermeture ; les éclaireurs peuvent partir dès l'annonce. Une arrivée hors de la fenêtre fait demi-tour |
 | Bannière | Une attaque qui vide la Citadelle avec un noble survivant plante la bannière de son camp (tribu et tribus alliées, ou joueur seul) ; ses survivants restent en garnison. Seul ce camp peut envoyer des renforts ; une attaque de ce camp devient un renfort |
 | Victoire | Le camp qui tient la bannière à la fermeture des portes gagne. Les troupes rentrent, les ordres programmés non partis sont annulés et remboursés |
@@ -342,6 +343,20 @@ Migration 020, règles pures dans `shared/src/crusade.ts`, serveur dans `server/
 Sur la carte, la Citadelle se suit en direct : pendant l'annonce et l'assaut, un étendard flotte aux couleurs du détenteur (les mêmes que la légende de la carte : vous, tribu, alliés, guerre, autres), une jauge de 20 crans montre la muraille, deux pastilles comptent les attaques et les renforts en route (sans révéler leur origine), et un panneau donne le compte à rebours et le dernier événement de la chronique. La carte se recharge toutes les 10 secondes pendant l'assaut. Code : `server/src/routes/map.ts` (champ `crusade` de la Citadelle), `client/src/components/MapView.tsx` (`drawCitadelLive`), `CrusadeMapHud` dans `client/src/components/CrusadeBanner.tsx`.
 
 Réglages à chaud (Administration > Monde) : `CRUSADES` (0 pour couper), `CRUSADE_DAYS` (« 3,6 », 0 = dimanche), `CRUSADE_TIME` (« 20:30 »), `CRUSADE_MINUTES`, `CRUSADE_NOTICE_HOURS`, `CRUSADE_GARRISON` (%), `CRUSADE_RELIC_BONUS` (%). L'administration peut lancer une croisade de test ou terminer la croisade en cours.
+
+## Armées en marche sur la carte
+
+Les mouvements de troupes se voient sur la carte : un groupe de soldats derrière un fanion avance le long d'un chemin en pointillés. Le fanion dit le genre du mouvement (queue d'aronde : attaque, carré : renfort, triangle : retour ou inconnu), le nombre de soldats sa taille (1 : moins de 100 places, 3 : jusqu'à 2 000, 5 : au-delà), un sac sur le dos le butin qui rentre.
+
+| Qui voit quoi | |
+|---|---|
+| Ses propres mouvements, ceux de sa tribu et des tribus alliées | Trajet complet, taille, nom du joueur |
+| Une attaque ou un renfort qui vise l'un de ses villages | Trajet complet et nom de l'envoyeur, contenu caché (taille moyenne affichée) |
+| Toute autre armée | Seulement pendant qu'elle passe à 5 cases ou moins de l'un de ses villages (`ARMY_SIGHT`) : sa taille, ni origine, ni destination, ni propriétaire |
+
+Coût serveur : une requête (`GET /api/map/armies`, 600 mouvements au plus) à chaque rechargement de la carte (30 s, 10 s pendant un assaut de croisade) ; le navigateur calcule seul la position entre deux rechargements. Pour une armée aperçue, le serveur n'envoie que la portion de trajet à portée de vue (`sightWindow` dans `shared/src/armies.ts`), pour qu'on ne puisse pas lire sa destination. Le bouton « Armées » de la carte les masque. Les animations s'arrêtent quand l'onglet est caché ; avec « réduire les animations », les armées avancent une fois par seconde sans balancer.
+
+Code : `server/src/routes/map.ts` (`/api/map/armies`), `client/src/components/mapArmies.ts`. Base des futures interceptions en rase campagne.
 
 ## Ménage des rapports et des mouvements
 

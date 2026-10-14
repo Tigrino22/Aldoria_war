@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Application, Assets, BitmapText, Container, Graphics, GraphicsContext, Sprite, TextStyle, Texture, TilingSprite } from 'pixi.js';
-import type { MapMovement, MapRelations, MapVillage } from '@aldoria/shared';
+import type { MapArmy, MapMovement, MapRelations, MapVillage } from '@aldoria/shared';
 import { api } from '../api';
 import { MAP_IMG } from '../assets';
 import { useGame } from '../game';
@@ -10,6 +10,7 @@ import MapColors from './MapColors';
 import { CrusadeMapHud } from './CrusadeBanner';
 import { PlayerLink } from '../ui';
 import { REL_COLORS, hash, hexToNum, makeColorContext, readMarks, styleOf, terrainAt, terrainCanvas, writeMarks, type ColorContext, type Mark } from './mapStyle';
+import { ARMY_COLORS, ARMY_LABELS, drawArmies } from './mapArmies';
 import './map.css';
 
 const TILE = 64;
@@ -23,7 +24,7 @@ const NAME_ZOOM = 0.6;
 const NO_RELATIONS: MapRelations = { warTribeIds: [], allyTribeIds: [] };
 
 /** Dernière carte reçue : la rouvrir s'affiche tout de suite, la mise à jour arrive ensuite. */
-let cache: { villages: MapVillage[]; relations: MapRelations; movements: MapMovement[] } | null = null;
+let cache: { villages: MapVillage[]; relations: MapRelations; movements: MapMovement[]; armies: MapArmy[] } | null = null;
 
 /** Préférences d'affichage de la carte, gardées dans le navigateur. */
 function readPref(key: string, fallback: boolean): boolean {
@@ -63,6 +64,12 @@ interface Scene {
   request: () => void;
   /** Animations en cours (Citadelle : halo de l'assaut, étendard au vent), jouées à petite cadence seulement quand il y en a. */
   anims: Set<(t: number) => void>;
+  /** Mises à jour de position (armées en marche) : jouées aussi quand l'animation est réduite, une fois par seconde. */
+  ticks: Set<(t: number) => void>;
+  /** L'appareil demande moins d'animations : les armées glissent sans balancer. */
+  still: boolean;
+  /** Calque des armées en marche (au-dessus des villages). */
+  armyLayer: Container;
   centerOn: (x: number, y: number) => void;
   zoomBy: (factor: number) => void;
 }
@@ -76,6 +83,7 @@ export default function MapView({ focus }: { focus?: string }) {
   const [villages, setVillages] = useState<MapVillage[]>(cache?.villages ?? []);
   const [relations, setRelations] = useState<MapRelations>(cache?.relations ?? NO_RELATIONS);
   const [movements, setMovements] = useState<MapMovement[]>(cache?.movements ?? []);
+  const [armies, setArmies] = useState<MapArmy[]>(cache?.armies ?? []);
   const [marks, setMarks] = useState<Mark[]>(() => readMarks(me.player.id));
   const [selected, setSelected] = useState<MapVillage | null>(null);
   const [hovered, setHovered] = useState<MapVillage | null>(null);
@@ -85,6 +93,7 @@ export default function MapView({ focus }: { focus?: string }) {
   const [panel, setPanel] = useState(false);
   const [showGrid, setShowGrid] = useState(() => readPref('grid', true));
   const [showMini, setShowMini] = useState(() => readPref('mini', true));
+  const [showArmies, setShowArmies] = useState(() => readPref('armies', true));
   const scene = useRef<Scene | null>(null);
   const villagesRef = useRef<Map<string, MapVillage>>(new Map());
   const selectRef = useRef<(v: MapVillage | null) => void>(() => undefined);
@@ -109,15 +118,17 @@ export default function MapView({ focus }: { focus?: string }) {
   const load = useCallback(
     () =>
       run(async () => {
-        const [list, rel, moves] = await Promise.all([
+        const [list, rel, moves, marching] = await Promise.all([
           api<MapVillage[]>('/api/map'),
           api<MapRelations>('/api/map/relations').catch(() => NO_RELATIONS),
           api<MapMovement[]>('/api/map/movements').catch(() => []),
+          api<MapArmy[]>('/api/map/armies').catch(() => []),
         ]);
-        cache = { villages: list, relations: rel, movements: moves };
+        cache = { villages: list, relations: rel, movements: moves, armies: marching };
         setVillages(list);
         setRelations(rel);
         setMovements(moves);
+        setArmies(marching);
       }),
     [run],
   );
@@ -291,6 +302,8 @@ export default function MapView({ focus }: { focus?: string }) {
       const villageChunks: Container[] = [];
       for (let i = 0; i < n * n; i++) villageLayer.addChild((villageChunks[i] = new Container()));
       worldC.addChild(villageLayer);
+      const armyLayer = new Container();
+      worldC.addChild(armyLayer);
       const overlay = new Graphics();
       worldC.addChild(overlay);
 
@@ -370,14 +383,26 @@ export default function MapView({ focus }: { focus?: string }) {
       };
       app.renderer.on('resize', request);
       cleanups.push(() => cancelAnimationFrame(frameReq));
-      // La carte ne se redessine qu'à la demande ; seule la Citadelle s'anime pendant une croisade (12 images par seconde, coupées si l'animation est réduite).
+      // La carte ne se redessine qu'à la demande. Seuls la Citadelle et les armées en marche s'animent, à 12 images par seconde ;
+      // si l'appareil demande moins d'animations, les armées avancent une fois par seconde et la Citadelle reste immobile.
       const anims = new Set<(t: number) => void>();
-      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      const ticks = new Set<(t: number) => void>();
+      const still = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      let lastTick = 0;
       const animTimer = window.setInterval(() => {
-        if (still || anims.size === 0 || document.hidden) return;
+        if (document.hidden) return;
         const t = performance.now() / 1000;
-        for (const f of anims) f(t);
-        request();
+        let dirty = false;
+        if (!still && anims.size) {
+          for (const f of anims) f(t);
+          dirty = true;
+        }
+        if (ticks.size && t - lastTick >= 1) {
+          lastTick = t;
+          for (const f of ticks) f(t);
+          dirty = true;
+        }
+        if (dirty) request();
       }, 80);
       cleanups.push(() => window.clearInterval(animTimer));
 
@@ -421,6 +446,9 @@ export default function MapView({ focus }: { focus?: string }) {
         dotsScale: 0,
         request,
         anims,
+        ticks,
+        still,
+        armyLayer,
         centerOn,
         zoomBy,
       };
@@ -663,6 +691,13 @@ export default function MapView({ focus }: { focus?: string }) {
     s.request();
   }, [hovered, cell, selected, ready]);
 
+  // Armées en marche : redessinées à chaque rechargement de la carte, puis animées sur place sans rien demander au serveur.
+  useEffect(() => {
+    const s = scene.current;
+    if (!s || !showArmies) return;
+    return drawArmies(s, armies);
+  }, [armies, showArmies, ready]);
+
   useEffect(() => {
     const s = scene.current;
     if (!s) return;
@@ -741,6 +776,10 @@ export default function MapView({ focus }: { focus?: string }) {
             <span aria-hidden>▣</span>
             <span className="lbl">Mini-map</span>
           </button>
+          <button className={`map-btn ${showArmies ? 'on' : ''}`} aria-pressed={showArmies} onClick={() => (writePref('armies', !showArmies), setShowArmies(!showArmies))} title="Armées en marche">
+            <span aria-hidden>⚑</span>
+            <span className="lbl">Armées</span>
+          </button>
           <button className={`map-btn ${panel ? 'on' : ''}`} aria-pressed={panel} onClick={() => setPanel(!panel)} title="Couleurs et repères">
             <span className="map-swatches" aria-hidden>
               <i style={{ background: REL_COLORS.own }} />
@@ -758,6 +797,13 @@ export default function MapView({ focus }: { focus?: string }) {
               {l}
             </span>
           ))}
+          {showArmies &&
+            (['threat', 'seen'] as const).filter((rel) => armies.some((a) => a.rel === rel)).map((rel) => (
+              <span key={`army-${rel}`} className="legend-army">
+                <i style={{ background: ARMY_COLORS[rel] }} />
+                {ARMY_LABELS[rel]}
+              </span>
+            ))}
           {marks.map((m) => (
             <span key={`${m.kind}${m.id}`}>
               <i style={{ background: m.color }} />

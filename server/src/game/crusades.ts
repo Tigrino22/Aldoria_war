@@ -12,6 +12,9 @@ import {
   emptyUnits,
   garrisonPopulation,
   gloryForKills,
+  guardWavesDue,
+  GUARD_WAVE_MINUTES,
+  GUARD_WAVE_SHARE,
   nextOpening,
   normalizeUnits,
   parseClock,
@@ -80,6 +83,7 @@ export interface CrusadeRow {
   closes_at: Date;
   status: 'announced' | 'open' | 'ended';
   garrison: UnitCounts;
+  guard_waves: number;
   wall: number;
   treasure: number;
   breached_at: Date | null;
@@ -506,9 +510,12 @@ export async function processCrusades(c: Db, outbox: Outbox, now: Date) {
   const active = (await c.query("SELECT * FROM crusades WHERE status <> 'ended' ORDER BY id FOR UPDATE")).rows as CrusadeRow[];
   for (const cr of active) {
     if (now.getTime() >= new Date(cr.closes_at).getTime()) await endCrusade(c, outbox, cr, now);
-    else if (cr.status === 'announced' && now.getTime() >= new Date(cr.opens_at).getTime()) {
-      await c.query("UPDATE crusades SET status = 'open' WHERE id = $1", [cr.id]);
-      await log(c, cr.id, new Date(cr.opens_at), 'open', `Les portes de ${cr.name} s’ouvrent : l’assaut est lancé`);
+    else {
+      if (cr.status === 'announced' && now.getTime() >= new Date(cr.opens_at).getTime()) {
+        await c.query("UPDATE crusades SET status = 'open' WHERE id = $1", [cr.id]);
+        await log(c, cr.id, new Date(cr.opens_at), 'open', `Les portes de ${cr.name} s’ouvrent : l’assaut est lancé`);
+      }
+      await guardWaves(c, cr, now);
     }
   }
   if (env.crusades && !active.some((cr) => now.getTime() < new Date(cr.closes_at).getTime())) {
@@ -526,6 +533,21 @@ export async function processCrusades(c: Db, outbox: Outbox, now: Date) {
     )
   ).rows;
   for (const r of stale) await c.query("DELETE FROM villages WHERE id = $1 AND kind = 'citadel'", [r.village_id]);
+}
+
+/**
+ * Vagues de la Garde : toutes les 15 minutes de l'assaut, si aucune bannière ne flotte, 15 % de la garnison de départ
+ * rejoint la Citadelle. Les vagues tombées pendant qu'un camp tenait la bannière sont perdues (on ne les rattrape pas).
+ */
+async function guardWaves(c: Db, cr: CrusadeRow, now: Date) {
+  const due = guardWavesDue({ opensAt: cr.opens_at, closesAt: cr.closes_at }, now);
+  if (due <= (cr.guard_waves ?? 0) || !cr.village_id) return;
+  await c.query('UPDATE crusades SET guard_waves = $2 WHERE id = $1', [cr.id, due]);
+  if (hasHolder(cr)) return;
+  const wave = citadelGarrison(populationOf(normalizeUnits(cr.garrison)) * GUARD_WAVE_SHARE);
+  await addTroops(c, cr.village_id, cr.village_id, wave);
+  const at = new Date(new Date(cr.opens_at).getTime() + due * GUARD_WAVE_MINUTES * 60_000);
+  await log(c, cr.id, at, 'guard', `La Garde renforce ${cr.name} : ${populationOf(wave)} défenseurs rejoignent les remparts`);
 }
 
 /** Prochaine ouverture prévue (pour l'affichage), sans rien créer. */

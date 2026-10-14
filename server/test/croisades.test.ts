@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CRUSADE_GLORY, STARTING_BUILDINGS, emptyUnits, populationOf, productionRates, travelTime, type UnitCounts } from '@aldoria/shared';
+import { CRUSADE_GLORY, GUARD_WAVE_SHARE, STARTING_BUILDINGS, citadelGarrison, emptyUnits, populationOf, productionRates, travelTime, type UnitCounts } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
 import { env } from '../src/env';
 import { migrate } from '../src/migrate';
@@ -67,8 +67,8 @@ describe('croisades', () => {
     expect(v.owner_id).toBeNull();
     expect(v.buildings.wall).toBe(20);
     const garrison = await tx((c) => getTroops(c, citadelId, citadelId));
-    // Monde vide : la garnison minimale (1 500 places).
-    expect(populationOf(garrison)).toBeGreaterThanOrEqual(1495);
+    // Monde vide : la garnison minimale (4 000 places).
+    expect(populationOf(garrison)).toBeGreaterThanOrEqual(3995);
     const state = await tx((c) => crusadeState(c, 0, T0));
     expect(state.current?.phase).toBe('announced');
     expect(state.log[0].kind).toBe('announce');
@@ -196,6 +196,31 @@ describe('croisades', () => {
     expect(new Date(all[0].arrive_at).getTime()).toBeGreaterThanOrEqual(opensMs);
     expect(all[0].units).toMatchObject(strikeUnits(units({ swordsman: 30_000, cavalry: 2000, ram: 300 })));
     (env as any).crusades = 0;
+  });
+
+  it('la Garde regarnit la Citadelle toutes les 15 minutes de l’assaut, sauf quand une bannière flotte', async () => {
+    const cr = (await pool.query("SELECT * FROM crusades WHERE status = 'announced' ORDER BY id DESC LIMIT 1")).rows[0];
+    const opensMs = new Date(cr.opens_at).getTime();
+    const pop = async () => populationOf(await tx((c) => getTroops(c, cr.village_id, cr.village_id)));
+    const start = await pop();
+    const wave = populationOf(citadelGarrison(populationOf(cr.garrison) * GUARD_WAVE_SHARE));
+    await tick(new Date(opensMs + MIN));
+    expect(await pop()).toBe(start);
+    await tick(new Date(opensMs + 16 * MIN));
+    expect(await pop()).toBe(start + wave);
+    // Un second passage ne rajoute rien.
+    await tick(new Date(opensMs + 17 * MIN));
+    expect(await pop()).toBe(start + wave);
+    // Bannière plantée : la vague de 30 minutes est perdue.
+    const holder = await player('Porte-bannière');
+    await pool.query('UPDATE crusades SET holder_player_id = $2, holder_since = $3 WHERE id = $1', [cr.id, holder, new Date(opensMs + 20 * MIN)]);
+    await tick(new Date(opensMs + 31 * MIN));
+    expect(await pop()).toBe(start + wave);
+    // Bannière abattue : la Garde revient à 45 minutes, sans rattraper la vague perdue.
+    await pool.query('UPDATE crusades SET holder_player_id = NULL, holder_since = NULL WHERE id = $1', [cr.id]);
+    await tick(new Date(opensMs + 46 * MIN));
+    expect(await pop()).toBe(start + 2 * wave);
+    expect((await pool.query("SELECT count(*)::int AS n FROM crusade_log WHERE crusade_id = $1 AND kind = 'guard'", [cr.id])).rows[0].n).toBe(2);
   });
 
   it('ménage : les vieux mouvements terminés et les vieux rapports non archivés disparaissent', async () => {

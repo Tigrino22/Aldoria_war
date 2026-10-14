@@ -58,7 +58,7 @@ export const env = {
   crusadeTime: process.env.CRUSADE_TIME || '20:30',
   crusadeMinutes: count('CRUSADE_MINUTES', 60),
   crusadeNoticeHours: count('CRUSADE_NOTICE_HOURS', 48),
-  crusadeGarrison: count('CRUSADE_GARRISON', 60),
+  crusadeGarrison: count('CRUSADE_GARRISON', 150),
   crusadeRelicBonus: count('CRUSADE_RELIC_BONUS', 5),
   /** Ménage : rapports des joueurs gardés (jours, hors archives ; 0 = tous) et mouvements terminés gardés (jours). */
   reportsKeepDays: count('REPORTS_KEEP_DAYS', 30),

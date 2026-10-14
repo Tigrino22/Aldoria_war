@@ -46,13 +46,38 @@ export function citadelGarrison(population: number): UnitCounts {
   return units;
 }
 
-/** Bornes de la garnison (population), pour qu'un monde vide reste jouable et qu'un monde énorme garde un objectif atteignable. */
-export const GARRISON_MIN = 1500;
+/** Bornes de la garnison (population), pour qu'un monde jeune garde un vrai défi et qu'un monde énorme garde un objectif atteignable. */
+export const GARRISON_MIN = 4000;
 export const GARRISON_MAX = 250_000;
 
 /** Population de la garnison : une part de l'armée offensive de la tribu la plus forte du monde. */
 export const garrisonPopulation = (strongestOffense: number, percent: number) =>
   Math.round(Math.min(GARRISON_MAX, Math.max(GARRISON_MIN, (strongestOffense * percent) / 100)));
+
+/**
+ * Vagues de la Garde : pendant l'assaut, tant qu'aucune bannière ne flotte sur la Citadelle, la Garde envoie des renforts
+ * toutes les 15 minutes (15 % de la garnison de départ, même composition). Une Citadelle vidée par une première attaque
+ * se regarnit : il faut enchaîner vite ou planter la bannière.
+ */
+export const GUARD_WAVE_MINUTES = 15;
+export const GUARD_WAVE_SHARE = 0.15;
+
+/** Nombre de vagues de la Garde déjà dues à l'instant `now` (aucune à l'ouverture, aucune à la fermeture des portes). */
+export function guardWavesDue(c: { opensAt: string | Date; closesAt: string | Date }, now: Date): number {
+  const open = new Date(c.opensAt).getTime();
+  const close = new Date(c.closesAt).getTime();
+  const step = GUARD_WAVE_MINUTES * 60_000;
+  const until = Math.min(now.getTime(), close - 1);
+  return until < open ? 0 : Math.floor((until - open) / step);
+}
+
+/** Heure de la prochaine vague de la Garde après `now`, ou null s'il n'y en a plus avant la fermeture. */
+export function nextGuardWave(c: { opensAt: string | Date; closesAt: string | Date }, now: Date): Date | null {
+  const open = new Date(c.opensAt).getTime();
+  const step = GUARD_WAVE_MINUTES * 60_000;
+  const next = open + (guardWavesDue(c, now) + 1) * step;
+  return next < new Date(c.closesAt).getTime() ? new Date(next) : null;
+}
 
 /** Trésor de la Citadelle, par ressource : deux ressources par place de garnison, à partager entre ceux qui ont combattu. */
 export const treasureFor = (garrisonPop: number) => Math.round(garrisonPop * 2);
@@ -189,7 +214,7 @@ export interface CrusadeScoreRow {
 
 export interface CrusadeLogEntry {
   at: string;
-  kind: 'announce' | 'open' | 'breach' | 'capture' | 'fall' | 'win' | 'hold';
+  kind: 'announce' | 'open' | 'breach' | 'capture' | 'fall' | 'win' | 'hold' | 'guard';
   text: string;
 }
 

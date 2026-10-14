@@ -416,7 +416,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </p>
         <ul>
           <li>
-            <b>Garnison :</b> lanciers, hallebardiers et épéistes, réglés sur l'armée offensive de la plus forte tribu du monde. La muraille est au niveau {CITADEL_WALL} : il faut des {U('ram')} pour l'abattre.
+            <b>Garnison :</b> lanciers, hallebardiers et épéistes, une fois et demie l'armée offensive de la plus forte tribu du monde, en place dès l'annonce. Pendant l'assaut, tant qu'aucune bannière ne flotte, la Garde envoie toutes les 15 minutes des renforts (15 % de la garnison de départ) : il faut enchaîner les vagues et planter vite la bannière. La muraille est au niveau {CITADEL_WALL} : il faut des {U('ram')} pour l'abattre.
           </li>
           <li>
             <b>Fenêtre d'assaut :</b> attaques et renforts doivent <b>arriver</b> pendant l'heure d'ouverture, sinon ils font demi-tour. Les {U('scout')} peuvent partir dès l'annonce. Le{' '}

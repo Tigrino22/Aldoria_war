@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CrusadeState, MapVillage } from '@aldoria/shared';
+import { nextGuardWave, type CrusadeState, type MapVillage } from '@aldoria/shared';
 import { api } from '../api';
 import { useNow } from '../game';
 import { Countdown } from '../ui';
@@ -65,6 +65,7 @@ export function CrusadeMapHud({ citadel, holderColor, onShow }: { citadel: MapVi
   const state = useCrusade(open ? 10_000 : 60_000);
   if (now >= Date.parse(cz.closesAt)) return null;
   const last = state?.current?.id && state.log[0];
+  const wave = open && !citadel.holderTag ? nextGuardWave(cz, new Date(now)) : null;
   return (
     <div className={`crusade-hud ${open ? 'open' : ''}`} role="status" aria-live="polite">
       <div className="ch-top">
@@ -95,6 +96,11 @@ export function CrusadeMapHud({ citadel, holderColor, onShow }: { citadel: MapVi
             'Bannière à prendre'
           )}
         </span>
+        {wave && (
+          <span className="ch-chip" title="Tant qu'aucune bannière ne flotte, la Garde regarnit la Citadelle toutes les 15 minutes">
+            Garde dans <b><Countdown to={wave.toISOString()} /></b>
+          </span>
+        )}
         {(cz.attacks > 0 || cz.supports > 0) && (
           <span className="ch-chip" title="Armées en route vers la Citadelle (leur origine reste secrète)">
             <b className="ch-atk">{cz.attacks}</b> attaque{cz.attacks > 1 ? 's' : ''} · <b className="ch-sup">{cz.supports}</b> renfort{cz.supports > 1 ? 's' : ''} en marche

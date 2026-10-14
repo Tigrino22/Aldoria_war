@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { RESOURCES, UNIT_KEYS, type MapMovement, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
+import { ARMY_SIGHT, RESOURCES, UNIT_KEYS, armySize, normalizeUnits, populationOf, sightWindow, totalUnits, type MapArmy, type MapMovement, type MapRelations, type MapVillage, type RaidStatus, type RaidTarget } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool } from '../db';
 import { forbidden } from '../errors';
@@ -88,6 +88,67 @@ export default async function mapRoutes(app: FastifyInstance) {
       [playerId],
     );
     return rows.map((r) => ({ villageId: r.id, attack: r.attack, support: r.support, threat: r.threat }));
+  });
+
+  /**
+   * Armées en marche que le joueur peut voir sur la carte : les siennes, celles de sa tribu et de ses alliés, celles qui visent
+   * ses villages, et les autres seulement pendant qu'elles passent à portée de vue de l'un de ses villages (ni origine ni destination).
+   * Une seule requête par rechargement de la carte : le client anime le trajet tout seul entre deux rechargements.
+   */
+  app.get('/api/map/armies', async (req): Promise<MapArmy[]> => {
+    const playerId = await requirePlayer(req);
+    const tribeId = ((await pool.query('SELECT tribe_id FROM players WHERE id = $1', [playerId])).rows[0]?.tribe_id ?? null) as number | null;
+    const allies = await allyTribeIdsOf(pool, tribeId);
+    const mine = (await pool.query('SELECT x, y FROM villages WHERE owner_id = $1', [playerId])).rows as { x: number; y: number }[];
+    const { rows } = await pool.query(
+      `SELECT c.id, c.type, c.player_id, c.units, c.sent_at, c.arrive_at, o.x AS ox, o.y AS oy, t.x AS tx, t.y AS ty, t.owner_id AS t_owner, pp.tribe_id, pp.username
+       FROM commands c JOIN villages o ON o.id = c.origin_village_id JOIN villages t ON t.id = c.target_village_id LEFT JOIN players pp ON pp.id = c.player_id
+       WHERE NOT c.processed AND c.arrive_at > now() AND (
+         c.player_id = $1
+         OR pp.tribe_id = ANY($2::int[])
+         OR (t.owner_id = $1 AND c.type IN ('attack', 'support'))
+         OR EXISTS (SELECT 1 FROM villages m WHERE m.owner_id = $1
+                    AND m.x BETWEEN least(o.x, t.x) - $3 AND greatest(o.x, t.x) + $3 AND m.y BETWEEN least(o.y, t.y) - $3 AND greatest(o.y, t.y) + $3))
+       ORDER BY c.arrive_at LIMIT 600`,
+      [playerId, tribeId ? [tribeId, ...allies] : [], ARMY_SIGHT],
+    );
+    const now = Date.now();
+    const out: MapArmy[] = [];
+    for (const r of rows) {
+      const units = normalizeUnits(r.units);
+      const scouts = units.scout > 0 && units.scout === totalUnits(units);
+      const sent = new Date(r.sent_at).getTime();
+      const arrive = new Date(r.arrive_at).getTime();
+      const from = { x: r.ox + 0.5, y: r.oy + 0.5 };
+      const to = { x: r.tx + 0.5, y: r.ty + 0.5 };
+      const known = (rel: MapArmy['rel'], seeUnits: boolean, owner: string | null): MapArmy => ({
+        id: r.id,
+        type: r.type,
+        rel,
+        from,
+        to,
+        fromAt: new Date(sent).toISOString(),
+        toAt: new Date(arrive).toISOString(),
+        size: seeUnits ? armySize(populationOf(units)) : 2,
+        scouts: seeUnits && scouts,
+        owner,
+      });
+      if (r.player_id === playerId) out.push(known('own', true, r.username));
+      else if (tribeId && r.tribe_id === tribeId) out.push(known('tribe', true, r.username));
+      else if (r.tribe_id && allies.includes(r.tribe_id)) out.push(known('ally', true, r.username));
+      else if (r.t_owner === playerId && r.type === 'attack') out.push(known('threat', false, r.username));
+      else if (r.t_owner === playerId && r.type === 'support') out.push(known('guest', false, r.username));
+      else {
+        // Armée aperçue : on voit sa taille, mais seule la portion du trajet à portée de vue est envoyée.
+        const w = sightWindow({ x: r.ox, y: r.oy }, { x: r.tx, y: r.ty }, mine);
+        if (!w) continue;
+        const at = (u: number) => sent + (arrive - sent) * u;
+        if (at(w[1]) <= now) continue;
+        const pos = (u: number) => ({ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u });
+        out.push({ id: r.id, type: 'unknown', rel: 'seen', from: pos(w[0]), to: pos(w[1]), fromAt: new Date(at(w[0])).toISOString(), toAt: new Date(at(w[1])).toISOString(), size: armySize(populationOf(units)), scouts, owner: null });
+      }
+    }
+    return out;
   });
 
   /** Tribus en guerre avec celle du joueur et tribus alliées, pour les couleurs de la carte. */
