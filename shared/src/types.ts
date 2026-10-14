@@ -272,6 +272,10 @@ export interface PlayerProfile {
   /** « can » : le chef de tribu qui consulte peut inviter ce joueur ; « pending » : invitation déjà envoyée ; sinon « none ». */
   invite: 'none' | 'can' | 'pending';
   villages: { id: number; name: string; x: number; y: number; points: number }[];
+  /** Titre de croisade affiché à côté du nom, titres gagnés et gloire de toutes les croisades. */
+  title?: string | null;
+  titles?: string[];
+  glory?: number;
 }
 
 /** Offre publique du marché : « je donne X contre Y ». */

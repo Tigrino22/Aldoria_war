@@ -25,6 +25,13 @@ import {
   UNITS,
   UNIT_KEYS,
   WALL_BONUS_PER_LEVEL,
+  CITADEL_WALL,
+  CRUSADE_GLORY,
+  CRUSADE_SEASON_DAYS,
+  CRUSADE_TITLES,
+  CRUSADE_TITLE_HELP,
+  RELIC_DAYS,
+  type CrusadeTitleKey,
   buildingCost,
   buildingTime,
   hiddenResources,
@@ -64,6 +71,7 @@ const SECTIONS = [
   { id: 'muraille', title: 'Muraille et béliers' },
   { id: 'conquete', title: 'Nobles et conquête' },
   { id: 'renforts', title: 'Renforts' },
+  { id: 'croisades', title: 'Croisades et Citadelle' },
   { id: 'marche', title: 'Marché et marchands' },
   { id: 'carte', title: 'Carte et villages barbares' },
   { id: 'social', title: 'Rapports, messages, tribus, classement' },
@@ -400,6 +408,50 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </ul>
       </>
     ),
+    croisades: (
+      <>
+        <p>
+          Deux soirs par semaine (par défaut le mercredi et le samedi à 20 h 30), une <b>Citadelle</b> surgit sur la carte. Elle est annoncée deux jours avant, puis ses portes restent ouvertes une heure. La{' '}
+          <a href="#/croisade">page Croisades</a> affiche le compte à rebours, la muraille, le camp qui tient la bannière, la chronique et la gloire de chacun.
+        </p>
+        <ul>
+          <li>
+            <b>Garnison :</b> lanciers, hallebardiers et épéistes, réglés sur l'armée offensive de la plus forte tribu du monde. La muraille est au niveau {CITADEL_WALL} : il faut des {U('ram')} pour l'abattre.
+          </li>
+          <li>
+            <b>Fenêtre d'assaut :</b> attaques et renforts doivent <b>arriver</b> pendant l'heure d'ouverture, sinon ils font demi-tour. Les {U('scout')} peuvent partir dès l'annonce. Le{' '}
+            <a href="#/ralliement">point de ralliement</a> programme une arrivée à la seconde près.
+          </li>
+          <li>
+            <b>Bannière :</b> l'attaque qui vide la Citadelle doit compter un {U('noble')} survivant pour planter la bannière de son camp (votre tribu et ses alliées, ou vous seul). Ses troupes restent alors en
+            garnison. Seul ce camp peut envoyer des renforts ; ses attaques deviennent des renforts. Les autres camps peuvent la reprendre.
+          </li>
+          <li>
+            <b>Victoire :</b> le camp qui tient la bannière à la fermeture des portes gagne. Toutes les troupes rentrent et les ordres programmés pas encore partis sont annulés.
+          </li>
+        </ul>
+        <p>
+          <b>Gloire :</b> 1 par {CRUSADE_GLORY.killsPerGlory} places de population ennemies tuées (en attaque comme en défense), +{CRUSADE_GLORY.breach} pour la brèche, +{CRUSADE_GLORY.capture} par bannière plantée et +
+          {CRUSADE_GLORY.victory} pour chaque membre du camp vainqueur qui a combattu (un quart de moins à chaque victoire d'affilée de la même tribu). Le{' '}
+          <a href="#/classement/gloire">classement de gloire</a> repart de zéro tous les {CRUSADE_SEASON_DAYS} jours.
+        </p>
+        <p>
+          <b>Récompenses :</b> la <b>relique</b> augmente la production de tous les villages du camp vainqueur pendant {RELIC_DAYS} jours (bannière dorée sur la carte) ; le <b>trésor</b> de la Citadelle est partagé
+          entre tous les combattants selon leur gloire et livré à leur plus ancien village ; des <b>titres</b> à choisir dans <a href="#/compte">Mon compte</a> s'affichent à côté de votre nom :
+        </p>
+        <ul>
+          {(Object.keys(CRUSADE_TITLES) as CrusadeTitleKey[]).map((k) => (
+            <li key={k}>
+              <b>{CRUSADE_TITLES[k]}</b> : {CRUSADE_TITLE_HELP[k].charAt(0).toLowerCase() + CRUSADE_TITLE_HELP[k].slice(1)}.
+            </li>
+          ))}
+        </ul>
+        <p>
+          <b>Les PNJ aussi :</b> les tribus de PNJ espionnent la Citadelle dès l'annonce, s'engagent si leur armée est assez forte, gardent leurs troupes en réserve et programment des vagues échelonnées, puis
+          renforcent ou contre-attaquent selon le camp qui tient la bannière.
+        </p>
+      </>
+    ),
     renforts: (
       <>
         <p>« Envoyer un renfort » envoie des troupes défendre un autre village : un des vôtres ou celui d'un allié.</p>
@@ -478,7 +530,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </p>
         <p>
           <b>Offensives des PNJ :</b> de temps en temps (environ une fois par jour de jeu), un village offensif de PNJ espionne une cible puis lui envoie la moitié de son armée : un joueur de force comparable,
-          un ennemi de guerre ou une tribu rivale. L'offensive est annulée si cette moitié ne suffit pas à battre la défense espionnée. Un joueur ne subit pas plus d'une offensive par période,
+          un ennemi de guerre ou une tribu rivale. Si cette moitié ne suffit pas à battre la défense espionnée, toute l'armée offensive part à la place ; si même elle ne suffit pas, l'offensive est annulée. Un PNJ ne lance plus d'attaque perdue d'avance. Un joueur ne subit pas plus d'une offensive par période,
           jamais pendant les heures calmes ni sous protection débutant. L'administration peut la couper, ou régler la part de l'armée et le rythme.
         </p>
         <p>

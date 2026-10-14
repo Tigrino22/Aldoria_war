@@ -158,6 +158,69 @@ const PATHS = {
       <path d="m11 12 9-9M17 6l3 3M14.5 8.5l2 2" />
     </>
   ),
+  // Croisades : la Citadelle et sa bannière, puis les pictogrammes de sa page (chronique, récompenses).
+  croisade: (
+    <>
+      <path d="M3 21h18" />
+      <path d="M5 21v-9h3v2h2v-2h4v2h2v-2h3v9" />
+      <path d="M10 21v-3a2 2 0 0 1 4 0v3" />
+      <path d="M12 12V3" />
+      <path d="M12 3.5h5l-1.5 2 1.5 2h-5" />
+    </>
+  ),
+  muraille: (
+    <>
+      <path d="M3 6h18v14H3z" />
+      <path d="M3 10.7h18M3 15.3h18" />
+      <path d="M8 6v4.7M15 6v4.7M11.5 10.7v4.6M5.5 15.3V20M17.5 15.3V20" />
+    </>
+  ),
+  banniere: (
+    <>
+      <path d="M5 21V3" />
+      <path d="M5 4h13l-3 4 3 4H5" />
+    </>
+  ),
+  porte: (
+    <>
+      <path d="M5 21V9a7 7 0 0 1 14 0v12" />
+      <path d="M3 21h18" />
+      <path d="M9 21v-9M12 21v-10M15 21v-9M7.5 14h9M7.5 17.5h9" />
+    </>
+  ),
+  couronne: (
+    <>
+      <path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z" />
+      <path d="M5 19h14" />
+    </>
+  ),
+  relique: (
+    <>
+      <path d="M12 2.5l6 6-6 13-6-13z" />
+      <path d="M6 8.5h12M9.5 8.5 12 21.5l2.5-13" />
+    </>
+  ),
+  tresor: (
+    <>
+      <path d="M3 10h18v10H3z" />
+      <path d="M3 10a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4" />
+      <path d="M3 13.5h18" />
+      <path d="M10.5 12h3v3h-3z" />
+    </>
+  ),
+  medaille: (
+    <>
+      <path d="M8 3l2.5 6M16 3l-2.5 6" />
+      <circle cx="12" cy="15" r="6" />
+      <path d="m12 12 .9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z" />
+    </>
+  ),
+  bouclier: (
+    <>
+      <path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" />
+      <path d="M12 3v18" />
+    </>
+  ),
   quitter: (
     <>
       <path d="M14 3H6v18h8" />

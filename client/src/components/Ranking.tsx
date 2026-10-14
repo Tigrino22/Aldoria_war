@@ -5,14 +5,19 @@ import { useGame } from '../game';
 import { PlayerLink } from '../ui';
 import { PageBanner } from './PageBanner';
 import WarRankingView from './WarRanking';
+import GloryRankingView from './GloryRanking';
 
-export default function Ranking() {
+export default function Ranking({ initial }: { initial?: string }) {
   const { me, run } = useGame();
-  const [tab, setTab] = useState<'players' | 'tribes' | 'war'>('players');
+  const [tab, setTab] = useState<'players' | 'tribes' | 'war' | 'glory'>(initial === 'gloire' ? 'glory' : initial === 'guerre' ? 'war' : 'players');
+  useEffect(() => {
+    if (initial === 'gloire') setTab('glory');
+    else if (initial === 'guerre') setTab('war');
+  }, [initial]);
   const [type, setType] = useState<'points' | 'attack' | 'defense'>('points');
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
-    if (tab !== 'war') run(async () => setRows(await api(`/api/ranking/${tab}?type=${type}`)));
+    if (tab !== 'war' && tab !== 'glory') run(async () => setRows(await api(`/api/ranking/${tab}?type=${type}`)));
   }, [tab, type, run]);
   const last = type === 'points' ? { label: 'Points', value: (r: any) => r.points } : type === 'attack' ? { label: 'Adversaires battus (attaque)', value: (r: any) => r.killsAttack } : { label: 'Adversaires battus (défense)', value: (r: any) => r.killsDefense };
 
@@ -21,6 +26,7 @@ export default function Ranking() {
       <button role="tab" aria-selected={tab === 'players'} onClick={() => setTab('players')}>Joueurs</button>
       <button role="tab" aria-selected={tab === 'tribes'} onClick={() => setTab('tribes')}>Tribus</button>
       <button role="tab" aria-selected={tab === 'war'} onClick={() => setTab('war')}>Guerre</button>
+      <button role="tab" aria-selected={tab === 'glory'} onClick={() => setTab('glory')}>Gloire</button>
     </div>
   );
   const mine = tab === 'players' ? rows.find((r) => r.id === me.player.id) : tab === 'tribes' ? rows.find((r) => r.id === me.player.tribe?.id) : null;
@@ -31,7 +37,7 @@ export default function Ranking() {
       title="Classement"
       lead="Les seigneurs et les tribus les plus puissants du royaume."
       stats={
-        tab === 'war'
+        tab === 'war' || tab === 'glory'
           ? undefined
           : [
               { value: mine ? `#${mine.rank}` : '–', label: tab === 'players' ? 'votre rang' : 'rang de votre tribu', tone: 'gold' },
@@ -41,12 +47,12 @@ export default function Ranking() {
       }
     />
   );
-  if (tab === 'war') {
+  if (tab === 'war' || tab === 'glory') {
     return (
       <div className="pg ranking">
         {banner}
         {tabs}
-        <WarRankingView />
+        {tab === 'war' ? <WarRankingView /> : <GloryRankingView />}
       </div>
     );
   }

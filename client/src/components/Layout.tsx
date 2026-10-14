@@ -34,6 +34,7 @@ const PAGES = {
   WorldWars: () => import('./WorldWars'),
   Admin: () => import('./Admin'),
   Raid: () => import('./Raid'),
+  Crusade: () => import('./Crusade'),
 };
 const Messages = lazy(PAGES.Messages);
 const RallyPage = lazy(PAGES.RallyPage);
@@ -50,6 +51,7 @@ const WorldStats = lazy(PAGES.WorldStats);
 const WorldWars = lazy(PAGES.WorldWars);
 const Admin = lazy(PAGES.Admin);
 const Raid = lazy(PAGES.Raid);
+const Crusade = lazy(PAGES.Crusade);
 
 interface NavItem {
   path: string;
@@ -77,6 +79,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'troupes', label: 'Troupes', icon: 'troupes' },
       { path: 'ralliement', label: 'Point de ralliement', icon: 'ralliement' },
       { path: 'pillage', label: 'Assistant de pillage', icon: 'pillage' },
+      { path: 'croisade', label: 'Croisades', icon: 'croisade' },
       { path: 'carte', label: 'Carte', icon: 'carte' },
     ],
   },
@@ -293,6 +296,7 @@ export default function Layout() {
           {page === 'troupes' && <RallyPoint />}
           {page === 'ralliement' && <RallyPage focus={route[1]} />}
           {page === 'pillage' && <Raid />}
+          {page === 'croisade' && <Crusade />}
           {page === 'carte' && (
             <Suspense fallback={<p className="muted">Chargement de la carte…</p>}>
               <MapView focus={route[1]} />
@@ -302,7 +306,7 @@ export default function Layout() {
           {page === 'messages' && <Messages id={route[1] && route[1] !== 'ecrire' ? Number(route[1]) : undefined} to={route[1] === 'ecrire' && route[2] ? decodeURIComponent(route[2]) : undefined} />}
           {page === 'joueur' && route[1] && <Profile name={decodeURIComponent(route[1])} />}
           {page === 'tribu' && <Tribe id={route[1] ? Number(route[1]) : undefined} />}
-          {page === 'classement' && <Ranking />}
+          {page === 'classement' && <Ranking initial={route[1]} />}
           {page === 'monde' && <WorldStats />}
           {page === 'guerres' && <WorldWars />}
           {page === 'marche' && <Market focus={route[1]} />}

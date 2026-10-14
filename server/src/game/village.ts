@@ -383,6 +383,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     ])
   ).rows;
 
+  const relic = await relicBonus(c, v.owner_id, new Date());
   return {
     id: v.id,
     name: v.name,
@@ -391,8 +392,8 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     points: v.points,
     loyalty: Math.floor(v.loyalty),
     resources: resourcesOf(v),
-    rates: boosted(productionRates(v.buildings, env.worldSpeed), await relicBonus(c, v.owner_id, new Date())),
-    relicBonus: await relicBonus(c, v.owner_id, new Date()),
+    rates: boosted(productionRates(v.buildings, env.worldSpeed), relic),
+    relicBonus: relic,
     capacity: warehouseCapacity(v.buildings.warehouse),
     syncedAt: new Date(v.resources_at).toISOString(),
     buildings: v.buildings,

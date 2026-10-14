@@ -16,6 +16,8 @@ import village1 from './assets/map/village-1.png';
 import village2 from './assets/map/village-2.png';
 import village3 from './assets/map/village-3.png';
 import barbarian from './assets/map/barbarian.png';
+import citadelMap from './assets/map/citadel.png';
+import citadel from './assets/citadel.png';
 import flag from './assets/map/flag.svg';
 import trees from './assets/map/trees.png';
 import hill from './assets/map/hill.png';
@@ -49,7 +51,9 @@ export function buildingImg(key: BuildingKey, level: number): string {
 }
 export const UNIT_IMG: Record<UnitKey, string> = { spearman, halberdier, swordsman, scout, cavalry, ram, noble };
 export const RESOURCE_IMG: Record<Resource, string> = { wood, clay, iron, wheat };
-export const MAP_IMG = { village1, village2, village3, barbarian, flag, trees, hill, ground };
+export const MAP_IMG = { village1, village2, village3, barbarian, citadel: citadelMap, flag, trees, hill, ground };
+/** La Citadelle des Croisades, grand rendu pour sa page. */
+export const CITADEL_IMG = citadel;
 /** Centre de chaque emplacement sur le décor du village, en % (calculé au rendu du décor). */
 export const VILLAGE_SPOTS = spots as Record<BuildingKey, { x: number; y: number }>;
 /** Largeur d'un bâtiment par rapport au décor : 18 m sur 64 m de scène. */

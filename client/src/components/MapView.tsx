@@ -51,7 +51,7 @@ interface Scene {
   strongGrid: Container;
   overlay: Graphics;
   textures: Record<string, Texture>;
-  shapes: { ring: GraphicsContext; shadow: GraphicsContext; attack: GraphicsContext; threat: GraphicsContext; support: GraphicsContext };
+  shapes: { ring: GraphicsContext; relic: GraphicsContext; shadow: GraphicsContext; attack: GraphicsContext; threat: GraphicsContext; support: GraphicsContext };
   /** Sprites de décor par case, masqués sous les villages. */
   decoAt: Map<string, Sprite[]>;
   /** Villages déjà dessinés, avec la signature de leur apparence pour ne redessiner que ce qui change. */
@@ -297,6 +297,12 @@ export default function MapView({ focus }: { focus?: string }) {
           .fill({ color: 0xffffff, alpha: 0.3 })
           .ellipse(TILE / 2, TILE * 0.74, TILE * 0.47, TILE * 0.2)
           .stroke({ width: 2.5, color: 0xffffff, alpha: 0.95 }),
+        // Liseré doré des villages dont le camp détient la relique d'une croisade.
+        relic: new GraphicsContext()
+          .ellipse(TILE / 2, TILE * 0.74, TILE * 0.52, TILE * 0.24)
+          .stroke({ width: 2, color: 0xf1cc63, alpha: 0.95 })
+          .ellipse(TILE / 2, TILE * 0.74, TILE * 0.58, TILE * 0.28)
+          .stroke({ width: 1, color: 0xf1cc63, alpha: 0.45 }),
         shadow: new GraphicsContext().ellipse(TILE / 2, TILE * 0.76, TILE * 0.38, TILE * 0.14).fill({ color: 0x000000, alpha: 0.3 }),
         attack: swordsBadge(false),
         threat: swordsBadge(true),
@@ -325,11 +331,12 @@ export default function MapView({ focus }: { focus?: string }) {
           sc0.dotsScale = sc;
           dots.clear();
           for (const { v, st } of sc0.dotsFor) {
-            const px = !v.ownerId ? 2.2 : st.rel === 'own' || st.rel === 'active' || st.mark ? 5 : 3.8;
+            const citadel = v.kind === 'citadel';
+            const px = citadel ? 7 : !v.ownerId ? 2.2 : st.rel === 'own' || st.rel === 'active' || st.mark ? 5 : 3.8;
             const cx = (v.x + 0.5) * TILE;
             const cy = (v.y + 0.5) * TILE;
-            dots.circle(cx, cy, (px + 1.2) / sc).fill({ color: 0x140e08, alpha: v.ownerId ? 0.75 : 0.4 });
-            dots.circle(cx, cy, px / sc).fill({ color: hexToNum(st.color) });
+            dots.circle(cx, cy, (px + 1.2) / sc).fill({ color: 0x140e08, alpha: v.ownerId || citadel ? 0.75 : 0.4 });
+            dots.circle(cx, cy, px / sc).fill({ color: citadel ? 0xf1cc63 : hexToNum(st.color) });
           }
         }
         fineGrid.visible = sc >= LOD_ZOOM;
@@ -557,7 +564,7 @@ export default function MapView({ focus }: { focus?: string }) {
       s.decoAt.get(`${v.x},${v.y}`)?.forEach((sp) => (sp.visible = false));
       const st = styleOf(v, colors);
       const chunk = Math.floor(v.y / CHUNK) * n + Math.floor(v.x / CHUNK);
-      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${st.color}|${st.rel}|${mv ? `${+mv.attack}${+mv.support}${+mv.threat}` : ''}`;
+      const sig = `${v.name}|${v.tribeTag}|${v.points}|${v.ownerId}|${v.holderTag ?? ''}|${+!!v.relic}|${st.color}|${st.rel}|${mv ? `${+mv.attack}${+mv.support}${+mv.threat}` : ''}`;
       const prev = s.drawn.get(v.id);
       if (prev && prev.sig === sig && prev.chunk === chunk) continue;
       if (prev) prev.node.destroy({ children: true });
@@ -817,16 +824,23 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?:
   c.position.set(v.x * TILE, v.y * TILE);
   const tint = hexToNum(color);
   c.addChild(new Graphics(s.shapes.shadow));
+  const citadel = v.kind === 'citadel';
   const ring = new Graphics(s.shapes.ring);
-  ring.tint = tint;
-  ring.alpha = v.ownerId ? 1 : 0.45;
+  // La Citadelle garde son socle doré, quel que soit le camp qui tient sa bannière ; un camp qui détient la relique a un socle doré lui aussi.
+  ring.tint = citadel ? 0xf1cc63 : tint;
+  ring.alpha = v.ownerId || citadel ? 1 : 0.45;
+  if (citadel) ring.scale.set(1.25), ring.position.set(-TILE * 0.125, -TILE * 0.2);
   c.addChild(ring);
-  // Hameau, bourg puis cité fortifiée selon les points du village.
-  const tex = !v.ownerId ? s.textures.barbarian : v.points < 120 ? s.textures.village1 : v.points < 600 ? s.textures.village2 : s.textures.village3;
+  if (v.relic) {
+    const halo = new Graphics(s.shapes.relic);
+    c.addChild(halo);
+  }
+  // Hameau, bourg puis cité fortifiée selon les points du village ; la Citadelle déborde de sa case.
+  const tex = citadel ? s.textures.citadel : !v.ownerId ? s.textures.barbarian : v.points < 120 ? s.textures.village1 : v.points < 600 ? s.textures.village2 : s.textures.village3;
   const sp = new Sprite(tex);
-  const scale = v.ownerId ? 1.12 : 0.95;
+  const scale = citadel ? 1.6 : v.ownerId ? 1.12 : 0.95;
   sp.width = sp.height = TILE * scale;
-  sp.position.set((TILE - sp.width) / 2, (TILE - sp.height) / 2 - 4);
+  sp.position.set((TILE - sp.width) / 2, (TILE - sp.height) / 2 - (citadel ? 14 : 4));
   c.addChild(sp);
   if (v.ownerId) {
     const f = new Sprite(s.textures.flag);
@@ -850,23 +864,25 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?:
   }
   // Étiquette : pastille sombre, point de couleur et nom (texte bitmap partagé, bien plus léger qu'un texte par village).
   const label = new Container();
-  label.label = 'name';
+  label.label = citadel ? 'name-fixed' : 'name';
   const text = new BitmapText({
-    text: v.tribeTag ? `[${v.tribeTag}] ${v.name}` : v.name,
+    text: citadel ? (v.holderTag ? `${v.name} · bannière ${v.holderTag}` : v.name) : v.tribeTag ? `[${v.tribeTag}] ${v.name}` : v.name,
     style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '600', fill: 0xf7efdc },
   });
-  const maxW = TILE * 1.7;
+  const maxW = TILE * (citadel ? 3 : 1.7);
   if (text.width > maxW) text.scale.set(maxW / text.width);
   const w = text.width + 18;
   const pill = new Graphics()
     .roundRect(-w / 2, 0, w, 16, 8)
-    .fill({ color: 0x17110b, alpha: 0.78 })
+    .fill({ color: citadel ? 0x3a2a12 : 0x17110b, alpha: citadel ? 0.92 : 0.78 })
     .circle(-w / 2 + 8, 8, 3.2)
-    .fill({ color: tint });
+    .fill({ color: citadel ? 0xf1cc63 : tint });
+  if (citadel) pill.roundRect(-w / 2, 0, w, 16, 8).stroke({ width: 1, color: 0xf1cc63, alpha: 0.9 });
   text.position.set(-w / 2 + 14, 8 - text.height / 2);
   label.addChild(pill, text);
   label.position.set(TILE / 2, TILE - 6);
-  label.visible = s.world.scale.x >= NAME_ZOOM;
+  // Le nom de la Citadelle reste lisible même de loin.
+  label.visible = citadel || s.world.scale.x >= NAME_ZOOM;
   c.addChild(label);
   return c;
 }

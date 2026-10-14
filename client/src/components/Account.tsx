@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { CrusadeTitleKey, PlayerTitleView } from '@aldoria/shared';
 import { api } from '../api';
 import { useGame } from '../game';
 import { Panel } from '../ui';
@@ -10,6 +11,16 @@ export default function Account() {
   const { me, logout, run } = useGame();
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
+  const [titles, setTitles] = useState<{ titles: PlayerTitleView[]; current: CrusadeTitleKey | null } | null>(null);
+  useEffect(() => {
+    run(async () => setTitles(await api('/api/me/titles')));
+  }, [run]);
+  const choose = (title: CrusadeTitleKey | null) =>
+    run(async () => {
+      await api('/api/me/title', { method: 'PUT', body: { title } });
+      setTitles((t) => (t ? { ...t, current: title } : t));
+    });
+  const earned = titles?.titles.filter((t) => t.earnedAt) ?? [];
 
   const remove = () =>
     run(async () => {
@@ -30,6 +41,35 @@ export default function Account() {
           { value: me.villages.length, label: me.villages.length > 1 ? 'Villages' : 'Village' },
         ]}
       />
+
+      <Panel title="Titres de croisade">
+        <p className="small">
+          Les titres se gagnent aux <a href="#/croisade">Croisades</a>. Celui que vous choisissez s'affiche à côté de votre nom dans les classements de gloire et sur votre profil.
+        </p>
+        {!titles ? (
+          <p className="muted">Chargement…</p>
+        ) : (
+          <div className="titles-grid">
+            {titles.titles.map((t) => {
+              const on = titles.current === t.key;
+              return (
+                <button
+                  key={t.key}
+                  className={`title-card ${t.earnedAt ? 'earned' : 'locked'} ${on ? 'on' : ''}`}
+                  disabled={!t.earnedAt}
+                  aria-pressed={on}
+                  onClick={() => choose(on ? null : t.key)}
+                >
+                  <b>{t.label}</b>
+                  <span>{t.help}</span>
+                  <i>{on ? 'Affiché' : t.earnedAt ? `Gagné le ${new Date(t.earnedAt).toLocaleDateString('fr-FR')}` : 'À gagner'}</i>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {earned.length === 0 && titles && <p className="small muted">Vous n'avez encore aucun titre : combattez à la prochaine croisade pour gagner celui de Croisé.</p>}
+      </Panel>
 
       <Panel title="Vos données">
         <p className="small">

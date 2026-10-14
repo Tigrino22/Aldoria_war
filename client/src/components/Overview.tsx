@@ -8,6 +8,7 @@ import { ManagerSwitch, useManager } from './Manager';
 import { buildingImg } from '../assets';
 import { Countdown, ResIcon, UnitList, liveResources } from '../ui';
 import { PageBanner } from './PageBanner';
+import { CrusadeBanner } from './CrusadeBanner';
 import './overview.css';
 
 export default function Overview() {
@@ -54,6 +55,7 @@ export default function Overview() {
           })),
         ]}
       />
+      <CrusadeBanner />
       <p className="muted small ov-hint">Le gestionnaire de compte construit et recrute automatiquement, par modèle (offensif, défensif…).</p>
       {villages.map((v) => {
         const res = liveResources(v, now);

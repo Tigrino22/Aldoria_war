@@ -66,6 +66,8 @@
 .mvc-facts { display: flex; flex-wrap: wrap; gap: 4px; }
 .mvc-chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--glass-line); background: rgb(0 0 0 / 0.2); }
 .mvc-chip.warn { border-color: #e0a84a; color: #f3cf8c; }
+.mvc-chip.gold { border-color: #e0b23c; color: #f3d88c; text-decoration: none; }
+.map-popup .mvc-chip.gold { color: var(--gold); border-color: var(--gold); }
 .mvc-times { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; padding-top: 8px; border-top: 1px solid var(--glass-line); }
 .mvc-time { display: flex; align-items: center; gap: 6px; font: 600 12px var(--body); font-variant-numeric: tabular-nums; }
 .mvc-time img { width: 24px; height: 24px; object-fit: contain; border-radius: 6px; background: rgb(243 226 179 / 0.85); padding: 1px; flex: none; }
