@@ -155,6 +155,21 @@ function produce(v: VillageRow, from: Date, to: Date, bonus: Resources = NO_BONU
  * Amène un village à l'instant `at` : production de ressources, constructions terminées,
  * unités recrutées et regain de loyauté. Rien n'est recalculé tant que personne ne regarde le village.
  */
+/** Recalcule les points de tous les villages (au démarrage, quand la formule ou les coûts des bâtiments changent). */
+export async function recomputeVillagePoints(c: Db): Promise<number> {
+  const rows = (await c.query('SELECT id, buildings, points FROM villages')).rows;
+  const changed = rows
+    .map((r) => ({ id: r.id as number, points: villagePoints(r.buildings) }))
+    .filter((r, i) => r.points !== rows[i].points);
+  if (changed.length) {
+    await c.query('UPDATE villages v SET points = u.points FROM unnest($1::int[], $2::int[]) AS u(id, points) WHERE v.id = u.id', [
+      changed.map((r) => r.id),
+      changed.map((r) => r.points),
+    ]);
+  }
+  return changed.length;
+}
+
 export async function syncVillage(c: Db, id: number, at: Date): Promise<VillageRow> {
   const v = await loadVillage(c, id, true);
   if (at.getTime() <= new Date(v.resources_at).getTime()) return v;

@@ -13,6 +13,13 @@ import {
   wallAfterRams,
   ramsToBreakWall,
   travelTime,
+  BUILDING_KEYS,
+  BUILDINGS,
+  type Buildings,
+  recruitTime,
+  resourceProduction,
+  villagePoints,
+  warehouseCapacity,
 } from '../src';
 
 describe('formules', () => {
@@ -87,5 +94,34 @@ describe('combat', () => {
     const base = { attackers: { ...emptyUnits(), swordsman: 50 }, defenders: [{ ...emptyUnits(), spearman: 120 }] };
     expect(resolveCombat({ ...base, wallLevel: 0 }).attackerWins).toBe(true);
     expect(resolveCombat({ ...base, wallLevel: 10 }).attackerWins).toBe(false);
+  });
+});
+
+describe('mines niveau 30, caserne 25 et points', () => {
+  it('la production garde ses valeurs jusqu’au niveau 20 puis atteint 3 000 au niveau 30', () => {
+    expect(resourceProduction(1)).toBe(30);
+    expect(resourceProduction(20)).toBe(958);
+    expect(resourceProduction(30)).toBe(3000);
+    for (let l = 1; l <= 30; l++) expect(resourceProduction(l)).toBeGreaterThan(resourceProduction(l - 1));
+  });
+
+  it('chaque niveau maximal tient dans un entrepôt niveau 20', () => {
+    for (const k of BUILDING_KEYS) {
+      const cost = buildingCost(k, BUILDINGS[k].maxLevel);
+      expect(Math.max(cost.wood, cost.clay, cost.iron, cost.wheat)).toBeLessThanOrEqual(warehouseCapacity(BUILDINGS.warehouse.maxLevel));
+    }
+  });
+
+  it('la caserne accélère encore le recrutement jusqu’au niveau 25', () => {
+    expect(BUILDINGS.barracks.maxLevel).toBe(25);
+    expect(recruitTime('spearman', 25, 1)).toBeLessThan(recruitTime('spearman', 20, 1));
+  });
+
+  it('les points suivent les ressources investies', () => {
+    const all = (n: number) => Object.fromEntries(BUILDING_KEYS.map((k) => [k, Math.min(n, BUILDINGS[k].maxLevel)])) as Buildings;
+    expect(villagePoints(STARTING_BUILDINGS)).toBe(6);
+    // Un village tout au niveau 20 coûte environ 5 fois un village tout au niveau 13 (≈ 800 points).
+    expect(villagePoints(all(13))).toBeGreaterThan(750);
+    expect(villagePoints(all(20)) / villagePoints(all(13))).toBeGreaterThan(5);
   });
 });

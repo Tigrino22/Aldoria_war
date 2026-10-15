@@ -49,6 +49,8 @@ Produit du bois. Prérequis : aucun. Coût x1.25 et durée x1.2 par niveau.
 | 10 | 373 / 447 / 298 / 149 | 25 min 48 |
 | 15 | 1137 / 1364 / 909 / 455 | 1 h 04 |
 | 20 | 3469 / 4163 / 2776 / 1388 | 2 h 39 |
+| 25 | 10588 / 12705 / 8470 / 4235 | 6 h 37 |
+| 30 | 32312 / 38774 / 25849 / 12925 | 16 h 29 |
 
 ### Argilière
 Produit de l'argile. Prérequis : aucun. Coût x1.25 et durée x1.2 par niveau.
@@ -62,6 +64,8 @@ Produit de l'argile. Prérequis : aucun. Coût x1.25 et durée x1.2 par niveau.
 | 10 | 484 / 373 / 298 / 149 | 25 min 48 |
 | 15 | 1478 / 1137 / 909 / 455 | 1 h 04 |
 | 20 | 4510 / 3469 / 2776 / 1388 | 2 h 39 |
+| 25 | 13764 / 10588 / 8470 / 4235 | 6 h 37 |
+| 30 | 42005 / 32312 / 25849 / 12925 | 16 h 29 |
 
 ### Mine de fer
 Produit du fer. Prérequis : aucun. Coût x1.25 et durée x1.2 par niveau.
@@ -75,6 +79,8 @@ Produit du fer. Prérequis : aucun. Coût x1.25 et durée x1.2 par niveau.
 | 10 | 559 / 484 / 522 / 186 | 30 min 58 |
 | 15 | 1705 / 1478 / 1592 / 568 | 1 h 17 |
 | 20 | 5204 / 4510 / 4857 / 1735 | 3 h 11 |
+| 25 | 15882 / 13764 / 14823 / 5294 | 7 h 56 |
+| 30 | 48468 / 42005 / 45236 / 16156 | 19 h 46 |
 
 ### Ferme
 Produit du blé et loge votre armée (population). Prérequis : aucun. Coût x1.26 et durée x1.2 par niveau.
@@ -120,13 +126,14 @@ Recrute les unités. Plus elle est haute, plus le recrutement est rapide. Prére
 
 | Niveau | Coût | Durée |
 |---|---|---|
-| 1 | 200 / 170 / 90 / 60 | 15 min 00 |
-| 2 | 252 / 214 / 113 / 76 | 18 min 00 |
-| 3 | 318 / 270 / 143 / 95 | 21 min 36 |
-| 5 | 504 / 428 / 227 / 151 | 31 min 06 |
-| 10 | 1601 / 1361 / 720 / 480 | 1 h 17 |
-| 15 | 5084 / 4322 / 2288 / 1525 | 3 h 12 |
-| 20 | 16146 / 13724 / 7266 / 4844 | 7 h 59 |
+| 1 | 195 / 170 / 90 / 60 | 15 min 00 |
+| 2 | 246 / 214 / 113 / 76 | 18 min 00 |
+| 3 | 310 / 270 / 143 / 95 | 21 min 36 |
+| 5 | 491 / 428 / 227 / 151 | 31 min 06 |
+| 10 | 1561 / 1361 / 720 / 480 | 1 h 17 |
+| 15 | 4957 / 4322 / 2288 / 1525 | 3 h 12 |
+| 20 | 15743 / 13724 / 7266 / 4844 | 7 h 59 |
+| 25 | 49995 / 43585 / 23075 / 15383 | 19 h 52 |
 
 ### Muraille
 Renforce la défense de toutes les troupes présentes dans le village. Prérequis : Caserne 1. Coût x1.26 et durée x1.2 par niveau.
