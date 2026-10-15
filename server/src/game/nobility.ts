@@ -107,7 +107,9 @@ export async function checkLetters(c: Q, playerId: number, count: number) {
   const missing = await missingLetters(c, playerId, count);
   if (missing > 0) {
     throw new GameError(
-      `Il manque ${missing} lettre${missing > 1 ? 's' : ''} de noblesse : il faut en avoir frappé autant que vos villages et vos nobles réunis. Frappez-les à l’hôtel de ville`,
+      missing > 1
+        ? `Il manque ${missing} lettres de noblesse : chaque noble a la sienne. Frappez-les à l’hôtel de ville`
+        : 'Il manque 1 lettre de noblesse : chaque noble a la sienne. Frappez-la à l’hôtel de ville',
     );
   }
 }

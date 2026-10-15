@@ -3,6 +3,7 @@ import { freeLetters, letterPriceAt, lettersAffordable, lettersCost, lettersRequ
 import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { env } from '../src/env';
+import { readFileSync } from 'node:fs';
 import { migrate } from '../src/migrate';
 import { ensureLetters } from '../src/game/nobility';
 
@@ -132,5 +133,23 @@ describe('cagnotte et lettres de noblesse', () => {
     await pool.query('UPDATE villages SET wood = 10000, resources_at = now() WHERE id = $1', [vid]);
     expect(await tx((c) => ensureLetters(c, pid, vid, 6, new Date()))).toBe(false);
     expect(Number((await player()).treasury_wood)).toBeGreaterThanOrEqual(5000);
+  });
+
+  it('compte les nobles déjà recrutés comme des lettres frappées (migration 037)', async () => {
+    const h = await register('Comtesse');
+    const me = (await app.inject({ method: 'GET', url: '/api/me', headers: h })).json();
+    const vid = me.villages[0].id as number;
+    const pid = me.player.id as number;
+    await pool.query(
+      `INSERT INTO troops (village_id, home_village_id, units) VALUES ($1, $1, '{"noble": 2}')
+       ON CONFLICT (village_id, home_village_id) DO UPDATE SET units = troops.units || '{"noble": 2}'::jsonb`,
+      [vid],
+    );
+    await pool.query('UPDATE players SET letters_minted = 0 WHERE id = $1', [pid]);
+    await pool.query(readFileSync(new URL('../migrations/037_lettres_nobles_existants.sql', import.meta.url), 'utf8'));
+    expect((await pool.query('SELECT letters_minted FROM players WHERE id = $1', [pid])).rows[0].letters_minted).toBe(2);
+    // Le 3e noble demande seulement la lettre n° 3.
+    const view = (await app.inject({ method: 'GET', url: `/api/villages/${vid}`, headers: h })).json().nobility;
+    expect(view).toMatchObject({ minted: 2, nobles: 2, free: 0, price: { wood: 3 * env.letterWood } });
   });
 });

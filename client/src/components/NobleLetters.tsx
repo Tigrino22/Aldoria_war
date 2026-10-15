@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LETTER_TOWNHALL, letterFactor, letterPriceAt, lettersAffordable, lettersCost, type Resources, type VillageState } from '@aldoria/shared';
+import { LETTER_TOWNHALL, lettersAffordable, lettersCost, type Resources, type VillageState } from '@aldoria/shared';
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
@@ -9,6 +9,7 @@ import { CardTitle } from './PageBanner';
 const TREASURY = ['wood', 'clay', 'iron'] as const;
 type Gift = Record<(typeof TREASURY)[number], string>;
 const NO_GIFT: Gift = { wood: '', clay: '', iron: '' };
+const ordinal = (k: number) => (k === 1 ? '1er' : `${k}e`);
 
 /**
  * Carte de l'hôtel de ville : la cagnotte de noblesse, commune à tous les villages du compte, et la frappe des lettres,
@@ -23,7 +24,9 @@ export default function NobleLetters({ v, res }: { v: VillageState; res: Resourc
   const locked = v.buildings.townhall < LETTER_TOWNHALL;
   const max = lettersAffordable(n.treasury, n.base, n.increase, n.minted);
   const rank = n.minted + 1;
-  const times = (k: number) => letterFactor(k, n.increase).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+  // Nobles installés dans les villages conquis (le premier village n'en a pas demandé) : ils gardent leur lettre.
+  const settled = Math.max(0, n.villages - 1);
+  const next = settled + n.nobles + 1;
   const wanted = Number(count || 0);
   const giving = TREASURY.some((r) => Number(gift[r] || 0) > 0);
 
@@ -42,7 +45,7 @@ export default function NobleLetters({ v, res }: { v: VillageState; res: Resourc
   return (
     <section className="pg-card th-letters">
       <header className="pg-card-head">
-        <CardTitle icon="couronne" count={fmt(n.minted)}>
+        <CardTitle icon="couronne" count={`${fmt(n.minted)} frappée${n.minted > 1 ? 's' : ''}`}>
           Lettres de noblesse
         </CardTitle>
       </header>
@@ -50,19 +53,37 @@ export default function NobleLetters({ v, res }: { v: VillageState; res: Resourc
       <div className="th-letters-body">
         <div className="th-letters-stock">
           <b>{fmt(n.free)}</b>
-          <span className="muted small">noble{n.free > 1 ? 's' : ''} recrutable{n.free > 1 ? 's' : ''}</span>
+          <span className="muted small">noble{n.free > 1 ? 's' : ''} sans nouvelle lettre</span>
         </div>
         <div className="th-letters-rule">
           <p>
-            Pour recruter un noble, il faut avoir frappé autant de lettres que vos villages et vos nobles réunis :{' '}
-            <b>
-              {n.villages} village{n.villages > 1 ? 's' : ''} + {n.nobles} noble{n.nobles > 1 ? 's' : ''} = {n.villages + n.nobles} lettre{n.villages + n.nobles > 1 ? 's' : ''}
-            </b>
-            . Vous en avez frappé <b>{fmt(n.minted)}</b>.
+            Chaque noble a sa lettre : le 1er noble demande 1 lettre, le 2e une lettre au prix de 2, le 3e une lettre au prix de 3, et
+            ainsi de suite.
+          </p>
+          <p>
+            Votre prochain noble sera votre <b>{ordinal(next)}</b>
+            {settled > 0 && (
+              <>
+                {' '}
+                ({settled} installé{settled > 1 ? 's' : ''} dans vos villages conquis
+                {n.nobles > 0 && <>, {n.nobles} dans votre armée</>})
+              </>
+            )}
+            {settled === 0 && n.nobles > 0 && <> ({n.nobles} dans votre armée)</>}
+            {n.free > 0 ? (
+              <> : sa lettre est déjà frappée.</>
+            ) : next - n.minted > 1 ? (
+              <>
+                {' '}: frappez les lettres n° {rank} à {next}.
+              </>
+            ) : (
+              <>
+                {' '}: frappez sa lettre, la n° {rank}, pour <Cost cost={n.price} />.
+              </>
+            )}
           </p>
           <p className="muted small">
-            Les lettres ne s’usent pas : un noble mort se recrute sans nouvelle lettre, et une conquête ne change rien (le noble s’installe, un village s’ajoute). Votre prochaine lettre est la n° {rank} : elle coûte <Cost cost={n.price} /> ({times(rank)} fois le prix de base), la suivante{' '}
-            <Cost cost={letterPriceAt(n.base, n.increase, rank + 1)} />.
+            Un noble mort se remplace sans nouvelle lettre. Un noble qui prend un village garde sa lettre.
           </p>
         </div>
       </div>
