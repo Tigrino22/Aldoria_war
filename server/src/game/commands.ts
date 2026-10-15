@@ -38,7 +38,7 @@ import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { assertCitadelMove, handleCitadelAttack, handleCitadelSupport } from './crusades';
-import { assertBastionMove, handleBastionAttack, handleBastionSupport } from './provinces';
+import { assertBastionMove, handleBastionAttack, handleBastionSupport, speedBonus } from './provinces';
 import { handleIntercept } from './intercept';
 import { launchDueOrders } from './orders';
 import { createReport } from './reports';
@@ -111,7 +111,8 @@ export async function dispatchCommand(
   outbox: Outbox,
   cmd: { type: 'attack' | 'support'; playerId: number; origin: VillageRow; target: VillageRow; units: UnitCounts; sentAt: Date; arriveAt?: Date },
 ) {
-  const arriveAt = cmd.arriveAt ?? new Date(cmd.sentAt.getTime() + travelTime(cmd.units, cmd.origin, cmd.target, env.worldSpeed) * 1000);
+  const arriveAt =
+    cmd.arriveAt ?? new Date(cmd.sentAt.getTime() + travelTime(cmd.units, cmd.origin, cmd.target, env.worldSpeed, await speedBonus(c, cmd.playerId, cmd.sentAt)) * 1000);
   // La Citadelle d'une croisade n'accepte que les arrivées pendant la fenêtre d'assaut.
   await assertCitadelMove(c, { type: cmd.type, playerId: cmd.playerId, target: cmd.target, units: cmd.units, arriveAt });
   // Un bastion : renforts réservés à la tribu de la bannière, Sanctuaire réservé aux tribus qui contrôlent assez de provinces voisines.
@@ -210,7 +211,7 @@ export async function recallTroops(c: Db, outbox: Outbox, playerId: number, stat
   const units = await getTroops(c, stationedId, homeId);
   if (totalUnits(units) === 0) throw new GameError('Aucune troupe à renvoyer');
   await setTroops(c, stationedId, homeId, emptyUnits());
-  const arriveAt = new Date(now.getTime() + travelTime(units, stationed, home, env.worldSpeed) * 1000);
+  const arriveAt = new Date(now.getTime() + travelTime(units, stationed, home, env.worldSpeed, await speedBonus(c, home.owner_id, now)) * 1000);
   await insertCommand(c, {
     type: 'return',
     originId: stationedId,
@@ -353,7 +354,7 @@ async function handleScouting(c: Db, outbox: Outbox, cmd: any, target: VillageRo
       playerId: attackerId,
       units: survivors,
       sentAt: at,
-      arriveAt: new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed) * 1000),
+      arriveAt: new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed, await speedBonus(c, attackerId, at)) * 1000),
     });
   }
   await addKills(c, target.owner_id, 'defense', populationOf(attackerLosses));
@@ -486,7 +487,7 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
     await conquer(c, outbox, target, attackerId, survivors);
     loyalty = { before: loyalty!.before, after: LOYALTY_AFTER_CONQUEST };
   } else if (totalUnits(survivors) > 0) {
-    const arriveAt = new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed) * 1000);
+    const arriveAt = new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed, await speedBonus(c, attackerId, at)) * 1000);
     await insertCommand(c, {
       type: 'return',
       originId: target.id,

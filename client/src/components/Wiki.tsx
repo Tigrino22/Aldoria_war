@@ -2,8 +2,6 @@ import { useState, type ReactNode } from 'react';
 import {
   ARMY_SIGHT,
   BASE_VILLAGE_DEFENSE,
-  BASTION_GARRISON,
-  BASTION_WALL,
   HOLY_GARRISON,
   HOLY_WALL,
   BEGINNER_PROTECTION_HOURS,
@@ -466,21 +464,25 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </p>
         <ul>
           <li>
-            <b>Bastion :</b> chaque province a un fort, gardé au départ par une garnison neutre de {fmt(BASTION_GARRISON)} places de population derrière une muraille {BASTION_WALL}. Il est ouvert jour et nuit.
+            <b>Bastion :</b> chaque province a un fort, gardé au départ par une garnison neutre derrière une muraille. Il est ouvert jour et nuit.
+          </li>
+          <li>
+            <b>Trois niveaux :</b> plus une province est proche de la Terre sainte, plus son bastion est dur et son bonus fort. Par défaut : niveau 1 au bord de la carte ({fmt(1500)} places de garde, muraille 5,
+            bonus +5 %), niveau 2 à mi-chemin ({fmt(3000)}, muraille 10, +10 %), niveau 3 autour de la Terre sainte ({fmt(6000)}, muraille 15, +15 %). La page Provinces donne les valeurs de ce monde.
           </li>
           <li>
             <b>Bannière :</b> l'attaque qui vide le bastion doit compter un {U('noble')} survivant pour planter la bannière de votre tribu ; vos survivants restent pour le garder. Sans tribu, pas de
             bannière. Votre tribu et ses alliées peuvent le renforcer, et leurs attaques deviennent des renforts.
           </li>
           <li>
-            <b>Contrôle :</b> après la durée de tenue (12 heures par défaut) sans perdre la bannière, la province est contrôlée : son bonus (+10 % de bois, d'argile, de fer ou de blé, ou recrutement plus
-            rapide) s'applique à tous les villages de la tribu. Les provinces s'additionnent.
+            <b>Contrôle :</b> après la durée de tenue (12 heures par défaut) sans perdre la bannière, la province est contrôlée : son bonus (bois, argile, fer ou blé en plus, recrutement plus rapide ou
+            troupes plus rapides, selon le niveau) s'applique à tous les villages de la tribu. Les provinces s'additionnent.
           </li>
           <li>
             <b>Perte :</b> une attaque victorieuse avec un noble remplace la bannière, sans noble elle l'abat ; la tribu qui la tenait perd le bonus tout de suite.
           </li>
           <li>
-            <b>Terre sainte :</b> son Sanctuaire ({fmt(HOLY_GARRISON)} places de garnison, muraille {HOLY_WALL}) ne peut être attaqué que par une tribu qui contrôle assez de provinces qui la bordent (2 par défaut) ;
+            <b>Terre sainte :</b> son Sanctuaire ({fmt(HOLY_GARRISON)} places de garnison, muraille {HOLY_WALL}) ne peut être attaqué que par une tribu qui contrôle assez de provinces de niveau 3, celles qui la bordent (2 par défaut) ;
             les {U('scout')} y vont librement. La tribu qui y garde sa bannière assez longtemps (3 jours par défaut) <b>gagne le monde</b> : ses membres reçoivent le titre « Maître d’Aldoria ».
           </li>
         </ul>

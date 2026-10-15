@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BASTION_GARRISON, HOLY_GARRISON, PROVINCE_BONUS_LABEL, provinceGrid, type MapRelations, type ProvinceView, type ProvincesState } from '@aldoria/shared';
+import { HOLY_GARRISON, HOLY_WALL, PROVINCE_BONUS_LABEL, TIER_LABEL, provinceGrid, type MapRelations, type ProvinceTier, type ProvinceView, type ProvincesState } from '@aldoria/shared';
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
@@ -105,7 +105,7 @@ export default function Provinces() {
   const mine = state.provinces.filter((p) => p.kind === 'province' && p.holder?.tribeId === myTribe && p.controlled);
   const ordered = [...state.provinces].sort((a, b) => {
     const rank = (p: ProvinceView) => (p.kind === 'holy' ? 0 : p.holder?.tribeId === myTribe && myTribe ? 1 : p.holder ? 2 : 3);
-    return rank(a) - rank(b) || a.name.localeCompare(b.name);
+    return rank(a) - rank(b) || b.tier - a.tier || a.name.localeCompare(b.name);
   });
   const around = new Set(holy?.neighbours ?? []);
 
@@ -120,7 +120,7 @@ export default function Provinces() {
           { value: mine.length, label: 'Provinces de votre tribu', tone: 'sky' },
           { value: state.mine ? `${state.mine.holyNeighbours}/${state.holyAccess}` : '–', label: 'Voisines de la Terre sainte', tone: state.mine?.canAttackHoly ? 'ok' : '' },
           { value: holy?.holder ? `[${holy.holder.tag}]` : 'Libre', label: 'Terre sainte', tone: 'gold' },
-          { value: `+${state.bonusPercent} %`, label: 'Bonus par province' },
+          { value: `+${state.tiers[0]?.bonus ?? 0} à ${state.tiers[2]?.bonus ?? 0} %`, label: 'Bonus selon le niveau' },
         ]}
       />
       {!state.enabled && <p className="warn">Les provinces sont désactivées sur ce monde.</p>}
@@ -148,7 +148,14 @@ export default function Provinces() {
                     <div className="prov-main">
                       <b>{p.name}</b>
                       <span className="prov-sub">
-                        {p.kind === 'holy' ? 'Terre sainte · victoire du monde' : p.bonus ? `${PROVINCE_BONUS_LABEL[p.bonus]} +${state.bonusPercent} %` : ''}
+                        {p.kind === 'holy' ? (
+                          'Terre sainte · victoire du monde'
+                        ) : (
+                          <>
+                            <span className={`prov-tier t${p.tier}`}>{TIER_LABEL[p.tier as ProvinceTier]}</span>
+                            {p.bonus ? ` ${PROVINCE_BONUS_LABEL[p.bonus]} +${p.bonusPercent} %` : ''}
+                          </>
+                        )}
                         {around.has(p.id) && ' · borde la Terre sainte'}
                       </span>
                       <span className="prov-sub">
@@ -177,10 +184,42 @@ export default function Provinces() {
             <ProvinceMap state={state} colorOf={colorOf} />
             <p className="muted small">Couleurs de la carte : bleu pour votre tribu, bleu ciel pour vos alliés, rouge vif pour vos ennemis, rouge foncé pour les autres. Plus pâle : bannière pas encore tenue assez longtemps.</p>
           </section>
+          <section className="pg-card">
+            <CardTitle icon="couronne">Trois niveaux de provinces</CardTitle>
+            <p className="muted small">Plus on approche de la Terre sainte, plus les bastions sont gardés et plus le bonus est fort. Le niveau 3 borde la Terre sainte : il faut le tenir pour l'attaquer.</p>
+            <table className="prov-tiers">
+              <thead>
+                <tr>
+                  <th>Niveau</th>
+                  <th>Où</th>
+                  <th>Garde</th>
+                  <th>Muraille</th>
+                  <th>Bonus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.tiers.map((t) => (
+                  <tr key={t.tier}>
+                    <td>
+                      <span className={`prov-tier t${t.tier}`}>{t.tier}</span>
+                    </td>
+                    <td>{t.tier === 1 ? 'Bord de la carte' : t.tier === 2 ? 'Mi-chemin' : 'Autour de la Terre sainte'}</td>
+                    <td>{fmt(t.garrison)}</td>
+                    <td>{t.wall}</td>
+                    <td>+{t.bonus} %</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted small">Chaque province donne un bonus : production d'une ressource, recrutement plus rapide ou troupes plus rapides, pour tous les villages de la tribu qui la contrôle.</p>
+          </section>
           <section className="pg-card pg-callout">
             <CardTitle icon="banniere">Comment prendre un bastion</CardTitle>
             <ol className="prov-steps">
-              <li>Chaque bastion est gardé au départ par {fmt(BASTION_GARRISON)} places de population derrière une muraille 10 (le Sanctuaire : {fmt(HOLY_GARRISON)} et muraille 20). Espionnez-le d'abord.</li>
+              <li>
+                Chaque bastion est gardé au départ selon son niveau, de {fmt(state.tiers[0]?.garrison ?? 0)} à {fmt(state.tiers[2]?.garrison ?? 0)} places de population (le Sanctuaire : {fmt(HOLY_GARRISON)} et muraille {HOLY_WALL}).
+                Espionnez-le d'abord.
+              </li>
               <li>Videz-le avec une attaque qui emmène un noble : s'il survit, il plante la bannière de votre tribu et vos survivants restent pour la garder.</li>
               <li>Votre tribu et ses alliés peuvent le renforcer. Tenez {state.holdHours} heures sans perdre la bannière pour contrôler la province.</li>
               <li>Une attaque victorieuse avec un noble remplace la bannière ; sans noble, elle l'abat. Dans les deux cas, le bonus est perdu tout de suite.</li>

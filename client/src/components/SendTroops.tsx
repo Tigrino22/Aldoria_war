@@ -81,7 +81,7 @@ export default function SendTroops({ target, protectedTarget, onSent }: { target
   const units = normalizeUnits(Object.fromEntries(UNIT_KEYS.map((k) => [k, Number(counts[k] || 0)])));
   const total = totalUnits(units);
   const valid = total > 0 && UNIT_KEYS.every((k) => units[k] <= v.troopsHome[k]);
-  const travel = total > 0 ? travelTime(units, v, target, world.speed) : 0;
+  const travel = total > 0 ? travelTime(units, v, target, world.speed, v.speedBonus) : 0;
   const ownTarget = target.ownerId === me.player.id;
   const wheat = attackWheatCost(units);
   const wheatHave = Math.floor(liveResources(v, now).wheat);

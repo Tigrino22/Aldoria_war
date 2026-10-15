@@ -1,6 +1,4 @@
 import {
-  BASTION_GARRISON,
-  BASTION_WALL,
   HOLY_GARRISON,
   HOLY_WALL,
   PROVINCE_BONUSES,
@@ -14,6 +12,7 @@ import {
   populationOf,
   provinceGrid,
   provinceNeighbours,
+  provinceTiers,
   resolveCombat,
   subtractUnits,
   totalUnits,
@@ -24,6 +23,8 @@ import {
   type Buildings,
   type ProvinceBonus,
   type ProvinceSeed,
+  type ProvinceTier,
+  type TierRules,
   type ProvinceView,
   type ProvincesState,
   type UnitCounts,
@@ -96,11 +97,20 @@ export interface ProvinceRow {
   y: number;
   weight: number;
   bonus: ProvinceBonus | null;
+  tier: ProvinceTier | 0 | null;
   bastion_village_id: number | null;
   holder_tribe_id: number | null;
   holder_since: Date | null;
   control_notified: boolean;
 }
+
+/** Garde, muraille et bonus d'un niveau, d'après les réglages du monde. */
+export function tierRules(tier: ProvinceTier): TierRules {
+  return { tier, garrison: env[`provinceGarrison${tier}`], wall: env[`provinceWall${tier}`], bonus: env[`provinceBonus${tier}`] };
+}
+
+/** Bonus (%) d'une province selon son niveau ; la Terre sainte n'en donne pas. */
+const tierBonus = (tier: ProvinceTier | 0 | null) => (tier ? tierRules(tier).bonus : 0);
 
 /** Les provinces contrôlées : bannière plantée depuis au moins la durée de tenue. */
 const controlled = (p: { holder_tribe_id: number | null; holder_since: Date | null }, at: Date) =>
@@ -111,7 +121,11 @@ const controlled = (p: { holder_tribe_id: number | null; holder_since: Date | nu
 /** Au premier démarrage avec les provinces, découpe la carte et dresse les bastions (sans déplacer de village). */
 export async function ensureProvinces(c: Db, now: Date, rng: () => number = Math.random) {
   if (!env.provinces) return;
-  if ((await c.query('SELECT 1 FROM provinces LIMIT 1')).rows.length) return;
+  if (!(await c.query('SELECT 1 FROM provinces LIMIT 1')).rows.length) await createProvinces(c, now, rng);
+  await ensureProvinceTiers(c, rng);
+}
+
+async function createProvinces(c: Db, now: Date, rng: () => number) {
   const seeds = generateSeeds(env.mapSize, rng);
   const names = [...NAMES].sort(() => rng() - 0.5);
   // Bonus répartis à parts égales, dans un ordre au hasard.
@@ -123,7 +137,7 @@ export async function ensureProvinces(c: Db, now: Date, rng: () => number = Math
     const spot = await findFreeSpot(c, s.x, s.y, 1);
     const buildings: Buildings = { ...STARTING_BUILDINGS };
     for (const k of Object.keys(buildings) as (keyof Buildings)[]) buildings[k] = 0;
-    buildings.wall = holy ? HOLY_WALL : BASTION_WALL;
+    buildings.wall = holy ? HOLY_WALL : env.provinceWall1;
     const villageId = await createVillage(c, {
       ownerId: null,
       name: holy ? SANCTUARY_NAME : bastionName(name),
@@ -132,7 +146,7 @@ export async function ensureProvinces(c: Db, now: Date, rng: () => number = Math
       buildings,
       resources: { wood: 0, clay: 0, iron: 0, wheat: 0 },
       at: now,
-      troops: bastionGarrison(holy ? HOLY_GARRISON : BASTION_GARRISON),
+      troops: bastionGarrison(holy ? HOLY_GARRISON : env.provinceGarrison1),
     });
     await c.query("UPDATE villages SET kind = 'bastion' WHERE id = $1", [villageId]);
     await c.query('INSERT INTO provinces (name, kind, x, y, weight, bonus, bastion_village_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
@@ -144,6 +158,41 @@ export async function ensureProvinces(c: Db, now: Date, rng: () => number = Math
       holy ? null : bonuses[i - 1],
       villageId,
     ]);
+  }
+}
+
+/**
+ * Niveaux des provinces, une seule fois par monde (au démarrage qui suit leur création ou l'arrivée des niveaux) : chaque province
+ * reçoit son niveau d'après sa distance à la Terre sainte ; les bastions sans bannière reçoivent la garde et la muraille de leur
+ * niveau, et leurs bonus sont redistribués pour que chaque niveau ait de tout (production, recrutement, vitesse). Les provinces
+ * déjà tenues gardent leur bonus.
+ */
+export async function ensureProvinceTiers(c: Db, rng: () => number = Math.random) {
+  if (!(await c.query('SELECT 1 FROM provinces WHERE tier IS NULL LIMIT 1')).rows.length) return;
+  const rows = (await c.query('SELECT * FROM provinces ORDER BY id FOR UPDATE')).rows as ProvinceRow[];
+  const grid = provinceGrid(env.mapSize, rows);
+  const tiers = provinceTiers(rows, provinceNeighbours(grid, env.mapSize, rows.length), rows.findIndex((r) => r.kind === 'holy'));
+  for (const [i, p] of rows.entries()) p.tier = p.kind === 'holy' ? 0 : tiers[i] || 1;
+  for (const tier of [1, 2, 3] as const) {
+    const free = rows.filter((p) => p.tier === tier && p.holder_tribe_id === null).sort(() => rng() - 0.5);
+    const deck: ProvinceBonus[] = [];
+    while (deck.length < free.length) deck.push(...[...PROVINCE_BONUSES].sort(() => rng() - 0.5));
+    free.forEach((p, k) => (p.bonus = deck[k]));
+  }
+  for (const p of rows) await c.query('UPDATE provinces SET tier = $2, bonus = $3 WHERE id = $1', [p.id, p.tier, p.kind === 'holy' ? null : p.bonus]);
+  await refreshNeutralBastions(c);
+}
+
+/**
+ * Remet la garde neutre et la muraille des bastions sans bannière aux valeurs de leur niveau (au premier calcul des niveaux et
+ * quand l'administrateur change ces réglages). Les troupes d'autres joueurs encore sur place ne sont pas touchées.
+ */
+export async function refreshNeutralBastions(c: Db) {
+  const { rows } = await c.query("SELECT tier, bastion_village_id FROM provinces WHERE kind = 'province' AND holder_tribe_id IS NULL AND bastion_village_id IS NOT NULL AND tier > 0");
+  for (const r of rows) {
+    const rules = tierRules(r.tier);
+    await setTroops(c, r.bastion_village_id, r.bastion_village_id, bastionGarrison(rules.garrison));
+    await c.query(`UPDATE villages SET buildings = jsonb_set(buildings, '{wall}', to_jsonb($2::int)) WHERE id = $1`, [r.bastion_village_id, rules.wall]);
   }
 }
 
@@ -415,7 +464,7 @@ export async function processProvinces(c: Db, outbox: Outbox, now: Date) {
       for (const m of everyone)
         await createReport(c, outbox, m.id, 'province', `[${tribe?.tag}] ${tribe?.name} a tenu la Terre sainte et gagne le monde !`, { province: p.name, text: `La tribu ${tribe?.name} est inscrite au tableau d'honneur du monde.` }, at);
     } else {
-      const bonus = p.bonus ? `${PROVINCE_BONUS_LABEL[p.bonus]} +${env.provinceBonus} %` : '';
+      const bonus = p.bonus && tierBonus(p.tier) > 0 ? `${PROVINCE_BONUS_LABEL[p.bonus]} +${tierBonus(p.tier)} %` : '';
       await tellTribe(c, outbox, p.holder_tribe_id, `Votre tribu contrôle ${p.name}${bonus ? ` : ${bonus}` : ''}`, { province: p.name, text: `Le bonus s'applique à tous les villages de la tribu tant que sa bannière flotte sur le bastion.` }, at);
     }
   }
@@ -423,16 +472,19 @@ export async function processProvinces(c: Db, outbox: Outbox, now: Date) {
 
 /** Bonus des provinces contrôlées par la tribu du propriétaire d'un village (fractions, qui s'additionnent). */
 export async function provinceBonuses(c: Db, ownerId: number | null, at: Date): Promise<Record<ProvinceBonus, number>> {
-  const out: Record<ProvinceBonus, number> = { wood: 0, clay: 0, iron: 0, wheat: 0, recruit: 0 };
-  if (!ownerId || !env.provinces || env.provinceBonus <= 0) return out;
+  const out: Record<ProvinceBonus, number> = { wood: 0, clay: 0, iron: 0, wheat: 0, recruit: 0, speed: 0 };
+  if (!ownerId || !env.provinces) return out;
   const { rows } = await c.query(
-    `SELECT pr.bonus, pr.holder_tribe_id, pr.holder_since FROM provinces pr JOIN players p ON p.tribe_id = pr.holder_tribe_id
+    `SELECT pr.bonus, pr.tier, pr.holder_tribe_id, pr.holder_since FROM provinces pr JOIN players p ON p.tribe_id = pr.holder_tribe_id
      WHERE p.id = $1 AND pr.bonus IS NOT NULL`,
     [ownerId],
   );
-  for (const r of rows) if (controlled(r, at)) out[r.bonus as ProvinceBonus] += env.provinceBonus / 100;
+  for (const r of rows) if (controlled(r, at)) out[r.bonus as ProvinceBonus] += tierBonus(r.tier ?? 1) / 100;
   return out;
 }
+
+/** Troupes plus rapides grâce aux provinces de vitesse que contrôle la tribu du joueur (0,1 = trajets 10 % plus rapides). */
+export const speedBonus = async (c: Db, playerId: number | null, at: Date) => (playerId ? (await provinceBonuses(c, playerId, at)).speed : 0);
 
 // ---------- Vues ----------
 
@@ -458,6 +510,8 @@ export async function provincesState(c: Db, playerId: number, now: Date): Promis
       y: r.y,
       weight: r.weight,
       bonus: r.bonus,
+      tier: r.kind === 'holy' ? 0 : (r.tier ?? 1),
+      bonusPercent: r.kind === 'holy' ? 0 : tierBonus(r.tier ?? 1),
       bastion: r.bastion_village_id ? { id: r.bastion_village_id, name: r.b_name, x: r.b_x, y: r.b_y, wall: r.b_wall ?? 0 } : null,
       holder: r.holder_tribe_id ? { tribeId: r.holder_tribe_id, tag: r.tag, name: r.tribe_name } : null,
       holderSince: r.holder_since ? new Date(r.holder_since).toISOString() : null,
@@ -474,7 +528,7 @@ export async function provincesState(c: Db, playerId: number, now: Date): Promis
     holdHours: env.provinceHoldHours,
     holyAccess: env.holyAccess,
     holyHoldDays: env.holyHoldDays,
-    bonusPercent: env.provinceBonus,
+    tiers: ([1, 2, 3] as const).map(tierRules),
     provinces,
     mine: tribeId ? { tribeId, holyNeighbours, canAttackHoly: holyNeighbours >= env.holyAccess } : null,
     victory: await worldVictory(c),

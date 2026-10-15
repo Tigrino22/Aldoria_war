@@ -837,7 +837,7 @@ export default function MapView({ focus }: { focus?: string }) {
       });
       title.anchor.set(0.5, 1);
       const sub = new BitmapText({
-        text: p.holder ? `[${p.holder.tag}]${p.controlled ? '' : ' · bannière'}` : p.kind === 'holy' ? 'Victoire du monde' : p.bonus ? `${PROVINCE_BONUS_LABEL[p.bonus]} +${provinces.bonusPercent} %` : '',
+        text: p.holder ? `[${p.holder.tag}]${p.controlled ? '' : ' · bannière'}` : p.kind === 'holy' ? 'Victoire du monde' : `Niveau ${p.tier}${p.bonus ? ` · ${PROVINCE_BONUS_LABEL[p.bonus]} +${p.bonusPercent} %` : ''}`,
         style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: p.holder ? hexToNum(tribeColor(p.holder.tribeId, colors) ?? '#f3e2b3') : 0xe9dcc0, stroke: { color: 0x140e08, width: 3 } },
       });
       sub.anchor.set(0.5, 0);
@@ -910,7 +910,7 @@ export default function MapView({ focus }: { focus?: string }) {
         worldSpeed={world.speed}
         ownerSlot={interactive && v.ownerName ? <PlayerLink name={v.ownerName} /> : undefined}
         province={v.provinceId ? provinces?.provinces.find((p) => p.id === v.provinceId) : undefined}
-        bonusPercent={provinces?.bonusPercent}
+        speedBonus={village?.speedBonus}
       />
     );
   };

@@ -134,9 +134,9 @@ export function slowestSpeed(units: UnitCounts): number {
   return slowest;
 }
 
-/** Durée de trajet en secondes réelles. */
-export function travelTime(units: UnitCounts, from: { x: number; y: number }, to: { x: number; y: number }, worldSpeed: number) {
-  const seconds = (distance(from, to) * slowestSpeed(units) * 60) / worldSpeed;
+/** Durée de trajet en secondes réelles ; `speedBonus` (0,1 = troupes 10 % plus rapides) vient des provinces de vitesse. */
+export function travelTime(units: UnitCounts, from: { x: number; y: number }, to: { x: number; y: number }, worldSpeed: number, speedBonus = 0) {
+  const seconds = (distance(from, to) * slowestSpeed(units) * 60) / worldSpeed / (1 + Math.max(0, speedBonus));
   return Math.max(1, Math.round(seconds));
 }
 

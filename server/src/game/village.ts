@@ -402,7 +402,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
   ).rows;
 
   const bonus = await productionBonus(c, v.owner_id, new Date());
-  const recruitBonus = (await provinceBonuses(c, v.owner_id, new Date())).recruit;
+  const { recruit: recruitBonus, speed: speedBonus } = await provinceBonuses(c, v.owner_id, new Date());
   return {
     id: v.id,
     name: v.name,
@@ -415,6 +415,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     relicBonus: bonus.relic,
     provinceBonus: bonus.province,
     recruitBonus,
+    speedBonus,
     capacity: warehouseCapacity(v.buildings.warehouse),
     syncedAt: new Date(v.resources_at).toISOString(),
     buildings: v.buildings,

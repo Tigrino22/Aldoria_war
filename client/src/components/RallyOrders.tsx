@@ -71,7 +71,7 @@ export function OrderForm({ v, focus }: { v: VillageState; focus?: string }) {
   const enough = UNIT_KEYS.every((k) => total[k] <= v.troopsHome[k]);
   const wheat = attack ? attackWheatCost(total) : 0;
   const wheatHave = Math.floor(liveResources(v, now).wheat);
-  const travelMs = (u: typeof strike) => travelTime(u, v, target ?? v, world.speed) * 1000;
+  const travelMs = (u: typeof strike) => travelTime(u, v, target ?? v, world.speed, v.speedBonus) * 1000;
   const landAt = timing === 'at' && landInput ? new Date(landInput) : null;
   const plan = target && totalUnits(total) > 0 ? planOrderParts(strike, trainSpec, { landAt: timing === 'at' ? landAt : null, now: new Date(now), travelMs }) : null;
   const problem = !coords.trim()
