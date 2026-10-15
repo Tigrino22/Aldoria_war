@@ -471,6 +471,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
             bonus +5 %), niveau 2 à mi-chemin ({fmt(3000)}, muraille 10, +10 %), niveau 3 autour de la Terre sainte ({fmt(6000)}, muraille 15, +15 %). La page Provinces donne les valeurs de ce monde.
           </li>
           <li>
+            <b>Trésor :</b> quand votre tribu prend le contrôle d'une province, chaque membre reçoit dans son <a href="#/inventaire">inventaire</a> un trésor qui remplit une part de l'entrepôt du
+            village de son choix (par défaut 10 %, 20 % ou 30 % selon le niveau), une seule fois par province.
+          </li>
+          <li>
             <b>Bannière :</b> l'attaque qui vide le bastion doit compter un {U('noble')} survivant pour planter la bannière de votre tribu ; vos survivants restent pour le garder. Sans tribu, pas de
             bannière. Votre tribu et ses alliées peuvent le renforcer, et leurs attaques deviennent des renforts.
           </li>

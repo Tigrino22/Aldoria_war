@@ -10,6 +10,7 @@ import {
   provinceTiers,
   recruitTime,
   travelTime,
+  warehouseCapacity,
   type UnitCounts,
 } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
@@ -18,6 +19,7 @@ import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents, sendCommand } from '../src/game/commands';
 import { bastionName, ensureProvinces, processProvinces, provinceBonuses, provincesState, refreshNeutralBastions, tierRules } from '../src/game/provinces';
+import { listItems, useItem } from '../src/game/items';
 import { createVillage, enqueueRecruit, getTroops, loadVillage } from '../src/game/village';
 
 const MIN = 60_000;
@@ -177,6 +179,21 @@ describe('provinces : bastions, bannière et Terre sainte', () => {
     expect((await reportsOf(mate)).at(-1).title).toContain(`contrôle ${first.name}`);
     const bonus = await tx((c) => provinceBonuses(c, mate, done));
     expect(bonus[first.bonus as 'wood']).toBeCloseTo(tierRules(first.tier).bonus / 100);
+
+    // Trésor : chaque membre le reçoit dans son inventaire et le vide dans un village, une seule fois par tribu et par province.
+    const items = await tx((c) => listItems(c, mate));
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: 'treasure', percent: tierRules(first.tier).treasure });
+    await pool.query('UPDATE villages SET wood = 0, clay = 0, iron = 0, wheat = 0, resources_at = $2 WHERE id = $1', [mateV, done]);
+    const { gain } = await tx((c) => useItem(c, new Outbox(), mate, items[0].id, mateV, done));
+    const cap = warehouseCapacity(10);
+    expect(gain.wood).toBe(Math.floor((cap * items[0].percent) / 100));
+    expect(Math.floor((await loadVillageAt(mateV)).wood)).toBe(gain.wood);
+    await expect(tx((c) => useItem(c, new Outbox(), mate, items[0].id, mateV, done))).rejects.toThrow(/déjà été utilisé/);
+    await expect(tx((c) => useItem(c, new Outbox(), p, items[0].id, mateV, done))).rejects.toThrow(/introuvable/);
+    await pool.query('UPDATE provinces SET control_notified = false WHERE id = $1', [first.id]);
+    await tx((c) => processProvinces(c, new Outbox(), done));
+    expect(await tx((c) => listItems(c, mate))).toHaveLength(0);
 
     // Le bonus de recrutement accélère la file (vérifié sur une province de recrutement, s'il y en a une).
     const recruit = (await pool.query("SELECT id, tier FROM provinces WHERE bonus = 'recruit' AND id <> $1 LIMIT 1", [first.id])).rows[0];

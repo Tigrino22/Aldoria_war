@@ -47,7 +47,8 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
   const counts = (
     await c.query(
       `SELECT (SELECT count(*)::int FROM reports WHERE player_id = $1 AND NOT read AND NOT archived) AS reports,
-              (SELECT count(*)::int FROM messages WHERE to_id = $1 AND NOT read) AS messages`,
+              (SELECT count(*)::int FROM messages WHERE to_id = $1 AND NOT read) AS messages,
+              (SELECT count(*)::int FROM player_items WHERE player_id = $1 AND used_at IS NULL) AS items`,
       [playerId],
     )
   ).rows[0];
@@ -68,6 +69,7 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
     villages,
     unreadReports: counts.reports,
     unreadMessages: counts.messages,
+    items: counts.items,
     isAdmin: env.adminUsernames.includes(String(p.username).toLowerCase()),
     invites: invites.map((i) => ({ id: i.id, tribeId: i.tribe_id, tribeName: i.name, tribeTag: i.tag })),
   };

@@ -396,6 +396,7 @@ La carte est découpée en provinces de taille et de forme variables (environ un
 | Garde d'un bastion, niveaux 1 / 2 / 3 | `PROVINCE_GARRISON_1` … `_3` | 1 500 / 3 000 / 6 000 | Population de la garde neutre ; appliquée tout de suite aux bastions sans bannière quand on la change |
 | Muraille d'un bastion, niveaux 1 / 2 / 3 | `PROVINCE_WALL_1` … `_3` | 5 / 10 / 15 | Idem |
 | Bonus d'une province, niveaux 1 / 2 / 3 | `PROVINCE_BONUS_1` … `_3` | 5 / 10 / 15 % | Production de sa ressource, vitesse de recrutement ou vitesse des troupes, pour toute la tribu |
+| Trésor d'une province, niveaux 1 / 2 / 3 | `PROVINCE_TREASURE_1` … `_3` | 10 / 20 / 30 % | Objet d'inventaire reçu par chaque membre à la prise de contrôle (une fois par tribu et par province) : remplit cette part de l'entrepôt d'un village. Code : `server/src/game/items.ts` (migration 025), page `client/src/components/Inventory.tsx` |
 | Provinces voisines exigées | `HOLY_ACCESS` | 2 | Provinces bordant la Terre sainte à contrôler pour attaquer le Sanctuaire (0 = libre) |
 | Tenue de la Terre sainte | `HOLY_HOLD_DAYS` | 3 j | Tenue du Sanctuaire pour gagner le monde (titre « Maître d'Aldoria ») |
 

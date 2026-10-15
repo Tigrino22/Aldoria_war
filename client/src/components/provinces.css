@@ -28,3 +28,4 @@
   .app .pg.provinces .prov-grid > .stack { display: contents; }
   .app .pg.provinces .prov-map-card { order: -1; }
 }
+.app .pg.provinces .prov-tiers td:nth-child(n + 3) { white-space: nowrap; }

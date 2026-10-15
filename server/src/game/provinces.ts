@@ -36,6 +36,7 @@ import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { addKills, insertCommand } from './commands';
 import { grantTitle } from './crusades';
+import { grantItem } from './items';
 import { createReport } from './reports';
 import { areAllied } from './tribe-alliances';
 import { addTroops, createVillage, loadVillage, saveVillage, setTroops, type VillageRow } from './village';
@@ -106,7 +107,7 @@ export interface ProvinceRow {
 
 /** Garde, muraille et bonus d'un niveau, d'après les réglages du monde. */
 export function tierRules(tier: ProvinceTier): TierRules {
-  return { tier, garrison: env[`provinceGarrison${tier}`], wall: env[`provinceWall${tier}`], bonus: env[`provinceBonus${tier}`] };
+  return { tier, garrison: env[`provinceGarrison${tier}`], wall: env[`provinceWall${tier}`], bonus: env[`provinceBonus${tier}`], treasure: env[`provinceTreasure${tier}`] };
 }
 
 /** Bonus (%) d'une province selon son niveau ; la Terre sainte n'en donne pas. */
@@ -465,7 +466,19 @@ export async function processProvinces(c: Db, outbox: Outbox, now: Date) {
         await createReport(c, outbox, m.id, 'province', `[${tribe?.tag}] ${tribe?.name} a tenu la Terre sainte et gagne le monde !`, { province: p.name, text: `La tribu ${tribe?.name} est inscrite au tableau d'honneur du monde.` }, at);
     } else {
       const bonus = p.bonus && tierBonus(p.tier) > 0 ? `${PROVINCE_BONUS_LABEL[p.bonus]} +${tierBonus(p.tier)} %` : '';
-      await tellTribe(c, outbox, p.holder_tribe_id, `Votre tribu contrôle ${p.name}${bonus ? ` : ${bonus}` : ''}`, { province: p.name, text: `Le bonus s'applique à tous les villages de la tribu tant que sa bannière flotte sur le bastion.` }, at);
+      // Trésor : une fois par tribu et par province, pour chaque membre (hors PNJ).
+      const percent = p.tier ? tierRules(p.tier).treasure : 0;
+      let treasure = '';
+      if (percent > 0) {
+        const fresh = await c.query('INSERT INTO province_rewards (province_id, tribe_id, at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [p.id, p.holder_tribe_id, at]);
+        if (fresh.rowCount) {
+          const bastion = p.bastion_village_id ? (await c.query('SELECT name FROM villages WHERE id = $1', [p.bastion_village_id])).rows[0]?.name : null;
+          const members = (await c.query('SELECT id FROM players WHERE tribe_id = $1 AND NOT is_npc', [p.holder_tribe_id])).rows;
+          for (const m of members) await grantItem(c, m.id, 'treasure', percent, `${bastion ?? p.name} · niveau ${p.tier}`, at);
+          treasure = ` Chaque membre reçoit dans son inventaire un trésor qui remplit ${percent} % de l'entrepôt d'un village.`;
+        }
+      }
+      await tellTribe(c, outbox, p.holder_tribe_id, `Votre tribu contrôle ${p.name}${bonus ? ` : ${bonus}` : ''}`, { province: p.name, text: `Le bonus s'applique à tous les villages de la tribu tant que sa bannière flotte sur le bastion.${treasure}` }, at);
     }
   }
 }

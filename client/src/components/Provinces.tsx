@@ -195,6 +195,7 @@ export default function Provinces() {
                   <th>Garde</th>
                   <th>Muraille</th>
                   <th>Bonus</th>
+                  <th>Trésor</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,11 +208,12 @@ export default function Provinces() {
                     <td>{fmt(t.garrison)}</td>
                     <td>{t.wall}</td>
                     <td>+{t.bonus} %</td>
+                    <td>{t.treasure > 0 ? `${t.treasure} %` : '–'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="muted small">Chaque province donne un bonus : production d'une ressource, recrutement plus rapide ou troupes plus rapides, pour tous les villages de la tribu qui la contrôle.</p>
+            <p className="muted small">Chaque province donne un bonus : production d'une ressource, recrutement plus rapide ou troupes plus rapides, pour tous les villages de la tribu qui la contrôle. À la prise de contrôle, chaque membre reçoit aussi dans son <a href="#/inventaire">inventaire</a> un trésor qui remplit la part indiquée de l'entrepôt d'un village (une fois par province).</p>
           </section>
           <section className="pg-card pg-callout">
             <CardTitle icon="banniere">Comment prendre un bastion</CardTitle>

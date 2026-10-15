@@ -21,6 +21,7 @@ import questRoutes from './routes/quests';
 import socialRoutes from './routes/social';
 import statsRoutes from './routes/stats';
 import villageRoutes from './routes/village';
+import itemRoutes from './routes/items';
 
 export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] } = {}) {
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: env.trustProxy });
@@ -78,6 +79,7 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   await app.register(socialRoutes);
   await app.register(statsRoutes);
   await app.register(crusadeRoutes);
+  await app.register(itemRoutes);
 
   // En production, le même serveur distribue aussi le site (le client utilise des routes en #, donc
   // tout chemin inconnu hors /api renvoie la page d'accueil).

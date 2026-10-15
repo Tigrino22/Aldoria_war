@@ -1,0 +1,21 @@
+/* Inventaire : trésors des bastions, charte « Heure dorée » (docs/CHARTE-GRAPHIQUE.md). */
+.app .pg.inventory .inv-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.app .pg.inventory .inv-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid rgb(224 178 60 / 0.45); background: color-mix(in srgb, var(--gold) 8%, rgb(0 0 0 / 0.12));
+}
+.app .pg.inventory .inv-medal {
+  flex: 0 0 auto; width: 58px; height: 58px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #e0b23c; background: radial-gradient(circle at 35% 30%, #3a2a12, #17110b); border: 2px solid #e0b23c; box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+}
+.app .pg.inventory .inv-medal b { font-size: 11px; line-height: 1; color: #f3e2b3; }
+.app .pg.inventory .inv-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.app .pg.inventory .inv-main > b { font-family: var(--display); letter-spacing: 0.02em; }
+.app .pg.inventory .inv-gain { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; font-weight: 600; }
+.app .pg.inventory .inv-gain span { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 640px) {
+  .app .pg.inventory .inv-item { flex-wrap: wrap; }
+  .app .pg.inventory .inv-medal { width: 50px; height: 50px; }
+  .app .pg.inventory .inv-main { flex: 1 1 calc(100% - 66px); }
+  .app .pg.inventory .inv-item .btn { flex: 1 1 100%; }
+}

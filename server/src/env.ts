@@ -76,6 +76,10 @@ export const env = {
   provinceBonus1: count('PROVINCE_BONUS_1', 5),
   provinceBonus2: count('PROVINCE_BONUS_2', 10),
   provinceBonus3: count('PROVINCE_BONUS_3', 15),
+  /** Trésor reçu par chaque membre de la tribu qui prend le contrôle d'une province : part de l'entrepôt remplie (%), 0 = aucun. */
+  provinceTreasure1: count('PROVINCE_TREASURE_1', 10),
+  provinceTreasure2: count('PROVINCE_TREASURE_2', 20),
+  provinceTreasure3: count('PROVINCE_TREASURE_3', 30),
   holyAccess: count('HOLY_ACCESS', 2),
   holyHoldDays: count('HOLY_HOLD_DAYS', 3),
   /** Ménage : rapports des joueurs gardés (jours, hors archives ; 0 = tous) et mouvements terminés gardés (jours). */
