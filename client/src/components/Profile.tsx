@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { PROFILE_BIO_MAX, type PlayerProfile } from '@aldoria/shared';
+import { ACHIEVEMENTS, ACHIEVEMENT_TIERS, TIER_LABELS, PROFILE_BIO_MAX, type AchievementBadge, type PlayerProfile } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { Panel, PlayerLink } from '../ui';
 import { CardTitle, PageBanner } from './PageBanner';
-import { Badge } from './Badge';
+import { Medal } from './Badge';
 import ReportButton from './ReportButton';
 import './account.css';
 
@@ -110,30 +110,8 @@ export default function Profile({ name }: { name: string }) {
             onSaved={(bio) => setProfile({ ...profile, bio })}
           />
         )}
+        {(profile.badges.length > 0 || mine) && <Showcase badges={profile.badges} mine={mine} />}
         <WarRecordCard profile={profile} />
-        {(profile.badges.length > 0 || mine) && (
-          <section className="pg-card">
-            <CardTitle icon="medaille" count={profile.badges.length}>
-              Succès
-            </CardTitle>
-            {profile.badges.length === 0 ? (
-              <p className="pg-empty">
-                Aucun badge pour l’instant : voyez vos <a href="#/succes">succès</a> pour savoir comment en gagner.
-              </p>
-            ) : (
-              <div className="ach-badges">
-                {profile.badges.map((b) => (
-                  <Badge key={b.key} title={b.title} tier={b.tier} />
-                ))}
-              </div>
-            )}
-            {mine && profile.badges.length > 0 && (
-              <p className="small">
-                <a href="#/succes">Voir tous mes succès</a>
-              </p>
-            )}
-          </section>
-        )}
       </div>
       <section className="panel">
         <header className="panel-head">
@@ -211,6 +189,56 @@ function Bio({ bio, editable, onSaved }: { bio: string; editable: boolean; onSav
             </button>
           )}
         </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Vitrine des succès : les dix succès du jeu, chacun avec la médaille de son plus haut palier ou grisé s'il reste à gagner.
+ */
+function Showcase({ badges, mine }: { badges: AchievementBadge[]; mine: boolean }) {
+  const won = new Map(badges.map((b) => [b.key, b.tier]));
+  const steps = badges.reduce((n, b) => n + ACHIEVEMENT_TIERS.indexOf(b.tier) + 1, 0);
+  const total = ACHIEVEMENTS.length * ACHIEVEMENT_TIERS.length;
+  const byTier = ACHIEVEMENT_TIERS.map((t) => ({ t, n: badges.filter((b) => b.tier === t).length })).reverse();
+  return (
+    <section className="pg-card pf-ach">
+      <header className="pf-ach-head">
+        <CardTitle icon="medaille" count={`${badges.length} / ${ACHIEVEMENTS.length}`}>
+          Succès
+        </CardTitle>
+        <span className="pf-ach-sum">
+          {byTier.map(({ t, n }) => (
+            <span key={t} title={TIER_LABELS[t]}>
+              <Medal tier={t} size={20} muted={n === 0} />
+              <b>{n}</b>
+            </span>
+          ))}
+          <span className="muted small">
+            {steps} palier{steps > 1 ? 's' : ''} sur {total}
+          </span>
+        </span>
+      </header>
+      <div className="pf-ach-bar" aria-hidden>
+        <span style={{ width: `${(100 * steps) / total}%` }} />
+      </div>
+      <ul className="pf-ach-grid">
+        {ACHIEVEMENTS.map((a) => {
+          const tier = won.get(a.key);
+          return (
+            <li key={a.key} className={tier ? `won ${tier}` : 'locked'} title={tier ? `${a.title} · ${TIER_LABELS[tier]}` : `${a.title} · pas encore gagné`}>
+              <Medal tier={tier ?? 'bronze'} size={52} muted={!tier} />
+              <b>{a.title}</b>
+              <span className="small">{tier ? TIER_LABELS[tier] : 'À gagner'}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {mine && (
+        <p className="small pf-ach-link">
+          <a href="#/succes">Voir mes progrès et les prochains paliers</a>
+        </p>
       )}
     </section>
   );
