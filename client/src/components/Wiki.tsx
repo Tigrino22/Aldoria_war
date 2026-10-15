@@ -44,6 +44,7 @@ import {
   populationCapacity,
   ATTACK_WHEAT_PER_POPULATION,
   resourceProduction,
+  wheatProduction,
   RESOURCES_PER_POINT,
   villagePoints,
   wallBonus,
@@ -116,7 +117,7 @@ function bonusLabel(key: BuildingKey): string {
 }
 
 function bonusAt(key: BuildingKey, level: number, speed: number): string {
-  if (key === 'farm') return `${fmt(resourceProduction(level) * speed)} · ${fmt(populationCapacity(level))}`;
+  if (key === 'farm') return `${fmt(wheatProduction(level) * speed)} · ${fmt(populationCapacity(level))}`;
   if (RESOURCE_BUILDING[key]) return fmt(resourceProduction(level) * speed);
   switch (key) {
     case 'townhall': return `x${(Math.pow(0.95, level - 1)).toFixed(2).replace('.', ',')} (−${pct(1 - Math.pow(0.95, level - 1))})`;
@@ -134,6 +135,7 @@ function bonusSummary(key: BuildingKey, speed: number): string {
       key === 'farm'
         ? ` La ferme loge aussi votre armée : chaque soldat occupe des places de population (1 pour un lancier, 4 pour un cavalier). Elle en offre ${fmt(populationCapacity(1))} au niveau 1, soit ${fmt(populationCapacity(1))} lanciers, et ${fmt(populationCapacity(20))} au niveau 20. Chaque attaque emporte aussi ses rations : ${ATTACK_WHEAT_PER_POPULATION} blé par place de population envoyée, rendu si vous annulez.`
         : '';
+    if (key === 'farm') return `Produit ${fmt(wheatProduction(1) * speed)} blé par heure au niveau 1 et ${fmt(wheatProduction(20) * speed)} au niveau 20 (+25 % par niveau environ, plus que les mines, pour suivre leur production).${extra}`;
     return `Produit ${fmt(resourceProduction(1) * speed)} ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} par heure au niveau 1, ${fmt(resourceProduction(20) * speed)} au niveau 20${BUILDINGS[key].maxLevel > 20 ? ` et ${fmt(resourceProduction(BUILDINGS[key].maxLevel) * speed)} au niveau ${BUILDINGS[key].maxLevel}` : ''} (sans bâtiment : ${fmt(resourceProduction(0) * speed)} par heure).${extra}`;
   }
   switch (key) {
@@ -262,7 +264,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           l'{B('claypit')}, la {B('ironmine')} et la {B('farm')} les produisent en continu, même quand vous n'êtes pas connecté.
         </p>
         <p>
-          Un bâtiment de ressource produit {fmt(resourceProduction(1) * s)} par heure au niveau 1 et +20 % par niveau, jusqu'à {fmt(resourceProduction(20) * s)} par heure au niveau 20. Le {B('woodcutter')}, l'{B('claypit')} et la {B('ironmine')} montent ensuite jusqu'au niveau {BUILDINGS.woodcutter.maxLevel} (+12 % par niveau environ) : {fmt(resourceProduction(BUILDINGS.woodcutter.maxLevel) * s)} par heure au niveau {BUILDINGS.woodcutter.maxLevel}.
+          Un bâtiment de ressource produit {fmt(resourceProduction(1) * s)} par heure au niveau 1 et +20 % par niveau, jusqu'à {fmt(resourceProduction(20) * s)} par heure au niveau 20. Le {B('woodcutter')}, l'{B('claypit')} et la {B('ironmine')} montent ensuite jusqu'au niveau {BUILDINGS.woodcutter.maxLevel} (+12 % par niveau environ) : {fmt(resourceProduction(BUILDINGS.woodcutter.maxLevel) * s)} par heure au niveau {BUILDINGS.woodcutter.maxLevel}. La {B('farm')} s'arrête au niveau 20 mais son blé grimpe plus vite : {fmt(wheatProduction(20) * s)} par heure au niveau 20.
         </p>
         <p>
           <b>Le blé</b> sert à construire et à recruter. Il ne nourrit pas l'armée : la taille de vos troupes est limitée par la population que loge votre {B('farm')}.
@@ -710,7 +712,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </p>
         <ul>
           <li><b>0 %</b> : bâtiments d'abord. Les troupes n'utilisent que l'excédent, donc rien ne part tant que le bâtiment n'est pas payé.</li>
-          <li><b>15 à 25 %</b> (Offensif 15 %, Défensif 25 %) : les troupes avancent déjà pendant que le bâtiment se prépare, et le bâtiment arrive toujours, avec seulement un peu de retard.</li>
+          <li><b>5 à 10 %</b> (Offensif 5 %, Défensif 10 %) : une petite garde se forme pendant que le village grandit, et le bâtiment arrive toujours, avec seulement un peu de retard. Les modèles de départ montent les mines très tôt : la production se cumule, et l'armée complète arrive plus vite qu'en recrutant dès le début.</li>
           <li><b>100 %</b> : troupes d'abord, rien n'est réservé pour les bâtiments.</li>
         </ul>
         <p>

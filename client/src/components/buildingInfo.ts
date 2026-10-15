@@ -7,6 +7,7 @@ import {
   MERCHANT_CAPACITY,
   populationCapacity,
   resourceProduction,
+  wheatProduction,
   warehouseCapacity,
   WALL_BONUS_PER_LEVEL,
   buildingTime,
@@ -24,7 +25,7 @@ export function effect(key: BuildingKey, level: number, speed: number): string {
     case 'townhall':
       return `Constructions ${Math.round((1 - Math.pow(0.95, Math.max(0, level - 1))) * 100)} % plus rapides`;
     case 'farm':
-      return `${fmt(resourceProduction(level) * speed)} blé par heure, ${fmt(populationCapacity(level))} places de population`;
+      return `${fmt(wheatProduction(level) * speed)} blé par heure, ${fmt(populationCapacity(level))} places de population`;
     case 'woodcutter':
     case 'claypit':
     case 'ironmine':

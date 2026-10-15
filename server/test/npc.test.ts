@@ -45,7 +45,7 @@ describe('règles des PNJ', () => {
     expect(npcCap(0, 1)).toBe(2);
     expect(npcCap(10, 1)).toBe(12);
     expect(npcCap(10, 1.5)).toBeGreaterThan(npcCap(10, 1));
-    expect(npcCap(1000, 1)).toBe(20);
+    expect(npcCap(1000, 1)).toBe(30);
   });
 
   it('un bâtiment dont les conditions manquent n’est pas choisi avant l’hôtel de ville niveau 3', () => {

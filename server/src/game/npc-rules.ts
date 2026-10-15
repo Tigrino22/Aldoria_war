@@ -43,11 +43,13 @@ export function isQuiet(date: Date, timeZone: string, start: number, end: number
   return start <= end ? h >= start && h < end : h >= start || h < end;
 }
 
-/** Niveaux gagnés par jour de monde : le plafond atteint 20 au bout de 18 jours (difficulté ×1). */
+/** Niveaux gagnés par jour de monde : le plafond atteint 20 au bout de 18 jours et 30 au bout de 28 (difficulté ×1). */
 export const NPC_LEVELS_PER_DAY = 1;
-/** Niveau maximal que les PNJ visent selon l'âge du monde : ils suivent un rythme régulier, sans dépasser le niveau 20. */
+/** Plafond le plus haut des PNJ : celui des mines et de l'entrepôt. Les autres bâtiments s'arrêtent à leur propre maximum (20, caserne 25). */
+export const NPC_MAX_CAP = 30;
+/** Niveau maximal que les PNJ visent selon l'âge du monde : ils suivent un rythme régulier, sans dépasser NPC_MAX_CAP. */
 export function npcCap(worldDays: number, difficulty: number): number {
-  return Math.max(2, Math.min(20, 2 + Math.floor(Math.max(0, worldDays) * NPC_LEVELS_PER_DAY * difficulty)));
+  return Math.max(2, Math.min(NPC_MAX_CAP, 2 + Math.floor(Math.max(0, worldDays) * NPC_LEVELS_PER_DAY * difficulty)));
 }
 
 /** Importance donnée à chaque bâtiment : plus le poids est fort, plus le PNJ le monte haut. */
