@@ -210,6 +210,30 @@ Page « Gestionnaire de compte », panneau « Équilibrage des ressources ». R�
 
 Tables : `manager_balance` et `manager_villages.balance` (migration 030). Routes : `PUT /api/manager/balance`, champ `balance` de `PUT /api/manager/villages/:id`.
 
+## Lettres de noblesse
+
+Chaque noble demande, en plus de son coût en ressources, des lettres de noblesse. Règle dans `shared/src/nobility.ts` (`lettersForNext`), serveur dans `server/src/game/nobility.ts`. Frappe : carte « Lettres de noblesse » de l'hôtel de ville (`POST /api/villages/:id/letters`).
+
+| Règle | Valeur |
+|---|---|
+| Frappe | À l'hôtel de ville niveau 10 (`LETTER_TOWNHALL`), instantanée, 100 lettres au plus d'un coup ; les ressources sont prises au village |
+| Réserve | Commune à tout le compte (`players.noble_letters`), utilisable depuis n'importe quelle caserne |
+| Prochain noble | 1 + `letterStep` × (villages + nobles − 1) lettres. Les nobles comptés sont ceux en vie, en route, en renfort, planifiés ou en formation. Recruter plusieurs nobles d'un coup additionne leurs prix (1 + 2 + 3… pour un seul village) |
+| Annulation | Les lettres des nobles pas encore formés reviennent dans la réserve (`recruit_queue.letters`) |
+| Noble mort | Ses lettres sont perdues ; après une conquête, le village gagné compte et le noble installé ne compte plus, le prix ne baisse donc pas |
+| PNJ | Même règle : avant de recruter des nobles, un PNJ frappe les lettres qui manquent avec les ressources du village, s'il peut les payer (`ensureLetters`), sinon il recrute moins de nobles |
+| Gestionnaire de compte | Ne frappe pas de lettres : sans lettres en réserve, le noble prévu attend (« Recrutement impossible » au journal) |
+
+Réglages de l'administration (onglet Monde) :
+
+| Réglage | Défaut | Effet |
+|---|---|---|
+| Lettres de noblesse (`nobleLetters`) | activées | Désactivées : les nobles ne coûtent que leurs ressources, les lettres en réserve sont gardées |
+| Prix d'une lettre (`letterWood`, `letterClay`, `letterIron`) | 3 000 / 3 500 / 3 000 | Ressources payées par lettre (pas de blé) |
+| Lettres en plus à chaque noble (`letterStep`) | 1 | 1 = 1, 2, 3, 4… lettres ; 2 = 1, 3, 5, 7… ; 0 = toujours 1 lettre |
+
+Migration 034.
+
 ## Succès et badges
 
 Page `#/succes` (menu Village > Succès). Définitions dans `shared/src/achievements.ts` (`ACHIEVEMENTS`), attribution dans `server/src/game/achievements.ts` : toutes les 5 minutes pour tous les joueurs (hors PNJ), et tout de suite quand le joueur ouvre la page ou récupère une quête.

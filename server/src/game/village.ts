@@ -39,6 +39,7 @@ import { barbarianCap, barbarianTier, growBarbarian } from './barbarians';
 import { relicBonus } from './crusades';
 import { provinceBonuses } from './provinces';
 import { GameError, notFound } from '../errors';
+import { nobilityView, refundLetters, spendLetters } from './nobility';
 
 export interface VillageRow {
   id: number;
@@ -338,6 +339,8 @@ export async function cancelRecruit(c: Db, villageId: number, queueId: number, n
   const remaining = item.count - item.delivered;
   const share = refundShare((now.getTime() - new Date(item.queued_at).getTime()) / 1000);
   refund(v, scaleResources(UNITS[item.unit as UnitKey].cost, remaining), share);
+  // Les lettres des nobles pas encore formés reviennent entières dans le stock.
+  if (item.letters > 0 && v.owner_id) await refundLetters(c, v.owner_id, Math.floor((item.letters * remaining) / item.count));
   if (item.delivered > 0) await c.query('UPDATE recruit_queue SET count = delivered WHERE id = $1', [queueId]);
   else await c.query('DELETE FROM recruit_queue WHERE id = $1', [queueId]);
   await saveVillage(c, v);
@@ -357,6 +360,8 @@ export async function enqueueRecruit(c: Db, villageId: number, unit: UnitKey, co
     throw new GameError('Votre ferme ne peut pas loger ces troupes : améliorez-la pour agrandir la population');
   }
   pay(v, scaleResources(def.cost, count));
+  // Les nobles demandent en plus des lettres de noblesse, prises sur le stock du compte.
+  const letters = unit === 'noble' && v.owner_id ? await spendLetters(c, v.owner_id, count) : 0;
 
   // Une province de recrutement contrôlée par la tribu raccourcit le temps de chaque unité.
   const speedUp = (await provinceBonuses(c, v.owner_id, now)).recruit;
@@ -367,13 +372,14 @@ export async function enqueueRecruit(c: Db, villageId: number, unit: UnitKey, co
   );
   const lastEnd = last.rows[0]?.end_at ? new Date(last.rows[0].end_at) : now;
   const startAt = lastEnd > now ? lastEnd : now;
-  await c.query('INSERT INTO recruit_queue (village_id, unit, count, start_at, unit_seconds, queued_at) VALUES ($1, $2, $3, $4, $5, $6)', [
+  await c.query('INSERT INTO recruit_queue (village_id, unit, count, start_at, unit_seconds, queued_at, letters) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
     villageId,
     unit,
     count,
     startAt,
     unitSeconds,
     now,
+    letters,
   ]);
   await saveVillage(c, v);
 }
@@ -463,6 +469,7 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     incoming: incoming.map((r) => toCommandView(r, (r.type !== 'attack' && r.type !== 'support') || r.player_id === viewerId)),
     outgoing: outgoing.map((r) => toCommandView(r, true)),
     market: { merchants: merchantCount(v.buildings.market), available: merchantCount(v.buildings.market) - (await busyMerchants(c, v.id)) },
+    nobility: await nobilityView(c, viewerId),
   };
 }
 

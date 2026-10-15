@@ -13,3 +13,4 @@ export * from './moderation';
 export * from './bugs';
 export * from './profile';
 export * from './achievements';
+export * from './nobility';

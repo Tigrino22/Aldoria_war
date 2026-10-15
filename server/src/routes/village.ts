@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { BUILDING_KEYS, RESOURCES, UNIT_KEYS } from '@aldoria/shared';
+import { BUILDING_KEYS, LETTER_BATCH_MAX, RESOURCES, UNIT_KEYS } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
@@ -10,6 +10,7 @@ import { villageSheet } from '../game/village-sheet';
 import { cancelOrder, placeOrder, plannedOrders } from '../game/orders';
 import { cancelCommand, disbandTroops, recallTroops, sendCommand, sendTrade } from '../game/commands';
 import { planInterception, sendInterception } from '../game/intercept';
+import { mintLetters } from '../game/nobility';
 import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -156,6 +157,17 @@ export default async function villageRoutes(app: FastifyInstance) {
       await c.query('UPDATE villages SET name = $2 WHERE id = $1', [id, name]);
       outbox.push(playerId, { type: 'me' });
       return { ok: true };
+    });
+  });
+
+  // Lettres de noblesse : frappées à l'hôtel de ville avec les ressources du village.
+  app.post('/api/villages/:id/letters', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const { count } = z.object({ count: z.number().int().min(1).max(LETTER_BATCH_MAX) }).parse(req.body);
+    return act(async (c, _o, now) => {
+      await mintLetters(c, playerId, id, count, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
     });
   });
 

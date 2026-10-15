@@ -139,7 +139,7 @@ function bonusSummary(key: BuildingKey, speed: number): string {
     return `Produit ${fmt(resourceProduction(1) * speed)} ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} par heure au niveau 1, ${fmt(resourceProduction(20) * speed)} au niveau 20${BUILDINGS[key].maxLevel > 20 ? ` et ${fmt(resourceProduction(BUILDINGS[key].maxLevel) * speed)} au niveau ${BUILDINGS[key].maxLevel}` : ''} (sans bâtiment : ${fmt(resourceProduction(0) * speed)} par heure).${extra}`;
   }
   switch (key) {
-    case 'townhall': return 'Chaque niveau au-delà du premier réduit de 5 % la durée de toutes les constructions du village. Il débloque le marché, la caserne et, au niveau 10, le noble.';
+    case 'townhall': return 'Chaque niveau au-delà du premier réduit de 5 % la durée de toutes les constructions du village. Il débloque le marché, la caserne et, au niveau 10, le noble et la frappe des lettres de noblesse.';
     case 'warehouse': return `Fixe la quantité maximale de chaque ressource. Au-delà, la production est perdue. ${pct(HIDDEN_SHARE)} de la capacité est cachée, ${fmt(HIDDEN_MAX)} au plus : les pillards ne peuvent pas la prendre.`;
     case 'market': return `Donne des marchands qui portent chacun ${fmt(MERCHANT_CAPACITY)} ressources vers d'autres villages de joueurs.`;
     case 'barracks': return "Permet de recruter les troupes. Chaque niveau au-delà du premier réduit de 6 % la durée de recrutement et débloque de nouvelles unités.";
@@ -403,6 +403,9 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
     conquete: (
       <>
         <p>Chaque village a une loyauté de 100. Pour prendre un village (joueur ou barbare), il faut l'attaquer avec des {U('noble')}s.</p>
+        <p>
+          <b>Lettres de noblesse :</b> en plus de son coût, chaque noble demande des lettres de noblesse, frappées à prix fixe à l'hôtel de ville (niveau 10) et gardées dans une réserve commune à tout votre compte. Le premier noble en demande 1, puis chaque noble suivant une de plus par village que vous possédez et par noble déjà en vie (1, 2, 3, 4… pour un seul village). Une lettre tient toujours dans l'entrepôt : c'est leur nombre qui grimpe à mesure que votre royaume s'étend. Les lettres d'un recrutement annulé reviennent dans la réserve, celles d'un noble tombé au combat sont perdues. Les PNJ suivent la même règle.
+        </p>
         <ul>
           <li>Si l'attaque est victorieuse et qu'au moins un noble survit, la loyauté baisse de {NOBLE_LOYALTY_MIN} à {NOBLE_LOYALTY_MAX} points (tirage au hasard), quel que soit le nombre de nobles : un seul tirage par attaque. Pour conquérir plus vite, lancez un train de nobles : une attaque par noble.</li>
           <li>

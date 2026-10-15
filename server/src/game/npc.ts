@@ -62,6 +62,7 @@ import { acceptOffer, cancelOffer, createOffer, expireOffers, freeMerchants } fr
 /** Nombre maximal d'échanges (acceptations ou publications) d'un PNJ par village et par réflexion. */
 const MARKET_ROUNDS = 10;
 import { npcAccepts, planOffer } from './market-rules';
+import { ensureLetters } from './nobility';
 import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, resourcesOf, syncVillage, transitMerchants } from './village';
 
 let rng: () => number = Math.random;
@@ -630,6 +631,8 @@ async function recruitStep(c: Db, profile: NpcProfile, role: VillageRole, villag
     // Trop cher ou trop de monde pour la ferme : on réduit le lot de moitié jusqu'à ce qu'il passe.
     for (let count = choice.count; count >= 1; count = Math.floor(count / 2)) {
       try {
+        // Comme un joueur, un PNJ frappe d'abord les lettres de noblesse qui manquent à ses nobles (s'il peut les payer).
+        if (choice.unit === 'noble' && !(await ensureLetters(c, v.owner_id!, villageId, count, now))) continue;
         await enqueueRecruit(c, villageId, choice.unit, count, now);
         batches++;
         break;

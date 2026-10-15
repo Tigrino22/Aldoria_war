@@ -1,5 +1,6 @@
 import type { ReportTone } from './report-tone';
 import type { AchievementBadge } from './achievements';
+import type { NobilityView } from './nobility';
 import type { ProfileConquest, WarRecord } from './profile';
 import type { BuildingKey, Buildings, Resource, Resources, UnitCounts, UnitKey } from './config';
 
@@ -133,6 +134,8 @@ export interface VillageState {
   incoming: CommandView[];
   outgoing: CommandView[];
   market: { merchants: number; available: number };
+  /** Lettres de noblesse du compte (stock, prix, lettres du prochain noble). */
+  nobility: NobilityView;
 }
 
 export interface MapVillage {

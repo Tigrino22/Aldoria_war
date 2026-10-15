@@ -18,6 +18,7 @@ import { clockTime, duration, fmt } from '../format';
 import { useGame, useNow } from '../game';
 import { CancelButton, Cost, Countdown, ResIcon, liveResources } from '../ui';
 import { effect, effectiveLevels, queueProgress } from './buildingInfo';
+import NobleLetters from './NobleLetters';
 import { CardTitle, PageBanner } from './PageBanner';
 import './townhall.css';
 
@@ -109,6 +110,8 @@ export default function TownHall({ v }: { v: VillageState }) {
           </ul>
         )}
       </section>
+
+      <NobleLetters v={v} res={res} />
 
       <section className="pg-card">
         <header className="pg-card-head">
