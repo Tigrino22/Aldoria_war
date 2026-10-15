@@ -34,6 +34,8 @@ export interface MeResponse {
   items?: number;
   /** Accès à la page d'administration (variable ADMIN_USERNAMES du serveur). */
   isAdmin: boolean;
+  /** Signalements en attente dans l'administration (seulement pour un administrateur). */
+  openModerationReports?: number;
   invites: { id: number; tribeId: number; tribeName: string; tribeTag: string }[];
 }
 

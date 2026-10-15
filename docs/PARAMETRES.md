@@ -212,9 +212,22 @@ Les ressources offertes sont retirées du village à la publication et rendues �
 
 ## Administration
 
-Page `#/admin` (menu « Aide » > « Administration »), en lecture seule : activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
+Page `#/admin` (menu « Aide » > « Administration ») : signalements des joueurs (voir plus bas), activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
 
 Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).
+
+### Signalements (Administration > Signalements)
+
+Un bouton rouge « Signaler » figure sur le profil d'un joueur, sur un message reçu et sur la page d'une autre tribu. Le joueur choisit un motif (insultes ou harcèlement, triche ou multicompte, nom ou description inappropriés, spam, autre) et peut préciser. L'administration ne lit jamais les messageries : seul un message que son destinataire signale est recopié dans le signalement, tel qu'il était à ce moment.
+
+| Règle | Valeur |
+|---|---|
+| Qui peut signaler quoi | Un joueur (pas soi-même), un message reçu (seulement par son destinataire), une tribu |
+| Limites | 20 signalements par joueur et par jour (`REPORTS_PER_DAY`), pas de doublon tant que le premier attend ; 1 000 caractères de précisions |
+| Anonymat | Le joueur visé n'est pas prévenu ; seul l'administrateur voit qui a signalé |
+| Administration | Onglet « Signalements », ouvert d'office quand il y en a en attente, compteur rouge sur l'entrée « Administration » du menu. « À traiter » (les plus anciens d'abord) et « Historique » ; chaque signalement se clôt en « Traité » ou « Rejeté » avec une note facultative, et peut être rouvert. Le nombre de signalements reçus par la même cible est affiché |
+
+Code : table `moderation_reports` (migration 029), `server/src/game/moderation.ts`, routes `POST /api/moderation/reports`, `GET/PUT /api/admin/moderation`, client `ReportButton.tsx` et `AdminModeration.tsx`.
 
 ### Réglages modifiables depuis l'administration
 

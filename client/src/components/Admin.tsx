@@ -7,9 +7,10 @@ import { Panel } from '../ui';
 import { PageBanner } from './PageBanner';
 import AdminWars from './AdminWars';
 import AdminPlayers from './AdminPlayers';
+import AdminModeration from './AdminModeration';
 import './admin.css';
 
-type Tab = 'npc' | 'wars' | 'players' | 'stats' | 'world';
+type Tab = 'moderation' | 'npc' | 'wars' | 'players' | 'stats' | 'world';
 type Kind = 'all' | 'attack' | 'scout' | 'market' | 'quiet';
 
 interface NpcEvent {
@@ -82,8 +83,10 @@ const SETTING_LABEL: Record<string, string> = {
 
 /** Page d'administration (lecture seule), réservée aux pseudos de ADMIN_USERNAMES. */
 export default function Admin() {
-  const { run, toast } = useGame();
-  const [tab, setTab] = useState<Tab>('npc');
+  const { me, run, toast } = useGame();
+  const pending = me.openModerationReports ?? 0;
+  // Des signalements attendent : on arrive directement dessus.
+  const [tab, setTab] = useState<Tab>(pending > 0 ? 'moderation' : 'npc');
   const [hours, setHours] = useState(24);
   const [kind, setKind] = useState<Kind>('all');
   const [log, setLog] = useState<NpcLog | null>(null);
@@ -139,6 +142,7 @@ export default function Admin() {
     });
 
   const tabs: [Tab, string][] = [
+    ['moderation', 'Signalements'],
     ['npc', 'PNJ'],
     ['wars', 'Guerres'],
     ['players', 'Joueurs'],
@@ -156,12 +160,13 @@ export default function Admin() {
 
   return (
     <div className="pg admin">
-      <PageBanner icon="admin" kicker="Administration" title="Tableau de bord du monde" lead="Lecture seule · actualisé toutes les 20 s" />
+      <PageBanner icon="admin" kicker="Administration" title="Tableau de bord du monde" lead="Signalements, PNJ, guerres, joueurs et réglages du monde · actualisé toutes les 20 s" />
       <div className="admin-toolbar">
         <div className="tabs" role="tablist">
           {tabs.map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
               {label}
+              {k === 'moderation' && pending > 0 && <span className="badge-pill">{pending}</span>}
             </button>
           ))}
         </div>
@@ -246,6 +251,8 @@ export default function Admin() {
       )}
 
       {tab === 'wars' && <AdminWars hours={hours} />}
+
+      {tab === 'moderation' && <AdminModeration />}
 
       {tab === 'players' && <AdminPlayers />}
 

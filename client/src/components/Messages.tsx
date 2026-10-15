@@ -4,6 +4,7 @@ import { clockTime } from '../format';
 import { useGame, useRoute } from '../game';
 import { PlayerLink } from '../ui';
 import { PageBanner } from './PageBanner';
+import ReportButton from './ReportButton';
 import './messages.css';
 
 interface MessageSummary {
@@ -90,6 +91,8 @@ export default function Messages({ id, to }: { id?: number; to?: string }) {
                 <button className="btn small primary" onClick={() => setCompose({ to: other, subject: `Re: ${msg.subject.replace(/^Re: /, '')}`, body: '' })}>Répondre</button>
               ) : null;
             })()}
+            {/* Seul le destinataire peut signaler un message : c'est lui qui choisit de le montrer à l'administration. */}
+            {msg.from && msg.to === me.player.username && <ReportButton kind="message" target={msg.id} label="ce message" />}
           </>
         }
       />

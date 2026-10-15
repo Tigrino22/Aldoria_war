@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CRUSADE_TITLES, reportTone, type CrusadeTitleKey, type PlayerProfile } from '@aldoria/shared';
+import { CRUSADE_TITLES, MODERATION_COMMENT_MAX, MODERATION_KINDS, MODERATION_REASONS, reportTone, type CrusadeTitleKey, type PlayerProfile } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
@@ -8,6 +8,8 @@ import { GameError, forbidden, notFound } from '../errors';
 import { allianceRelation, allyTribeIdsOf } from '../game/tribe-alliances';
 import { declareWar, endWar, tribeWarsView } from '../game/tribe-wars';
 import { tribeHeldBrief, tribeProvincesView } from '../game/provinces';
+import { createModerationReport } from '../game/moderation';
+import { env } from '../env';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
@@ -120,6 +122,28 @@ export default async function socialRoutes(app: FastifyInstance) {
       const me = await c.query('SELECT username FROM players WHERE id = $1', [playerId]);
       outbox.push(rows[0].id, { type: 'message', from: me.rows[0].username });
       return { ok: true };
+    });
+  });
+
+  // ---------- Signalements ----------
+  app.post('/api/moderation/reports', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const playerId = await requirePlayer(req);
+    const body = z
+      .object({
+        kind: z.enum(MODERATION_KINDS),
+        target: z.union([z.string().trim().min(1).max(60), z.number().int().positive()]),
+        reason: z.enum(MODERATION_REASONS),
+        comment: z.string().max(MODERATION_COMMENT_MAX).optional(),
+      })
+      .parse(req.body);
+    return act(async (c, outbox, now) => {
+      const id = await createModerationReport(c, playerId, body, now);
+      // Les administrateurs connectés voient aussitôt le compteur de leur menu monter.
+      if (env.adminUsernames.length) {
+        const admins = await c.query('SELECT id FROM players WHERE lower(username) = ANY($1)', [env.adminUsernames]);
+        for (const a of admins.rows) outbox.push(a.id, { type: 'me' });
+      }
+      return { id };
     });
   });
 
