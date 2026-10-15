@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { CRUSADE_TITLES, MODERATION_COMMENT_MAX, MODERATION_KINDS, MODERATION_REASONS, reportTone, type CrusadeTitleKey, type PlayerProfile } from '@aldoria/shared';
+import { BUG_DESCRIPTION_MAX, BUG_DESCRIPTION_MIN, CRUSADE_TITLES, MODERATION_COMMENT_MAX, MODERATION_KINDS, MODERATION_REASONS, reportTone, type CrusadeTitleKey, type PlayerProfile } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
@@ -8,8 +8,10 @@ import { GameError, forbidden, notFound } from '../errors';
 import { allianceRelation, allyTribeIdsOf } from '../game/tribe-alliances';
 import { declareWar, endWar, tribeWarsView } from '../game/tribe-wars';
 import { tribeHeldBrief, tribeProvincesView } from '../game/provinces';
+import { createBugReport, myBugReports } from '../game/bugs';
 import { createModerationReport } from '../game/moderation';
 import { env } from '../env';
+import type { Outbox } from '../notify';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
@@ -35,6 +37,13 @@ export async function leaveTribe(c: Db, playerId: number): Promise<boolean> {
   if (!rest.length) await c.query('DELETE FROM tribes WHERE id = $1', [tribeId]);
   else if (isLeader) await c.query('UPDATE tribes SET leader_id = $2 WHERE id = $1', [tribeId, rest[0].id]);
   return true;
+}
+
+/** Les administrateurs connectés voient aussitôt le compteur de leur menu monter (signalement ou bug). */
+async function notifyAdmins(c: Db, outbox: Outbox) {
+  if (!env.adminUsernames.length) return;
+  const admins = await c.query('SELECT id FROM players WHERE lower(username) = ANY($1)', [env.adminUsernames]);
+  for (const a of admins.rows) outbox.push(a.id, { type: 'me' });
 }
 
 export default async function socialRoutes(app: FastifyInstance) {
@@ -138,14 +147,34 @@ export default async function socialRoutes(app: FastifyInstance) {
       .parse(req.body);
     return act(async (c, outbox, now) => {
       const id = await createModerationReport(c, playerId, body, now);
-      // Les administrateurs connectés voient aussitôt le compteur de leur menu monter.
-      if (env.adminUsernames.length) {
-        const admins = await c.query('SELECT id FROM players WHERE lower(username) = ANY($1)', [env.adminUsernames]);
-        for (const a of admins.rows) outbox.push(a.id, { type: 'me' });
-      }
+      await notifyAdmins(c, outbox);
       return { id };
     });
   });
+
+  // ---------- Bugs ----------
+  app.post('/api/bugs', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req) => {
+    const playerId = await requirePlayer(req);
+    const body = z
+      .object({
+        description: z
+          .string()
+          .trim()
+          .min(BUG_DESCRIPTION_MIN, `Décrivez le bug en quelques mots (${BUG_DESCRIPTION_MIN} caractères au moins)`)
+          .max(BUG_DESCRIPTION_MAX),
+        page: z.string().max(200).optional(),
+        device: z.string().max(300).optional(),
+        screen: z.string().max(20).optional(),
+      })
+      .parse(req.body);
+    return act(async (c, outbox, now) => {
+      const id = await createBugReport(c, playerId, body, now);
+      await notifyAdmins(c, outbox);
+      return { id };
+    });
+  });
+
+  app.get('/api/bugs/mine', async (req) => myBugReports(pool, await requirePlayer(req)));
 
   // ---------- Tribus ----------
   app.post('/api/tribes', async (req) => {

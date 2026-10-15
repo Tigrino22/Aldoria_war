@@ -6,6 +6,7 @@ import { createSession, hashPassword, requirePlayer, verifyPassword, bearer } fr
 import { pool, type Db } from '../db';
 import { env } from '../env';
 import { GameError } from '../errors';
+import { openBugCount } from '../game/bugs';
 import { openModerationCount } from '../game/moderation';
 import { createVillage } from '../game/village';
 import { ensureWorld, spawnLocation } from '../game/world';
@@ -73,7 +74,7 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
     unreadMessages: counts.messages,
     items: counts.items,
     isAdmin,
-    ...(isAdmin ? { openModerationReports: await openModerationCount(c) } : {}),
+    ...(isAdmin ? { openModerationReports: await openModerationCount(c), openBugReports: await openBugCount(c) } : {}),
     invites: invites.map((i) => ({ id: i.id, tribeId: i.tribe_id, tribeName: i.name, tribeTag: i.tag })),
   };
 }

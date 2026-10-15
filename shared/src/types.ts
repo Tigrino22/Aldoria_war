@@ -36,6 +36,8 @@ export interface MeResponse {
   isAdmin: boolean;
   /** Signalements en attente dans l'administration (seulement pour un administrateur). */
   openModerationReports?: number;
+  /** Bugs en attente dans l'administration (seulement pour un administrateur). */
+  openBugReports?: number;
   invites: { id: number; tribeId: number; tribeName: string; tribeTag: string }[];
 }
 

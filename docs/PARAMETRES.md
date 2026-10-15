@@ -229,7 +229,7 @@ Les ressources offertes sont retirées du village à la publication et rendues �
 
 ## Administration
 
-Page `#/admin` (menu « Aide » > « Administration ») : signalements des joueurs (voir plus bas), activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
+Page `#/admin` (menu « Aide » > « Administration ») : signalements et bugs remontés par les joueurs (voir plus bas), activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
 
 Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).
 
@@ -245,6 +245,12 @@ Un bouton rouge « Signaler » figure sur le profil d'un joueur, sur un message 
 | Administration | Onglet « Signalements », ouvert d'office quand il y en a en attente, compteur rouge sur l'entrée « Administration » du menu. « À traiter » (les plus anciens d'abord) et « Historique » ; chaque signalement se clôt en « Traité » ou « Rejeté » avec une note facultative, et peut être rouvert. Le nombre de signalements reçus par la même cible est affiché |
 
 Code : table `moderation_reports` (migration 029), `server/src/game/moderation.ts`, routes `POST /api/moderation/reports`, `GET/PUT /api/admin/moderation`, client `ReportButton.tsx` et `AdminModeration.tsx`.
+
+### Bugs (Administration > Bugs)
+
+Entrée « Signaler un bug » du menu (groupe Aide, `#/bug`, `BugReport.tsx`) : le joueur décrit le problème (10 à 2 000 caractères) ; la page d'où il vient, son navigateur et la taille de son écran sont joints tout seuls. En dessous, il retrouve ses derniers bugs, leur état (En attente, Corrigé, Non retenu) et la réponse de l'administrateur. 10 bugs par joueur et par jour au plus (`BUGS_PER_DAY`).
+
+Onglet « Bugs » de l'administration (`AdminBugs.tsx`), compteur compris dans celui du menu : « À traiter » et « Historique », boutons « Corrigé » et « Non retenu » avec une réponse facultative montrée au joueur, « Rouvrir ». Code : table `bug_reports` (migration 031), `server/src/game/bugs.ts`, routes `POST /api/bugs`, `GET /api/bugs/mine`, `GET/PUT /api/admin/bugs`.
 
 ### Réglages modifiables depuis l'administration
 
