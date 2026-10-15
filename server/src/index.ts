@@ -13,6 +13,7 @@ import { processManager } from './manager/engine';
 import { migrate } from './migrate';
 import { loadSettings } from './settings';
 import { recomputeVillagePoints } from './game/village';
+import { processAchievements } from './game/achievements';
 
 async function main() {
   await migrate();
@@ -78,6 +79,20 @@ async function main() {
     10_000,
   );
 
+  // Succès : toutes les 5 minutes, les joueurs reçoivent les paliers atteints (badge, coffre et rapport).
+  const achievementTimer = setInterval(
+    report(
+      skipIfBusy(() =>
+        withGameLock(async () => {
+          const outbox = new Outbox();
+          await tx((c) => processAchievements(c, outbox, new Date()));
+          outbox.flush();
+        }),
+      ),
+    ),
+    300_000,
+  );
+
   // Ménage : une fois par heure, les vieux mouvements terminés et les vieux rapports sont effacés, par petits lots.
   const houseTimer = setInterval(report(skipIfBusy(() => housekeeping(new Date()))), 3_600_000);
   setTimeout(report(() => housekeeping(new Date())), 60_000);
@@ -86,6 +101,7 @@ async function main() {
     clearInterval(timer);
     clearInterval(crusadeTimer);
     clearInterval(houseTimer);
+    clearInterval(achievementTimer);
     clearInterval(managerTimer);
     if (npcTimer) clearInterval(npcTimer);
     await app.close();

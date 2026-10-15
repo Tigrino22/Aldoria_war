@@ -1,12 +1,13 @@
 import { RESOURCES, type Resources } from './config';
 
 /**
- * Inventaire : objets que le joueur garde pour plus tard. Pour l'instant un seul genre, le trésor d'un bastion, reçu par chaque
- * membre de la tribu qui prend le contrôle d'une province : il remplit une part de l'entrepôt du village choisi.
+ * Inventaire : objets que le joueur garde pour plus tard. Pour l'instant un seul genre, le trésor, reçu par chaque membre de la
+ * tribu qui prend le contrôle d'une province ou pour un palier de succès : il remplit une part de l'entrepôt du village choisi.
  */
-export type ItemKind = 'treasure';
+/** `treasure` : trésor d'un bastion ; `chest` : coffre d'un palier de succès. Les deux s'utilisent de la même façon. */
+export type ItemKind = 'treasure' | 'chest';
 
-export const ITEM_LABEL: Record<ItemKind, string> = { treasure: 'Trésor de bastion' };
+export const ITEM_LABEL: Record<ItemKind, string> = { treasure: 'Trésor de bastion', chest: 'Coffre de succès' };
 
 export interface InventoryItem {
   id: number;

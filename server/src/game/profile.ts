@@ -1,6 +1,7 @@
 import { CRUSADE_TITLES, PROFILE_CONQUESTS, cleanBio, type CrusadeTitleKey, type PlayerProfile } from '@aldoria/shared';
 import type { Db } from '../db';
 import { GameError, notFound } from '../errors';
+import { badgesOf } from './achievements';
 
 type Q = Pick<Db, 'query'>;
 
@@ -62,6 +63,7 @@ export async function playerProfile(c: Q, name: string, now: Date): Promise<Play
         other: won ? k.loser_name : k.conqueror_name,
       };
     }),
+    badges: await badgesOf(c, p.id),
   };
 }
 

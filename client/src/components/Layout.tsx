@@ -39,6 +39,7 @@ const PAGES = {
   Crusade: () => import('./Crusade'),
   Provinces: () => import('./Provinces'),
   Inventory: () => import('./Inventory'),
+  Achievements: () => import('./Achievements'),
 };
 const Messages = lazy(PAGES.Messages);
 const RallyPage = lazy(PAGES.RallyPage);
@@ -60,6 +61,7 @@ const Raid = lazy(PAGES.Raid);
 const Crusade = lazy(PAGES.Crusade);
 const Provinces = lazy(PAGES.Provinces);
 const Inventory = lazy(PAGES.Inventory);
+const Achievements = lazy(PAGES.Achievements);
 
 interface NavItem {
   path: string;
@@ -79,6 +81,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'marche/offres', label: 'Offres du marché', icon: 'offres' },
       { path: 'apercu', label: 'Mes villages', icon: 'apercu' },
       { path: 'inventaire', label: 'Inventaire', icon: 'tresor' },
+      { path: 'succes', label: 'Succès', icon: 'medaille' },
       { path: 'gestionnaire', label: 'Gestionnaire de compte', icon: 'gestionnaire' },
     ],
   },
@@ -315,6 +318,7 @@ export default function Layout() {
           {page === 'croisade' && <Crusade />}
           {page === 'provinces' && <Provinces />}
           {page === 'inventaire' && <Inventory />}
+          {page === 'succes' && <Achievements />}
           {page === 'carte' && (
             <Suspense fallback={<p className="muted">Chargement de la carte…</p>}>
               <MapView focus={route[1]} />

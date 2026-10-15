@@ -37,6 +37,7 @@ import { tx, type Db } from '../db';
 import { env } from '../env';
 import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
+import { addLoot } from './achievements';
 import { assertCitadelMove, handleCitadelAttack, handleCitadelSupport } from './crusades';
 import { assertBastionMove, handleBastionAttack, handleBastionSupport, speedBonus } from './provinces';
 import { handleIntercept } from './intercept';
@@ -486,6 +487,7 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
       for (const r of RESOURCES) available[r] = Math.max(0, Math.floor(target[r]) - hidden);
       loot = plunder(available, carryCapacity(survivors));
       for (const r of RESOURCES) target[r] -= loot[r];
+      await addLoot(c, attackerId, RESOURCES.reduce((sum, r) => sum + loot![r], 0));
     }
   }
 
