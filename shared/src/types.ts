@@ -1,4 +1,5 @@
 import type { ReportTone } from './report-tone';
+import type { AchievementBadge } from './achievements';
 import type { ProfileConquest, WarRecord } from './profile';
 import type { BuildingKey, Buildings, Resource, Resources, UnitCounts, UnitKey } from './config';
 
@@ -312,6 +313,8 @@ export interface PlayerProfile {
   war: WarRecord;
   /** Dernières conquêtes et pertes de villages, les plus récentes d'abord. */
   conquests: ProfileConquest[];
+  /** Plus haut palier obtenu de chaque succès, dans l'ordre des succès. */
+  badges: AchievementBadge[];
 }
 
 /** Offre publique du marché : « je donne X contre Y ». */

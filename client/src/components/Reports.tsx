@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BUILDINGS, BUILDING_KEYS, RELIC_DAYS, RESOURCES, UNIT_KEYS, type AttackReportData, type Intel, type Resources, type ReportSummary, type ScoutReportData, type TradeReportData, type UnitCounts } from '@aldoria/shared';
+import { BUILDINGS, BUILDING_KEYS, RELIC_DAYS, RESOURCES, TIER_LABELS, UNIT_KEYS, type AchievementTier, type AttackReportData, type Intel, type Resources, type ReportSummary, type ScoutReportData, type TradeReportData, type UnitCounts } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame, useRoute } from '../game';
 import { PlayerLink, ResIcon, UnitIcon, UnitList, VillageLink } from '../ui';
 import { PageBanner } from './PageBanner';
+import { Medal } from './Badge';
 import './reports.css';
 
 function TroopTable({ units, losses }: { units: UnitCounts | null; losses: UnitCounts | null }) {
@@ -105,6 +106,33 @@ function TradeReport({ d }: { d: TradeReportData }) {
 
 /** Compte rendu d'une croisade (fin de l'assaut) ou troupes refoulées aux portes de la Citadelle. */
 /** Rapport des provinces : bannière plantée ou tombée, contrôle, victoire du monde, troupes renvoyées. */
+function AchievementReport({ d }: { d: { earned?: { title: string; tier: AchievementTier; goal: string; reward: number }[] } }) {
+  return (
+    <div className="ach-report">
+      <ul>
+        {(d.earned ?? []).map((e, i) => (
+          <li key={i}>
+            <Medal tier={e.tier} size={40} />
+            <span>
+              <b>
+                {e.title} · {TIER_LABELS[e.tier]}
+              </b>
+              <br />
+              <span className="muted small">
+                {e.goal}
+                {e.reward > 0 && ` · coffre de ${e.reward} % de l’entrepôt dans votre inventaire`}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p>
+        <a href="#/succes">Voir mes succès</a> · <a href="#/inventaire">Ouvrir l’inventaire</a>
+      </p>
+    </div>
+  );
+}
+
 function ProvinceReport({ d }: { d: any }) {
   return (
     <div className="stack">
@@ -242,6 +270,8 @@ export default function Reports({ id }: { id?: number }) {
             <CrusadeReport d={report.data} />
           ) : report.type === 'province' ? (
             <ProvinceReport d={report.data} />
+          ) : report.type === 'achievement' ? (
+            <AchievementReport d={report.data} />
           ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
             <AttackReport d={report.data} />
           ) : (
@@ -267,6 +297,7 @@ const CATEGORIES: { key: string; label: string }[] = [
   { key: 'support', label: 'Renforts' },
   { key: 'crusade', label: 'Croisades' },
   { key: 'province', label: 'Provinces' },
+  { key: 'achievement', label: 'Succès' },
 ];
 
 const LEGEND: { tone: string; label: string }[] = [

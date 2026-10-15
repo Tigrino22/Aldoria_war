@@ -5,6 +5,7 @@ import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { Panel, PlayerLink } from '../ui';
 import { CardTitle, PageBanner } from './PageBanner';
+import { Badge } from './Badge';
 import ReportButton from './ReportButton';
 import './account.css';
 
@@ -110,6 +111,29 @@ export default function Profile({ name }: { name: string }) {
           />
         )}
         <WarRecordCard profile={profile} />
+        {(profile.badges.length > 0 || mine) && (
+          <section className="pg-card">
+            <CardTitle icon="medaille" count={profile.badges.length}>
+              Succès
+            </CardTitle>
+            {profile.badges.length === 0 ? (
+              <p className="pg-empty">
+                Aucun badge pour l’instant : voyez vos <a href="#/succes">succès</a> pour savoir comment en gagner.
+              </p>
+            ) : (
+              <div className="ach-badges">
+                {profile.badges.map((b) => (
+                  <Badge key={b.key} title={b.title} tier={b.tier} />
+                ))}
+              </div>
+            )}
+            {mine && profile.badges.length > 0 && (
+              <p className="small">
+                <a href="#/succes">Voir tous mes succès</a>
+              </p>
+            )}
+          </section>
+        )}
       </div>
       <section className="panel">
         <header className="panel-head">

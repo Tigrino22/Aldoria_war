@@ -33,7 +33,7 @@ export default function Inventory() {
         icon="tresor"
         kicker="Village · réserves"
         title="Inventaire"
-        lead="Les trésors gagnés en prenant le contrôle d'une province. Chacun remplit une part de l'entrepôt du village de votre choix : passez sur le bon village en haut de l'écran, puis utilisez-le."
+        lead="Les trésors gagnés en prenant le contrôle d'une province et les coffres de vos succès. Chacun remplit une part de l'entrepôt du village de votre choix : passez sur le bon village en haut de l'écran, puis utilisez-le."
         stats={[
           { value: items?.length ?? '–', label: 'Objets', tone: 'gold' },
           { value: village ? fmt(village.capacity) : '–', label: `Entrepôt de ${village?.name ?? 'votre village'}` },
@@ -48,7 +48,7 @@ export default function Inventory() {
         ) : !items.length ? (
           <p className="muted">
             Votre inventaire est vide. Prenez un bastion avec votre tribu et tenez-le jusqu'au contrôle de la province : chaque membre reçoit un trésor, plus gros pour les provinces proches de la{' '}
-            <a href="#/provinces">Terre sainte</a>.
+            <a href="#/provinces">Terre sainte</a>. Chaque palier de vos <a href="#/succes">succès</a> donne aussi un coffre.
           </p>
         ) : (
           <ul className="inv-list">
@@ -58,7 +58,7 @@ export default function Inventory() {
               return (
                 <li key={item.id} className="inv-item">
                   <span className="inv-medal">
-                    <NavIcon name="tresor" size={28} />
+                    <NavIcon name={item.kind === 'chest' ? 'medaille' : 'tresor'} size={28} />
                     <b>{item.percent} %</b>
                   </span>
                   <div className="inv-main">

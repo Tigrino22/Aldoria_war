@@ -210,6 +210,33 @@ Page « Gestionnaire de compte », panneau « Équilibrage des ressources ». R�
 
 Tables : `manager_balance` et `manager_villages.balance` (migration 030). Routes : `PUT /api/manager/balance`, champ `balance` de `PUT /api/manager/villages/:id`.
 
+## Succès et badges
+
+Page `#/succes` (menu Village > Succès). Définitions dans `shared/src/achievements.ts` (`ACHIEVEMENTS`), attribution dans `server/src/game/achievements.ts` : toutes les 5 minutes pour tous les joueurs (hors PNJ), et tout de suite quand le joueur ouvre la page ou récupère une quête.
+
+| Succès | Compteur | Bronze | Argent | Or |
+|---|---|---|---|---|
+| Bâtisseur | Points (tous villages) | 1 000 | 15 000 | 60 000 |
+| Seigneur de domaines | Villages possédés | 2 | 5 | 12 |
+| Conquérant | Villages pris à des joueurs | 1 | 10 | 40 |
+| Pillard | Ressources rapportées des attaques (`players.loot_total`, compté depuis la migration 033) | 10 000 | 250 000 | 2 000 000 |
+| Chef de guerre | Attaques gagnées contre des joueurs | 10 | 100 | 500 |
+| Gardien | Attaques repoussées | 10 | 100 | 500 |
+| Fléau des armées | Adversaires battus en attaque (population tuée) | 500 | 5 000 | 50 000 |
+| Rempart | Adversaires battus en défense | 500 | 5 000 | 50 000 |
+| Croisé | Titres de croisade | 1 | 3 | 8 |
+| Premiers pas | Quêtes de départ récupérées | 3 | 6 | 10 |
+
+Réglages de l'administration (onglet Monde) :
+
+| Réglage | Défaut | Effet |
+|---|---|---|
+| Succès (`achievements`) | activés | Désactivés : plus aucun nouveau palier, les badges restent |
+| Difficulté des succès (`achievementScale`) | 100 % | Multiplie tous les seuils du tableau (50 = deux fois plus faciles) |
+| Coffre bronze / argent / or (`achievementRewardBronze`, `Silver`, `Gold`) | 5 / 15 / 30 % | Part de l'entrepôt que remplit le coffre reçu à chaque palier (objet « Coffre de succès » de l'inventaire, utilisé sur le village choisi) ; 0 = pas de coffre |
+
+Chaque passage qui donne des paliers envoie un seul rapport « Succès » au joueur. Le profil montre en badge le plus haut palier de chaque succès. Tables : `player_achievements` (migration 033).
+
 ## Profil joueur
 
 Page `#/joueur/<pseudo>`. Serveur : `playerProfile` et `setBio` (`server/src/game/profile.ts`), route `GET /api/players/:name`. Constantes dans `shared/src/profile.ts`.
