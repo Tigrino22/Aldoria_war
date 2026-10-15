@@ -100,6 +100,18 @@ describe('administration', () => {
     await new Promise((r) => setTimeout(r, 100));
     const seen = (await app.inject({ method: 'GET', url: '/api/admin/players', headers: boss })).json().find((p: { username: string }) => p.username === 'Curieux');
     expect(seen.lastSeen).not.toBeNull();
+
+    // Fiche d'un joueur : villages, troupes (au village, dehors, en recrutement) et rang, réservée à l'administrateur.
+    const bossId = (await pool.query("SELECT id FROM players WHERE username = 'Patron'")).rows[0].id as number;
+    expect((await app.inject({ method: 'GET', url: `/api/admin/players/${bossId}`, headers: other })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: '/api/admin/players/999999', headers: boss })).statusCode).toBe(404);
+    const detail = (await app.inject({ method: 'GET', url: `/api/admin/players/${bossId}`, headers: boss })).json();
+    expect(detail.username).toBe('Patron');
+    expect(detail.villages).toHaveLength(1);
+    expect(detail.troops.home.spearman).toBe(30);
+    expect(detail.troops.away.spearman).toBe(5);
+    expect(detail.troops.queued.swordsman).toBe(10);
+    expect(detail.rank.all).toBeGreaterThan(0);
   });
 
   it('remplit les entrepôts des PNJ jusqu’à un pourcentage, sans jamais réduire', async () => {
