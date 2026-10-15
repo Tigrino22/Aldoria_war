@@ -1,50 +1,44 @@
-import type { Resources } from './config';
+import { RESOURCES, type Resources } from './config';
 
 /**
- * Lettres de noblesse : frappées à l'hôtel de ville à prix fixe, stockées sur le compte, et consommées par chaque noble recruté.
- * Le noble suivant demande une lettre de plus (réglage `letterStep`) par village possédé et par noble déjà en vie au-delà du premier :
- * le prix d'une lettre tient toujours dans l'entrepôt, c'est leur nombre qui grimpe.
+ * Lettres de noblesse : chaque noble consomme une lettre, frappée à l'hôtel de ville avec la cagnotte du compte.
+ * La cagnotte reçoit ce que chaque village y verse, sans plafond (elle échappe à l'entrepôt). Le prix d'une lettre monte
+ * de `growth` % par village possédé au-delà du premier : les nobles d'une même conquête paient le même prix, et chaque
+ * village conquis renchérit les suivants.
  */
 
-/** Niveau d'hôtel de ville pour frapper des lettres (celui qu'exige le noble). */
+/** Niveau d’hôtel de ville pour frapper des lettres (celui qu’exige le noble). Tout village peut verser à la cagnotte. */
 export const LETTER_TOWNHALL = 10;
 /** Lettres frappées d'un coup au plus. */
-export const LETTER_BATCH_MAX = 100;
+export const LETTER_BATCH_MAX = 20;
 
-/** Lettres que demande le noble suivant, pour `villages` villages et `nobles` nobles déjà en vie ou en formation. */
-export function lettersForNext(villages: number, nobles: number, step: number): number {
-  return 1 + step * Math.max(0, villages + nobles - 1);
+/** Prix d'une lettre pour un joueur qui possède `villages` villages. */
+export function letterPriceFor(base: Resources, growthPercent: number, villages: number): Resources {
+  const factor = Math.pow(1 + growthPercent / 100, Math.max(0, villages - 1));
+  const out = {} as Resources;
+  for (const r of RESOURCES) out[r] = Math.round(base[r] * factor);
+  return out;
 }
 
-/** Lettres que demandent `count` nobles recrutés d'un coup (chacun compte pour le suivant). */
-export function lettersForNobles(villages: number, nobles: number, count: number, step: number): number {
-  let total = 0;
-  for (let i = 0; i < count; i++) total += lettersForNext(villages, nobles + i, step);
-  return total;
+/** Lettres que la cagnotte peut payer au prix `price`. */
+export function lettersAffordable(treasury: Resources, price: Resources): number {
+  let max = Infinity;
+  for (const r of RESOURCES) if (price[r] > 0) max = Math.min(max, Math.floor(treasury[r] / price[r]));
+  return max === Infinity ? LETTER_BATCH_MAX : Math.max(0, max);
 }
 
-/** Nombre de nobles que permettent `letters` lettres. */
-export function noblesAffordable(villages: number, nobles: number, letters: number, step: number): number {
-  let n = 0;
-  let left = letters;
-  for (;;) {
-    const need = lettersForNext(villages, nobles + n, step);
-    if (need > left || n >= 1000) return n;
-    left -= need;
-    n++;
-  }
-}
-
-/** Ce que le propriétaire voit de ses lettres depuis un village. */
+/** Ce que le propriétaire voit de ses lettres et de sa cagnotte depuis un village. */
 export interface NobilityView {
   /** Système activé dans l'administration ; sinon les nobles ne demandent aucune lettre. */
   enabled: boolean;
   letters: number;
-  /** Prix d'une lettre. */
+  /** Ressources versées par les villages, communes au compte. */
+  treasury: Resources;
+  /** Prix d'une lettre maintenant. */
   price: Resources;
-  /** Lettres que demande le prochain noble. */
-  next: number;
+  /** Prix d'une lettre après le prochain village conquis. */
+  nextPrice: Resources;
   villages: number;
-  nobles: number;
-  step: number;
+  /** Hausse du prix par village possédé, en %. */
+  growth: number;
 }

@@ -276,7 +276,7 @@ export const UNITS: Record<UnitKey, UnitDef> = {
     name: 'Noble',
     description: "Fait baisser la loyauté d'un village ennemi. À 0, le village est à vous.",
     kind: 'infantry',
-    cost: { wood: 4000, clay: 5000, iron: 5000, wheat: 2000 },
+    cost: { wood: 10000, clay: 12000, iron: 12000, wheat: 3000 },
     population: 100,
     attack: 30,
     defenseInfantry: 100,
