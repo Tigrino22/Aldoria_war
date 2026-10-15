@@ -56,3 +56,10 @@
 .app .pg .th-letters-rule { flex: 1 1 280px; min-width: 0; }
 .app .pg .th-letters-rule p { margin: 0 0 4px; }
 .app .pg .th-letters input[type='number'] { width: 110px; }
+.app .pg .th-treasury { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid rgba(122, 84, 16, 0.25); border-radius: 10px; background: rgba(255, 236, 190, 0.35); }
+.app .pg .th-treasury h4 { margin: 0; font: 600 14px var(--display); color: #7a5410; }
+.app .pg .th-treasury-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.app .pg .th-treasury-sum > span:not(.muted) { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.app .pg .th-treasury-give { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.app .pg .th-give { display: inline-flex; align-items: center; gap: 4px; }
+.app .pg .th-give input[type='number'] { width: 96px; }

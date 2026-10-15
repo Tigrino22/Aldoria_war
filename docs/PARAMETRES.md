@@ -176,7 +176,7 @@ Chaque niveau d'hôtel de ville réduit toutes les durées de 5 % (niveau 20 : d
 | Éclaireur | 50 / 50 / 20 / 10 | 2 | 5 min 00 | 2 min 52 | 1 min 33 | 0 | 2 | 1 | 9 | 0 |
 | Cavalier | 125 / 100 / 250 / 40 | 4 | 10 min 00 | 5 min 44 | 3 min 05 | 120 | 30 | 40 | 10 | 80 |
 | Bélier | 300 / 200 / 200 / 40 | 5 | 15 min 00 | 8 min 36 | 4 min 38 | 2 | 20 | 50 | 30 | 0 |
-| Noble | 4000 / 5000 / 5000 / 2000 | 100 | 1 h 00 | 34 min 23 | 18 min 31 | 30 | 100 | 50 | 35 | 0 |
+| Noble | 10000 / 12000 / 12000 / 3000 | 100 | 1 h 00 | 34 min 23 | 18 min 31 | 30 | 100 | 50 | 35 | 0 |
 
 Chaque niveau de caserne réduit le temps de recrutement de 6 %.
 
@@ -212,27 +212,30 @@ Tables : `manager_balance` et `manager_villages.balance` (migration 030). Routes
 
 ## Lettres de noblesse
 
-Chaque noble demande, en plus de son coût en ressources, des lettres de noblesse. Règle dans `shared/src/nobility.ts` (`lettersForNext`), serveur dans `server/src/game/nobility.ts`. Frappe : carte « Lettres de noblesse » de l'hôtel de ville (`POST /api/villages/:id/letters`).
+Chaque noble demande, en plus de son coût en ressources (10 000 bois, 12 000 argile, 12 000 fer, 3 000 blé, dans `shared/src/config.ts`), une lettre de noblesse. Prix dans `shared/src/nobility.ts` (`letterPriceFor`), serveur dans `server/src/game/nobility.ts`. Carte « Lettres de noblesse » de l'hôtel de ville : versement à la cagnotte (`POST /api/villages/:id/treasury`) et frappe (`POST /api/villages/:id/letters`).
 
 | Règle | Valeur |
 |---|---|
-| Frappe | À l'hôtel de ville niveau 10 (`LETTER_TOWNHALL`), instantanée, 100 lettres au plus d'un coup ; les ressources sont prises au village |
-| Réserve | Commune à tout le compte (`players.noble_letters`), utilisable depuis n'importe quelle caserne |
-| Prochain noble | 1 + `letterStep` × (villages + nobles − 1) lettres. Les nobles comptés sont ceux en vie, en route, en renfort, planifiés ou en formation. Recruter plusieurs nobles d'un coup additionne leurs prix (1 + 2 + 3… pour un seul village) |
+| Cagnotte | Commune à tout le compte (`players.treasury_wood`, `treasury_clay`, `treasury_iron`), sans plafond. Tout village du joueur peut y verser du bois, de l'argile et du fer, au plus son stock ; un versement ne revient pas au village |
+| Frappe | À l'hôtel de ville niveau 10 (`LETTER_TOWNHALL`), instantanée, 20 lettres au plus d'un coup (`LETTER_BATCH_MAX`), payée par la cagnotte |
+| Prix d'une lettre | Prix de base × (1 + `letterGrowth` %)^(villages − 1). Les nobles d'une même conquête paient donc le même prix, et chaque village gagné renchérit les suivants |
+| Réserve | Commune à tout le compte (`players.noble_letters`), utilisable depuis n'importe quelle caserne ; une lettre par noble |
 | Annulation | Les lettres des nobles pas encore formés reviennent dans la réserve (`recruit_queue.letters`) |
-| Noble mort | Ses lettres sont perdues ; après une conquête, le village gagné compte et le noble installé ne compte plus, le prix ne baisse donc pas |
-| PNJ | Même règle : avant de recruter des nobles, un PNJ frappe les lettres qui manquent avec les ressources du village, s'il peut les payer (`ensureLetters`), sinon il recrute moins de nobles |
-| Gestionnaire de compte | Ne frappe pas de lettres : sans lettres en réserve, le noble prévu attend (« Recrutement impossible » au journal) |
+| Noble mort | Sa lettre est perdue |
+| PNJ | Même règle : avant de recruter des nobles, un PNJ verse à la cagnotte ce qui manque depuis le village puis frappe (`ensureLetters`). S'il ne peut pas tout payer d'un coup, il verse la moitié de son stock utile et recrute moins de nobles |
+| Gestionnaire de compte | Ne verse pas et ne frappe pas : sans lettres en réserve, le noble prévu attend (« Recrutement impossible » au journal) |
+
+Coût d'une conquête de 4 nobles (noble + lettre, 25 % par village, vitesse ×1) : environ 340 000 ressources avec 1 village, 620 000 avec 5, 1,6 million avec 10, 13,5 millions avec 20. Pour comparer, un village aux mines de niveau 20 produit environ 69 000 ressources par jour, 122 000 au niveau 25.
 
 Réglages de l'administration (onglet Monde) :
 
 | Réglage | Défaut | Effet |
 |---|---|---|
-| Lettres de noblesse (`nobleLetters`) | activées | Désactivées : les nobles ne coûtent que leurs ressources, les lettres en réserve sont gardées |
-| Prix d'une lettre (`letterWood`, `letterClay`, `letterIron`) | 3 000 / 3 500 / 3 000 | Ressources payées par lettre (pas de blé) |
-| Lettres en plus à chaque noble (`letterStep`) | 1 | 1 = 1, 2, 3, 4… lettres ; 2 = 1, 3, 5, 7… ; 0 = toujours 1 lettre |
+| Lettres de noblesse (`nobleLetters`) | activées | Désactivées : les nobles ne coûtent que leurs ressources, les lettres et la cagnotte sont gardées |
+| Prix d'une lettre (`letterWood`, `letterClay`, `letterIron`) | 15 000 / 18 000 / 15 000 | Ressources payées par la cagnotte pour une lettre avec un seul village (pas de blé) |
+| Hausse du prix par village (`letterGrowth`) | 25 % | ×1,25 au 2e village, ×3 au 6e, ×9 au 11e, ×87 au 21e ; 0 = prix fixe |
 
-Migration 034.
+Migrations 034 et 035.
 
 ## Succès et badges
 

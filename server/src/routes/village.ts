@@ -10,7 +10,7 @@ import { villageSheet } from '../game/village-sheet';
 import { cancelOrder, placeOrder, plannedOrders } from '../game/orders';
 import { cancelCommand, disbandTroops, recallTroops, sendCommand, sendTrade } from '../game/commands';
 import { planInterception, sendInterception } from '../game/intercept';
-import { mintLetters } from '../game/nobility';
+import { depositTreasury, mintLetters } from '../game/nobility';
 import { cancelBuild, cancelRecruit, enqueueBuild, enqueueRecruit, loadVillage, syncVillage, villageState } from '../game/village';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
@@ -160,13 +160,25 @@ export default async function villageRoutes(app: FastifyInstance) {
     });
   });
 
-  // Lettres de noblesse : frappées à l'hôtel de ville avec les ressources du village.
+  // Cagnotte de noblesse : chaque village y verse une part de son stock.
+  app.post('/api/villages/:id/treasury', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { id } = idParam.parse(req.params);
+    const amount = z.number().int().min(0).max(1e9);
+    const body = z.object({ wood: amount, clay: amount, iron: amount }).parse(req.body);
+    return act(async (c, _o, now) => {
+      await depositTreasury(c, playerId, id, { ...body, wheat: 0 }, now);
+      return villageState(c, await syncVillage(c, id, now), playerId);
+    });
+  });
+
+  // Lettres de noblesse : frappées à l'hôtel de ville avec la cagnotte.
   app.post('/api/villages/:id/letters', async (req) => {
     const playerId = await requirePlayer(req);
     const { id } = idParam.parse(req.params);
     const { count } = z.object({ count: z.number().int().min(1).max(LETTER_BATCH_MAX) }).parse(req.body);
     return act(async (c, _o, now) => {
-      await mintLetters(c, playerId, id, count, now);
+      await mintLetters(c, playerId, id, count);
       return villageState(c, await syncVillage(c, id, now), playerId);
     });
   });

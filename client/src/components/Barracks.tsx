@@ -9,8 +9,6 @@ import {
   type UnitKey,
   emptyUnits,
   meetsRequirements,
-  lettersForNobles,
-  noblesAffordable,
   recruitTime,
   scaleResources,
 } from '@aldoria/shared';
@@ -56,7 +54,7 @@ export default function Barracks() {
     const def = UNITS[k];
     let max = Math.floor(freePopulation / def.population);
     for (const r of RESOURCES) if (def.cost[r] > 0) max = Math.min(max, Math.floor(res[r] / def.cost[r]));
-    if (k === 'noble' && v.nobility.enabled) max = Math.min(max, noblesAffordable(v.nobility.villages, v.nobility.nobles, v.nobility.letters, v.nobility.step));
+    if (k === 'noble' && v.nobility.enabled) max = Math.min(max, v.nobility.letters);
     return Math.max(0, max);
   };
 
@@ -254,9 +252,8 @@ export default function Barracks() {
                   </p>
                 )}
                 {k === 'noble' && v.nobility.enabled && (
-                  <p className={`small ${v.nobility.letters >= v.nobility.next ? 'muted' : 'warn'}`}>
-                    Demande aussi {n > 1 ? lettersForNobles(v.nobility.villages, v.nobility.nobles, n, v.nobility.step) : v.nobility.next} lettre
-                    {(n > 1 || v.nobility.next > 1) && 's'} de noblesse (vous en avez {fmt(v.nobility.letters)}) :{' '}
+                  <p className={`small ${v.nobility.letters >= Math.max(1, n) ? 'muted' : 'warn'}`}>
+                    Chaque noble demande aussi une lettre de noblesse (vous en avez {fmt(v.nobility.letters)}) :{' '}
                     <a href="#/hotel">les frapper à l’hôtel de ville</a>
                   </p>
                 )}
