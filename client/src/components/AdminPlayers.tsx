@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BUILDINGS, RESOURCES, UNIT_KEYS, type BuildingKey, type Resources, type UnitCounts } from '@aldoria/shared';
+import { BUILDINGS, BUILDING_KEYS, RESOURCES, UNIT_KEYS, type BuildingKey, type Resources, type UnitCounts } from '@aldoria/shared';
 import { api } from '../api';
 import { ago, clockTime, fmt } from '../format';
 import { useGame } from '../game';
@@ -34,6 +34,7 @@ interface AdminVillage {
   capacity: number;
   population: number;
   populationCap: number;
+  buildings: Record<BuildingKey, number>;
   troopsHome: UnitCounts;
   troopsAway: UnitCounts;
   troopsQueued: UnitCounts;
@@ -451,6 +452,18 @@ function PlayerDetail({ id, onBack }: { id: number; onBack: () => void }) {
                       ' · aucune construction'
                     )}
                   </div>
+                  <ul className="admin-pl-buildings" aria-label="Bâtiments">
+                    {BUILDING_KEYS.map((b) => {
+                      const level = v.buildings[b] ?? 0;
+                      const max = BUILDINGS[b].maxLevel;
+                      return (
+                        <li key={b} className={level === 0 ? 'none' : level >= max ? 'max' : ''} title={`${BUILDINGS[b].name} : niveau ${level} sur ${max}`}>
+                          <span>{BUILDINGS[b].name}</span>
+                          <b>{level}</b>
+                        </li>
+                      );
+                    })}
+                  </ul>
                   {UNIT_KEYS.some((u) => v.troopsHome[u] > 0) && (
                     <div className="small">
                       <UnitList units={v.troopsHome} />
