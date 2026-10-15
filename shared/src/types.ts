@@ -323,3 +323,33 @@ export interface MarketOfferView {
   /** Distance en cases depuis le village qui consulte les offres. */
   distance: number;
 }
+
+/** Relation d'un village avec le joueur qui le regarde (mêmes catégories que la légende de la carte). */
+export type VillageRelation = 'mine' | 'tribe' | 'ally' | 'war' | 'other' | 'barbarian' | 'neutral';
+
+/** Fiche d'un village (`#/fiche/x,y`) : ce que tout le monde voit, plus ce que le joueur sait de lui. */
+export interface VillageSheet {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  /** Village ordinaire, bastion de province ou Citadelle des croisades. */
+  kind: 'village' | 'bastion' | 'citadel';
+  points: number;
+  owner: { id: number; name: string } | null;
+  tribe: { id: number; tag: string; name: string } | null;
+  relation: VillageRelation;
+  protected: boolean;
+  province: { id: number; name: string; holy: boolean } | null;
+  /** Loyauté, seulement pour ses propres villages. */
+  loyalty: number | null;
+  /** Ce que le joueur sait de la défense et du butin (ses propres rapports). */
+  intel: TargetIntel | null;
+  lootable: LootEstimate | null;
+  /** Derniers rapports du joueur qui concernent ce village (attaques, défenses, espionnages, livraisons…). */
+  reports: ReportSummary[];
+  /** Mouvements du joueur en route vers ce village. */
+  movements: { id: number; type: string; arriveAt: string; fromName: string }[];
+  /** Conquêtes de ce village (journal public). */
+  conquests: { at: string; conqueror: string; loser: string }[];
+}

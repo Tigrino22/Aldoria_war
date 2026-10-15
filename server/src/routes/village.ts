@@ -6,6 +6,7 @@ import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
 import { GameError, forbidden } from '../errors';
 import { pickIntel } from '../game/intel';
+import { villageSheet } from '../game/village-sheet';
 import { cancelOrder, placeOrder, plannedOrders } from '../game/orders';
 import { cancelCommand, disbandTroops, recallTroops, sendCommand, sendTrade } from '../game/commands';
 import { planInterception, sendInterception } from '../game/intercept';
@@ -45,6 +46,13 @@ export default async function villageRoutes(app: FastifyInstance) {
       for (const r of rows) out.push(await villageState(c, await syncVillage(c, r.id, now), playerId));
       return out;
     });
+  });
+
+  /** Fiche d'un village par ses coordonnées (`#/fiche/x,y`), avec les rapports et renseignements du joueur. */
+  app.get('/api/village-sheet/:x/:y', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { x, y } = z.object({ x: z.coerce.number().int().min(0), y: z.coerce.number().int().min(0) }).parse(req.params);
+    return villageSheet(pool, playerId, x, y, new Date());
   });
 
   app.get('/api/villages/:id/public', async (req) => {

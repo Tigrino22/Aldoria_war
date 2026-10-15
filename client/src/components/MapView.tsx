@@ -1160,7 +1160,12 @@ export default function MapView({ focus }: { focus?: string }) {
             </button>
             {card(selected, true)}
             {selected.id === villageId ? (
-              <p className="muted small">C'est votre village actif.</p>
+              <>
+                <p className="muted small">C'est votre village actif.</p>
+                <a className="btn ghost small" href={`#/fiche/${selected.x},${selected.y}`}>
+                  Fiche du village
+                </a>
+              </>
             ) : (
               <>
                 <SendTroops
@@ -1172,6 +1177,9 @@ export default function MapView({ focus }: { focus?: string }) {
                   }}
                 />
                 <div className="row wrap">
+                  <a className="btn ghost small" href={`#/fiche/${selected.x},${selected.y}`}>
+                    Fiche du village
+                  </a>
                   <a className="btn ghost small" href={`#/ralliement/${selected.x},${selected.y}`}>
                     Point de ralliement
                   </a>

@@ -99,6 +99,15 @@ export function CancelButton({ since, onCancel, movement = false }: { since: str
 }
 
 /** Nom de joueur cliquable qui mène à son profil. */
+/** Lien vers la fiche d'un village : « Nom (x|y) ». */
+export function VillageLink({ v }: { v: { name: string; x: number; y: number } }) {
+  return (
+    <a href={`#/fiche/${v.x},${v.y}`}>
+      {v.name} ({v.x}|{v.y})
+    </a>
+  );
+}
+
 export function PlayerLink({ name }: { name: string | null | undefined }) {
   if (!name) return null;
   return <a href={`#/joueur/${encodeURIComponent(name)}`}>{name}</a>;

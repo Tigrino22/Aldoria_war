@@ -1,0 +1,13 @@
+/* Fiche d'un village (#/fiche/x,y), au gabarit des pages (docs/CHARTE-GRAPHIQUE.md, section 8). */
+.vsheet-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+@media (max-width: 900px) { .vsheet-grid { grid-template-columns: 1fr; } }
+.vsheet-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+.vsheet-res { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.vsheet-res > span { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.vsheet-times { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.vsheet-times > span { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; }
+.vsheet-times > span > :first-child { grid-row: span 2; }
+.vsheet-moves { list-style: none; margin: 0; padding: 0; }
+.vsheet-moves li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.vsheet-moves li:last-child { border-bottom: 0; }
+.vsheet-moves li > span:nth-child(2) { flex: 1 1 12em; min-width: 0; }

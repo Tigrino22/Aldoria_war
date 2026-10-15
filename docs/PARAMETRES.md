@@ -210,6 +210,20 @@ Page « Gestionnaire de compte », panneau « Équilibrage des ressources ». R�
 
 Tables : `manager_balance` et `manager_villages.balance` (migration 030). Routes : `PUT /api/manager/balance`, champ `balance` de `PUT /api/manager/villages/:id`.
 
+## Fiche d'un village
+
+Page `#/fiche/x,y`, ouverte depuis la carte (« Fiche du village »), les rapports ou le profil d’un joueur. Serveur : `villageSheet` (`server/src/game/village-sheet.ts`), route `GET /api/village-sheet/:x/:y`. Aucun réglage dans l'administration : la fiche ne montre que ce que le joueur sait déjà.
+
+| Bloc | Contenu |
+|---|---|
+| Public | Nom, coordonnées, propriétaire, tribu, points, province (ou Terre sainte), protection débutant, conquêtes du village (10 dernières, `conquest_log`) |
+| Relation | Votre village, tribu, allié, ennemi en guerre, autre joueur, barbare ou lieu neutre (mêmes catégories que la carte) |
+| Loyauté | Seulement pour ses propres villages |
+| Renseignements | Troupes et muraille du dernier espionnage ou de la dernière attaque du joueur, butin estimé (comme l'assistant de pillage) |
+| Rapports | Les 15 derniers rapports du joueur où ce village apparaît (`SHEET_REPORTS`) : attaque, défense, espionnage, livraison |
+| Mouvements | Attaques, renforts et convois du joueur en route vers ce village |
+| Temps de trajet | Par unité, depuis le village actif, bonus de vitesse des provinces compris |
+
 ## Offres de marché (joueurs et PNJ)
 
 Valeurs dans `server/src/game/market-rules.ts`, à ajuster librement.

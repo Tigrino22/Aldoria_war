@@ -116,7 +116,7 @@ export default function Profile({ name }: { name: string }) {
               <tbody>
                 {profile.villages.map((v) => (
                   <tr key={v.id}>
-                    <td><a href={`#/carte/${v.x},${v.y}`}>{v.name}</a></td>
+                    <td><a href={`#/fiche/${v.x},${v.y}`}>{v.name}</a></td>
                     <td>({v.x}|{v.y})</td>
                     <td>{fmt(v.points)}</td>
                   </tr>
