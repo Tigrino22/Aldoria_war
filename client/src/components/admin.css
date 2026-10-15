@@ -126,3 +126,4 @@
 .app .pg .admin-pl-buildings li b { font-variant-numeric: tabular-nums; }
 .app .pg .admin-pl-buildings li.none { opacity: 0.45; }
 .app .pg .admin-pl-buildings li.max b { color: var(--gold); }
+.admin .tabs .badge-pill { display: inline-grid; margin-left: 6px; vertical-align: middle; }

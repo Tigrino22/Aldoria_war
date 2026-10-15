@@ -1,0 +1,28 @@
+/* Bouton « Signaler » (bouton rouge .btn.danger, bien visible) et sa fenêtre. */
+.report-btn { display: inline-flex; align-items: center; gap: 6px; }
+
+.report-dialog { width: min(480px, 100%); background: var(--panel); border: 2px solid var(--danger); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.45); }
+.report-dialog h2 { margin: 0; }
+.report-dialog textarea { width: 100%; }
+.report-dialog .row.between { justify-content: space-between; }
+.report-reasons { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+.report-reasons legend { font-weight: 600; margin-bottom: 4px; }
+.report-reasons label { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.report-reasons label.on { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+/* Administration > Signalements */
+.mod-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.mod-card { border: 1px solid var(--line); border-left: 4px solid var(--danger); border-radius: 10px; padding: 12px; display: grid; gap: 8px; background: var(--panel); }
+.mod-card.done, .mod-card.rejected { border-left-color: var(--line); }
+.mod-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mod-date { margin-left: auto; }
+.mod-line { margin: 0; }
+.mod-comment { margin: 0; padding: 8px 12px; border-left: 3px solid var(--line); background: var(--panel-2); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
+.mod-message { display: grid; gap: 4px; padding: 10px 12px; background: var(--panel-2); border-radius: 8px; }
+.mod-message p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mod-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mod-actions input { flex: 1 1 220px; min-width: 0; }
+.mod-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+.mod-tag.alert { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.mod-tag.done { border-color: var(--ok); color: var(--ok); }
+@media (max-width: 640px) { .mod-actions input { flex-basis: 100%; } }

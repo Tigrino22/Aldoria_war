@@ -213,7 +213,7 @@ export default function Layout() {
       for (const load of Object.values(PAGES)) void load();
     });
   }, []);
-  const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : 0);
+  const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : path === 'admin' ? (me.openModerationReports ?? 0) : 0);
 
   if (!me.villages.length) {
     return (

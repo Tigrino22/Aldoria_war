@@ -5,6 +5,7 @@ import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
 import { Panel } from '../ui';
 import { CardTitle, PageBanner } from './PageBanner';
+import ReportButton from './ReportButton';
 import './account.css';
 
 export default function Profile({ name }: { name: string }) {
@@ -54,6 +55,7 @@ export default function Profile({ name }: { name: string }) {
       <a className="btn primary" href={`#/messages/ecrire/${encodeURIComponent(profile.username)}`}>
         Écrire
       </a>
+      <ReportButton kind="player" target={profile.username} label={profile.username} />
     </>
   );
 

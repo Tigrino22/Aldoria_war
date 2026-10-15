@@ -9,6 +9,7 @@ import TribeAlliances from './TribeAlliances';
 import TribeCrest from './TribeCrest';
 import TribeProvinces from './TribeProvinces';
 import { Broadcast, MemberAttacks, Threats } from './TribeTools';
+import ReportButton from './ReportButton';
 import TribeWars from './TribeWars';
 
 interface Viewer {
@@ -456,6 +457,7 @@ export default function Tribe({ id }: { id?: number }) {
           </button>
         </>
       )}
+      <ReportButton kind="tribe" target={tribe.id} label={`la tribu [${tribe.tag}]`} />
     </>
   );
 

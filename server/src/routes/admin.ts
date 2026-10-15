@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { MODERATION_COMMENT_MAX } from '@aldoria/shared';
 import { requirePlayer } from '../auth';
 import { pool, tx } from '../db';
 import { env } from '../env';
@@ -14,14 +15,19 @@ import { GameError } from '../errors';
 import { act } from '../act';
 import { announceCrusade, endCrusade } from '../game/crusades';
 import { refreshNeutralBastions } from '../game/provinces';
+import { listModerationReports, resolveModerationReport } from '../game/moderation';
 import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
 /** Réservé aux pseudos listés dans ADMIN_USERNAMES : vérifié à chaque requête, côté serveur. */
 async function requireAdmin(req: FastifyRequest) {
+  return (await requireAdminNamed(req)).id;
+}
+
+async function requireAdminNamed(req: FastifyRequest) {
   const id = await requirePlayer(req);
   const name = (await pool.query('SELECT username FROM players WHERE id = $1', [id])).rows[0]?.username as string | undefined;
   if (!name || !env.adminUsernames.includes(name.toLowerCase())) throw forbidden('Réservé à l’administrateur');
-  return id;
+  return { id, name };
 }
 
 const hoursQuery = z.object({ hours: z.coerce.number().int().min(1).max(168).default(24) });
@@ -198,6 +204,23 @@ export default async function adminRoutes(app: FastifyInstance) {
       await endCrusade(c, outbox, cr, now);
       return { id: cr.id };
     });
+  });
+
+  /** Signalements des joueurs : `?status=open` (à traiter) ou `closed` (traités ou rejetés). */
+  app.get('/api/admin/moderation', async (req) => {
+    await requireAdmin(req);
+    const { status } = z.object({ status: z.enum(['open', 'closed']).default('open') }).parse(req.query);
+    return listModerationReports(pool, status);
+  });
+
+  app.put('/api/admin/moderation/:id', async (req) => {
+    const admin = await requireAdminNamed(req);
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
+    const body = z
+      .object({ status: z.enum(['open', 'done', 'rejected']), note: z.string().max(MODERATION_COMMENT_MAX).nullable().optional() })
+      .parse(req.body);
+    await tx((c) => resolveModerationReport(c, id, admin.name, body.status, body.note ?? null, new Date()));
+    return { ok: true };
   });
 
   /** Totaux du monde et paramètres actifs. */
