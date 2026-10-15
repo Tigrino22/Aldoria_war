@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { requirePlayer } from '../auth';
-import { pool } from '../db';
+import { pool, tx } from '../db';
 import { env } from '../env';
 import { forbidden } from '../errors';
 import { fillNpcWarehouses } from '../game/npc-fill';
@@ -11,6 +11,7 @@ import { warOverview } from '../game/npc-war-report';
 import { GameError } from '../errors';
 import { act } from '../act';
 import { announceCrusade, endCrusade } from '../game/crusades';
+import { refreshNeutralBastions } from '../game/provinces';
 import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
 /** Réservé aux pseudos listés dans ADMIN_USERNAMES : vérifié à chaque requête, côté serveur. */
@@ -147,6 +148,8 @@ export default async function adminRoutes(app: FastifyInstance) {
     if (unknown) throw new GameError(`Réglage inconnu : ${unknown}`);
     const error = await saveSettings(values as Partial<Record<SettingDef['key'], unknown>>);
     if (error) throw new GameError(error);
+    // Garde ou muraille d'un niveau changée : les bastions sans bannière la reçoivent tout de suite.
+    if (Object.keys(values).some((k) => /^province(Garrison|Wall)[123]$/.test(k))) await tx((c) => refreshNeutralBastions(c));
     return settingsView();
   });
 

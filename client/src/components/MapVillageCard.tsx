@@ -1,4 +1,4 @@
-import { PROVINCE_BONUS_LABEL, UNITS, UNIT_KEYS, distance, emptyUnits, travelTime, type MapVillage, type ProvinceView } from '@aldoria/shared';
+import { PROVINCE_BONUS_LABEL, TIER_LABEL, UNITS, UNIT_KEYS, distance, emptyUnits, travelTime, type MapVillage, type ProvinceTier, type ProvinceView } from '@aldoria/shared';
 import { clockTime, duration, fmt } from '../format';
 import { UnitIcon } from '../ui';
 import { REL_LABELS, type Mark, type Relation } from './mapStyle';
@@ -13,7 +13,7 @@ export default function MapVillageCard({
   worldSpeed,
   ownerSlot,
   province,
-  bonusPercent = 10,
+  speedBonus = 0,
 }: {
   v: MapVillage;
   rel: Relation;
@@ -25,7 +25,8 @@ export default function MapVillageCard({
   ownerSlot?: React.ReactNode;
   /** Pour un bastion : sa province (bonus, bannière, contrôle). */
   province?: ProvinceView;
-  bonusPercent?: number;
+  /** Troupes plus rapides grâce aux provinces de vitesse de la tribu. */
+  speedBonus?: number;
 }) {
   const dist = from ? distance(from, v) : 0;
   const tag = mark ? `Repère : ${mark.name}` : REL_LABELS[rel];
@@ -55,9 +56,10 @@ export default function MapVillageCard({
           </>
         ) : v.kind === 'bastion' ? (
           <>
+            {province && province.tier > 0 && <span className="mvc-chip">{TIER_LABEL[province.tier as ProvinceTier]}</span>}
             {province?.bonus && (
               <span className="mvc-chip gold">
-                {PROVINCE_BONUS_LABEL[province.bonus]} +{bonusPercent} %
+                {PROVINCE_BONUS_LABEL[province.bonus]} +{province.bonusPercent} %
               </span>
             )}
             {v.holy && <span className="mvc-chip gold">Victoire du monde</span>}
@@ -90,7 +92,7 @@ export default function MapVillageCard({
             <span key={k} className="mvc-time">
               <UnitIcon unit={k} size={22} />
               <span className="mvc-unit">{UNITS[k].name}</span>
-              <span>{duration(travelTime({ ...emptyUnits(), [k]: 1 }, from, v, worldSpeed))}</span>
+              <span>{duration(travelTime({ ...emptyUnits(), [k]: 1 }, from, v, worldSpeed, speedBonus))}</span>
             </span>
           ))}
         </div>

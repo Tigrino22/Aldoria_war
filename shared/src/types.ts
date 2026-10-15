@@ -105,6 +105,8 @@ export interface VillageState {
   provinceBonus?: Resources;
   /** Recrutement accéléré par les provinces contrôlées (0,1 = 10 % plus vite). */
   recruitBonus?: number;
+  /** Troupes plus rapides grâce aux provinces contrôlées (0,1 = trajets 10 % plus rapides). */
+  speedBonus?: number;
   capacity: number;
   syncedAt: string;
   buildings: Buildings;

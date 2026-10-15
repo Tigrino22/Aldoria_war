@@ -21,7 +21,7 @@ import { GameError, forbidden } from '../errors';
 import { Outbox } from '../notify';
 import { assertCanAttack, chargeAttackWheat, dispatchCommand, refundAttackWheat } from './commands';
 import { assertCitadelMove } from './crusades';
-import { assertBastionMove } from './provinces';
+import { assertBastionMove, speedBonus } from './provinces';
 import { addTroops, getTroops, loadVillage, setTroops, syncVillage } from './village';
 
 /**
@@ -82,10 +82,11 @@ export async function placeOrder(c: Db, outbox: Outbox, playerId: number, origin
   if (!hasUnits(available, units)) throw new GameError("Vous n'avez pas assez de troupes au village");
   // Un refus de principe (soi-même, joueur protégé) vaut tout de suite : la protection du joueur ne tombe qu'au départ de l'attaque.
   if (input.type === 'attack') await assertCanAttack(c, playerId, target, now, false);
+  const speed = await speedBonus(c, playerId, now);
   const parts = orderParts(strike, train, {
     landAt: input.arriveAt ?? null,
     now,
-    travelMs: (u) => travelTime(u, origin, target, env.worldSpeed) * 1000,
+    travelMs: (u) => travelTime(u, origin, target, env.worldSpeed, speed) * 1000,
   });
 
   // Vers la Citadelle d'une croisade, chaque mouvement de l'ordre doit arriver pendant la fenêtre d'assaut.

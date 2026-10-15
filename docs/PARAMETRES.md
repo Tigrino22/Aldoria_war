@@ -393,8 +393,10 @@ La carte est découpée en provinces de taille et de forme variables (environ un
 |---|---|---|---|
 | Provinces | `PROVINCES` | 1 | 0 : plus de bonus ni de prise de bastion |
 | Tenue d'un bastion avant contrôle | `PROVINCE_HOLD_HOURS` | 12 h | Temps de bannière sans interruption pour contrôler la province |
-| Bonus d'une province | `PROVINCE_BONUS` | 10 % | Production de sa ressource, ou vitesse de recrutement, pour toute la tribu |
+| Garde d'un bastion, niveaux 1 / 2 / 3 | `PROVINCE_GARRISON_1` … `_3` | 1 500 / 3 000 / 6 000 | Population de la garde neutre ; appliquée tout de suite aux bastions sans bannière quand on la change |
+| Muraille d'un bastion, niveaux 1 / 2 / 3 | `PROVINCE_WALL_1` … `_3` | 5 / 10 / 15 | Idem |
+| Bonus d'une province, niveaux 1 / 2 / 3 | `PROVINCE_BONUS_1` … `_3` | 5 / 10 / 15 % | Production de sa ressource, vitesse de recrutement ou vitesse des troupes, pour toute la tribu |
 | Provinces voisines exigées | `HOLY_ACCESS` | 2 | Provinces bordant la Terre sainte à contrôler pour attaquer le Sanctuaire (0 = libre) |
 | Tenue de la Terre sainte | `HOLY_HOLD_DAYS` | 3 j | Tenue du Sanctuaire pour gagner le monde (titre « Maître d'Aldoria ») |
 
-Règles : garde neutre de 2 500 places de population et muraille 10 (Sanctuaire : 8 000 et muraille 20). Une attaque victorieuse avec un noble survivant plante la bannière de la tribu de l'attaquant et ses survivants restent en garnison ; sans noble, elle abat la bannière. Seuls la tribu qui tient le bastion et ses alliés peuvent le renforcer. Code : `server/src/game/provinces.ts` (migration 023), page `client/src/components/Provinces.tsx`, `GET /api/provinces`.
+Niveaux : 3 pour les provinces qui bordent la Terre sainte, puis les autres coupées en deux selon leur distance au centre (la moitié la plus proche en niveau 2, le reste en niveau 1), calculés au démarrage (migration 024). Règles : garde neutre et muraille selon le niveau (Sanctuaire : 8 000 et muraille 20). Une attaque victorieuse avec un noble survivant plante la bannière de la tribu de l'attaquant et ses survivants restent en garnison ; sans noble, elle abat la bannière. Seuls la tribu qui tient le bastion et ses alliés peuvent le renforcer. Code : `server/src/game/provinces.ts` (migration 023), page `client/src/components/Provinces.tsx`, `GET /api/provinces`.

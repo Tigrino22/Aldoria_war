@@ -355,7 +355,7 @@ export default function VillageView() {
 }
 
 /** Bonus des provinces contrôlées par la tribu, en pastilles : « Bois +10 % », « Recrutement +10 % ». */
-function provinceChips(v: { provinceBonus?: Record<'wood' | 'clay' | 'iron' | 'wheat', number>; recruitBonus?: number }): string[] {
+function provinceChips(v: { provinceBonus?: Record<'wood' | 'clay' | 'iron' | 'wheat', number>; recruitBonus?: number; speedBonus?: number }): string[] {
   const out: string[] = [];
   const labels = { wood: 'Bois', clay: 'Argile', iron: 'Fer', wheat: 'Blé' } as const;
   for (const r of ['wood', 'clay', 'iron', 'wheat'] as const) {
@@ -363,5 +363,6 @@ function provinceChips(v: { provinceBonus?: Record<'wood' | 'clay' | 'iron' | 'w
     if (b > 0) out.push(`${labels[r]} +${Math.round(b * 100)} %`);
   }
   if ((v.recruitBonus ?? 0) > 0) out.push(`Recrutement +${Math.round((v.recruitBonus ?? 0) * 100)} %`);
+  if ((v.speedBonus ?? 0) > 0) out.push(`Vitesse des troupes +${Math.round((v.speedBonus ?? 0) * 100)} %`);
   return out;
 }

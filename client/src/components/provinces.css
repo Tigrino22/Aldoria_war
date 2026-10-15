@@ -12,6 +12,15 @@
 .app .pg.provinces .prov-sub { font-size: 13px; color: var(--muted); }
 .app .pg.provinces .prov-map { width: 100%; max-width: 420px; aspect-ratio: 1; display: block; margin: 0 auto 8px; border-radius: 10px; border: 1px solid rgb(224 178 60 / 0.55); image-rendering: pixelated; }
 .app .pg.provinces .prov-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.app .pg.provinces .prov-tier {
+  display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  color: #1c140c; background: #c9b48a; border: 1px solid rgb(20 14 8 / 0.6);
+}
+.app .pg.provinces .prov-tier.t2 { background: #d9a441; }
+.app .pg.provinces .prov-tier.t3 { background: #e0b23c; box-shadow: 0 0 0 1px rgb(241 204 99 / 0.6), 0 0 8px rgb(224 178 60 / 0.45); }
+.app .pg.provinces .prov-tiers { width: 100%; border-collapse: collapse; font-size: 14px; margin: 6px 0; }
+.app .pg.provinces .prov-tiers th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid rgb(224 178 60 / 0.35); }
+.app .pg.provinces .prov-tiers td { padding: 6px; border-bottom: 1px solid rgb(255 255 255 / 0.06); }
 .app .pg.provinces .prov-victory { border-color: #a77a14; background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 22%, var(--panel)), var(--panel)); }
 @media (max-width: 1000px) {
   .app .pg.provinces .prov-grid { grid-template-columns: minmax(0, 1fr); }

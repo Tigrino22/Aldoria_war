@@ -9,19 +9,51 @@ import { emptyUnits } from './formulas';
  */
 
 export type ProvinceKind = 'province' | 'holy';
-export type ProvinceBonus = 'wood' | 'clay' | 'iron' | 'wheat' | 'recruit';
-export const PROVINCE_BONUSES: ProvinceBonus[] = ['wood', 'clay', 'iron', 'wheat', 'recruit'];
+export type ProvinceBonus = 'wood' | 'clay' | 'iron' | 'wheat' | 'recruit' | 'speed';
+export const PROVINCE_BONUSES: ProvinceBonus[] = ['wood', 'clay', 'iron', 'wheat', 'recruit', 'speed'];
 export const PROVINCE_BONUS_LABEL: Record<ProvinceBonus, string> = {
   wood: 'Bois',
   clay: 'Argile',
   iron: 'Fer',
   wheat: 'Blé',
   recruit: 'Recrutement',
+  speed: 'Vitesse des troupes',
 };
 
-/** Garde neutre d'un bastion au départ (population) et muraille ; la Terre sainte est bien plus dure. */
-export const BASTION_GARRISON = 2500;
-export const BASTION_WALL = 10;
+/**
+ * Niveau d'une province, selon sa distance à la Terre sainte : 3 pour celles qui la bordent, 2 pour leurs voisines, 1 pour
+ * les terres du bord. Plus le niveau est haut, plus le bastion est gardé et plus le bonus est fort (valeurs dans l'administration).
+ */
+export type ProvinceTier = 1 | 2 | 3;
+export const PROVINCE_TIERS: ProvinceTier[] = [1, 2, 3];
+export const TIER_LABEL: Record<ProvinceTier, string> = { 1: 'Niveau 1', 2: 'Niveau 2', 3: 'Niveau 3' };
+
+/** Réglages d'un niveau : garde neutre du bastion (population), muraille et bonus (%) de la province. */
+export interface TierRules {
+  tier: ProvinceTier;
+  garrison: number;
+  wall: number;
+  bonus: number;
+}
+
+/**
+ * Niveau de chaque province (indices dans la liste) : 3 pour celles qui bordent la Terre sainte (il faut les tenir pour l'attaquer),
+ * puis les autres coupées en deux selon la distance de leur point à la Terre sainte : la moitié la plus proche en niveau 2, le reste
+ * en niveau 1. La Terre sainte elle-même reçoit 0.
+ */
+export function provinceTiers(seeds: { x: number; y: number }[], neighbours: Set<number>[], holyIndex: number): (ProvinceTier | 0)[] {
+  if (holyIndex < 0) return seeds.map(() => 1);
+  const holy = seeds[holyIndex];
+  const out: (ProvinceTier | 0)[] = seeds.map((_, i) => (i === holyIndex ? 0 : neighbours[holyIndex].has(i) ? 3 : 1));
+  const rest = seeds
+    .map((s, i) => ({ i, d: Math.hypot(s.x - holy.x, s.y - holy.y) }))
+    .filter(({ i }) => out[i] === 1)
+    .sort((a, b) => a.d - b.d || a.i - b.i);
+  rest.slice(0, Math.ceil(rest.length / 2)).forEach(({ i }) => (out[i] = 2));
+  return out;
+}
+
+/** Garde neutre du Sanctuaire (population) et muraille : la Terre sainte est bien plus dure que tous les bastions. */
 export const HOLY_GARRISON = 8000;
 export const HOLY_WALL = 20;
 
@@ -162,6 +194,10 @@ export interface ProvinceView {
   y: number;
   weight: number;
   bonus: ProvinceBonus | null;
+  /** Niveau de la province (0 pour la Terre sainte). */
+  tier: ProvinceTier | 0;
+  /** Bonus de la province pour la tribu qui la contrôle, en %, selon son niveau. */
+  bonusPercent: number;
   bastion: { id: number; name: string; x: number; y: number; wall: number } | null;
   /** Tribu dont la bannière flotte sur le bastion, et depuis quand. */
   holder: { tribeId: number; tag: string; name: string } | null;
@@ -186,7 +222,8 @@ export interface ProvincesState {
   holdHours: number;
   holyAccess: number;
   holyHoldDays: number;
-  bonusPercent: number;
+  /** Garde, muraille et bonus de chaque niveau. */
+  tiers: TierRules[];
   provinces: ProvinceView[];
   /** Tribu du joueur : provinces contrôlées qui bordent la Terre sainte, et accès à son Sanctuaire. */
   mine: { tribeId: number; holyNeighbours: number; canAttackHoly: boolean } | null;

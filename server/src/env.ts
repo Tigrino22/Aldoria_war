@@ -62,11 +62,20 @@ export const env = {
   crusadeNoticeHours: count('CRUSADE_NOTICE_HOURS', 48),
   crusadeGarrison: count('CRUSADE_GARRISON', 150),
   crusadeRelicBonus: count('CRUSADE_RELIC_BONUS', 5),
-  /** Provinces (1 = activées) : tenue d'un bastion avant contrôle (heures), bonus d'une province (%), provinces voisines contrôlées
+  /** Provinces (1 = activées) : tenue d'un bastion avant contrôle (heures), réglages des trois niveaux, provinces voisines contrôlées
    *  exigées pour attaquer la Terre sainte et tenue de la Terre sainte pour gagner le monde (jours) ; modifiables à chaud. */
   provinces: count('PROVINCES', 1) > 0 ? 1 : 0,
   provinceHoldHours: count('PROVINCE_HOLD_HOURS', 12),
-  provinceBonus: count('PROVINCE_BONUS', 10),
+  /** Niveaux des provinces (1 au bord, 3 autour de la Terre sainte) : garde neutre du bastion (population), muraille et bonus (%). */
+  provinceGarrison1: count('PROVINCE_GARRISON_1', 1500),
+  provinceGarrison2: count('PROVINCE_GARRISON_2', 3000),
+  provinceGarrison3: count('PROVINCE_GARRISON_3', 6000),
+  provinceWall1: count('PROVINCE_WALL_1', 5),
+  provinceWall2: count('PROVINCE_WALL_2', 10),
+  provinceWall3: count('PROVINCE_WALL_3', 15),
+  provinceBonus1: count('PROVINCE_BONUS_1', 5),
+  provinceBonus2: count('PROVINCE_BONUS_2', 10),
+  provinceBonus3: count('PROVINCE_BONUS_3', 15),
   holyAccess: count('HOLY_ACCESS', 2),
   holyHoldDays: count('HOLY_HOLD_DAYS', 3),
   /** Ménage : rapports des joueurs gardés (jours, hors archives ; 0 = tous) et mouvements terminés gardés (jours). */

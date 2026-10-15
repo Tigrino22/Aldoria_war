@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
-  BASTION_GARRISON,
   STARTING_BUILDINGS,
   emptyUnits,
   generateSeeds,
@@ -8,7 +7,9 @@ import {
   provinceCount,
   provinceGrid,
   provinceNeighbours,
+  provinceTiers,
   recruitTime,
+  travelTime,
   type UnitCounts,
 } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
@@ -16,7 +17,7 @@ import { env } from '../src/env';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents, sendCommand } from '../src/game/commands';
-import { bastionName, ensureProvinces, processProvinces, provinceBonuses, provincesState } from '../src/game/provinces';
+import { bastionName, ensureProvinces, processProvinces, provinceBonuses, provincesState, refreshNeutralBastions, tierRules } from '../src/game/provinces';
 import { createVillage, enqueueRecruit, getTroops, loadVillage } from '../src/game/village';
 
 const MIN = 60_000;
@@ -86,6 +87,21 @@ describe('provinces : découpage de la carte', () => {
     for (const [i, set] of around.entries()) for (const j of set) expect(around[j].has(i)).toBe(true);
   });
 
+  it('classe les provinces en trois niveaux selon leur distance à la Terre sainte', () => {
+    const size = 100;
+    const seeds = generateSeeds(size, seeded(7)).map((s, i) => ({ ...s, id: i + 1 }));
+    const around = provinceNeighbours(provinceGrid(size, seeds), size, seeds.length);
+    const tiers = provinceTiers(seeds, around, 0);
+    expect(tiers[0]).toBe(0);
+    for (const [i, t] of tiers.entries()) if (i > 0) expect(t === 3).toBe(around[0].has(i));
+    // Les autres : la moitié la plus proche de la Terre sainte en niveau 2.
+    const d = (i: number) => Math.hypot(seeds[i].x - seeds[0].x, seeds[i].y - seeds[0].y);
+    const two = tiers.flatMap((t, i) => (t === 2 ? [d(i)] : []));
+    const one = tiers.flatMap((t, i) => (t === 1 ? [d(i)] : []));
+    expect(Math.abs(two.length - one.length)).toBeLessThanOrEqual(1);
+    expect(Math.max(...two)).toBeLessThanOrEqual(Math.min(...one));
+  });
+
   it('nomme les bastions d’après leur province', () => {
     expect(bastionName('Marche de Valbrune')).toBe('Bastion de Valbrune');
     expect(bastionName('Comté d’Aubefer')).toBe('Bastion d’Aubefer');
@@ -104,7 +120,8 @@ describe('provinces : bastions, bannière et Terre sainte', () => {
     (env as any).provinceHoldHours = 12;
     (env as any).holyAccess = 2;
     (env as any).holyHoldDays = 3;
-    (env as any).provinceBonus = 10;
+    Object.assign(env, { provinceGarrison1: 1500, provinceGarrison2: 3000, provinceGarrison3: 6000, provinceWall1: 5, provinceWall2: 10, provinceWall3: 15 });
+    Object.assign(env, { provinceBonus1: 5, provinceBonus2: 10, provinceBonus3: 15 });
     await tx((c) => ensureProvinces(c, T0, seeded(3)));
     await tx((c) => ensureProvinces(c, T0, seeded(4)));
     ids = (await pool.query('SELECT id FROM provinces ORDER BY id')).rows.map((r) => r.id);
@@ -119,12 +136,23 @@ describe('provinces : bastions, bannière et Terre sainte', () => {
     expect(ids).toHaveLength(provinceCount(env.mapSize) + 1);
     const b = await tx((c) => loadVillage(c, first.bastion_village_id));
     expect(b).toMatchObject({ kind: 'bastion', owner_id: null });
-    expect(b.buildings.wall).toBe(10);
-    expect(populationOf(await tx((c) => getTroops(c, b.id, b.id)))).toBeGreaterThan(BASTION_GARRISON - 10);
+    expect([1, 2, 3]).toContain(first.tier);
+    expect(b.buildings.wall).toBe(tierRules(first.tier).wall);
+    expect(populationOf(await tx((c) => getTroops(c, b.id, b.id)))).toBeGreaterThan(tierRules(first.tier).garrison - 10);
+    // Les provinces qui bordent la Terre sainte sont de niveau 3, la garde grandit avec le niveau.
+    const all = (await pool.query('SELECT p.tier, p.bonus, (v.buildings->>\'wall\')::int AS wall FROM provinces p JOIN villages v ON v.id = p.bastion_village_id WHERE p.kind = \'province\'')).rows;
+    // Petite carte de test : toutes les provinces bordent la Terre sainte.
+    expect(all.every((r) => r.tier === 3)).toBe(true);
+    for (const r of all) expect(r.wall).toBe(tierRules(r.tier).wall);
+    expect(all.some((r) => r.bonus === 'speed')).toBe(true);
+    expect(holy.tier).toBe(0);
     expect(first.bonus).not.toBeNull();
     expect(holy.bonus).toBeNull();
     const map = await tx((c) => provincesState(c, 0, T0));
-    expect(map.provinces.find((p) => p.kind === 'holy')!.neighbours.length).toBeGreaterThanOrEqual(2);
+    const holyView = map.provinces.find((p) => p.kind === 'holy')!;
+    expect(holyView.neighbours.length).toBeGreaterThanOrEqual(2);
+    for (const id of holyView.neighbours) expect(map.provinces.find((p) => p.id === id)).toMatchObject({ tier: 3, bonusPercent: 15 });
+    expect(map.tiers.map((t) => t.bonus)).toEqual([5, 10, 15]);
   });
 
   it('plante la bannière avec un noble, contrôle la province après la tenue et donne son bonus', async () => {
@@ -148,17 +176,30 @@ describe('provinces : bastions, bannière et Terre sainte', () => {
     await tx((c) => processProvinces(c, new Outbox(), done));
     expect((await reportsOf(mate)).at(-1).title).toContain(`contrôle ${first.name}`);
     const bonus = await tx((c) => provinceBonuses(c, mate, done));
-    expect(bonus[first.bonus as 'wood']).toBeCloseTo(0.1);
+    expect(bonus[first.bonus as 'wood']).toBeCloseTo(tierRules(first.tier).bonus / 100);
 
     // Le bonus de recrutement accélère la file (vérifié sur une province de recrutement, s'il y en a une).
-    const recruit = (await pool.query("SELECT id FROM provinces WHERE bonus = 'recruit' LIMIT 1")).rows[0];
+    const recruit = (await pool.query("SELECT id, tier FROM provinces WHERE bonus = 'recruit' AND id <> $1 LIMIT 1", [first.id])).rows[0];
     if (recruit) {
       await pool.query('UPDATE provinces SET holder_tribe_id = $2, holder_since = $3 WHERE id = $1', [recruit.id, t, T0]);
       await tx((c) => enqueueRecruit(c, mateV, 'spearman', 1, done));
       const q = (await pool.query('SELECT unit_seconds FROM recruit_queue WHERE village_id = $1', [mateV])).rows[0];
-      expect(q.unit_seconds).toBeCloseTo(recruitTime('spearman', 5, env.worldSpeed) / 1.1, 3);
+      const extra = first.bonus === 'recruit' ? tierRules(first.tier).bonus : 0;
+      expect(q.unit_seconds).toBeCloseTo(recruitTime('spearman', 5, env.worldSpeed) / (1 + (tierRules(recruit.tier).bonus + extra) / 100), 3);
       await pool.query('UPDATE provinces SET holder_tribe_id = NULL, holder_since = NULL WHERE id = $1', [recruit.id]);
     }
+
+    // Une province de vitesse raccourcit les trajets des troupes de la tribu.
+    const speed = (await pool.query("SELECT id, tier FROM provinces WHERE bonus = 'speed' AND id <> $1 LIMIT 1", [first.id])).rows[0];
+    await pool.query('UPDATE provinces SET holder_tribe_id = $2, holder_since = $3 WHERE id = $1', [speed.id, t, T0]);
+    const target = await loadVillageAt(mateV);
+    const bastionV = await tx((c) => loadVillage(c, first.bastion_village_id));
+    const { id: fast } = await send(mate, mateV, first.bastion_village_id, 'support', { spearman: 5 }, done);
+    const extraSpeed = first.bonus === 'speed' ? tierRules(first.tier).bonus : 0;
+    const expected = travelTime(units({ spearman: 5 }), target, bastionV, env.worldSpeed, (tierRules(speed.tier).bonus + extraSpeed) / 100);
+    expect(((await arrival(fast)).getTime() - done.getTime()) / 1000).toBeCloseTo(expected, 0);
+    expect(expected).toBeLessThan(travelTime(units({ spearman: 5 }), target, bastionV, env.worldSpeed));
+    await pool.query('UPDATE provinces SET holder_tribe_id = NULL, holder_since = NULL WHERE id = $1', [speed.id]);
 
     // Un renfort d'une autre tribu est refusé, celui d'un membre accepté.
     const other = await player('Odon', await tribe('Les Ours', 'OURS'));
@@ -180,6 +221,18 @@ describe('provinces : bastions, bannière et Terre sainte', () => {
     const formerMember = (await pool.query("SELECT id FROM players WHERE username = 'Bertrade'")).rows[0].id;
     expect((await reportsOf(formerMember)).some((r) => r.title.includes('votre bannière est tombée'))).toBe(true);
     expect((await tx((c) => provinceBonuses(c, formerMember, now)))[first.bonus as 'wood']).toBe(0);
+  });
+
+  it('l’administrateur change la garde d’un niveau : les bastions sans bannière la reçoivent', async () => {
+    const free = (await pool.query("SELECT tier, bastion_village_id FROM provinces WHERE kind = 'province' AND holder_tribe_id IS NULL LIMIT 1")).rows[0];
+    expect(free.tier).toBe(3);
+    (env as any).provinceGarrison3 = 4000;
+    (env as any).provinceWall3 = 12;
+    await tx((c) => refreshNeutralBastions(c));
+    const b = await tx((c) => loadVillage(c, free.bastion_village_id));
+    expect(b.buildings.wall).toBe(12);
+    expect(populationOf(await tx((c) => getTroops(c, b.id, b.id)))).toBeGreaterThan(3990);
+    Object.assign(env, { provinceGarrison3: 6000, provinceWall3: 15 });
   });
 
   it('le Sanctuaire n’est ouvert qu’aux tribus qui contrôlent assez de provinces voisines, et sa tenue gagne le monde', async () => {
@@ -206,6 +259,10 @@ describe('provinces : bastions, bannière et Terre sainte', () => {
     expect((await pool.query("SELECT 1 FROM player_titles WHERE player_id = $1 AND title = 'master'", [p])).rows).toHaveLength(1);
   });
 });
+
+async function loadVillageAt(id: number) {
+  return tx((c) => loadVillage(c, id));
+}
 
 function totalOf(u: UnitCounts) {
   return Object.values(u).reduce((a, b) => a + b, 0);
