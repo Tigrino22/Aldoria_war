@@ -193,6 +193,23 @@ Chaque niveau de caserne réduit le temps de recrutement de 6 %.
 Chaque marchand porte 1 000 ressources, à 6 min par case.
 
 
+## Équilibrage automatique des ressources (gestionnaire de compte)
+
+Page « Gestionnaire de compte », panneau « Équilibrage des ressources ». Règles pures dans `server/src/manager/balance.ts` (`planBalance`), exécution dans `runBalance` (`server/src/manager/engine.ts`), juste après la passe des constructions de chaque minute. Coupé avec le reste du gestionnaire par l'interrupteur « Gestionnaire de compte » de l'administration.
+
+| Règle | Valeur |
+|---|---|
+| Seuils (par joueur) | Un village reçoit sous `low` % de son entrepôt (30 par défaut) et donne au-dessus de `high` % (70 par défaut), ressource par ressource ; 10 points d'écart au moins |
+| Prochain bâtiment | Un village piloté garde le coût de son prochain bâtiment (il ne le donne jamais) et le réclame s'il lui manque, même au-dessus du seuil bas ; un coût plus grand que l'entrepôt ne compte pas |
+| Ordre | Les villages les plus en manque d'abord, servis par les donneurs les plus proches ; un convoi par paire de villages, plusieurs ressources à la fois |
+| Marchands | Ceux du donneur, libres à ce moment ; le chargement est réduit à ce qu'ils portent |
+| En route | Les convois déjà en route vers un village comptent dans son stock : pas de doublon d'une minute à l'autre |
+| Petits envois | Pas de convoi sous 200 ressources (`MIN_SHIPMENT`) |
+| Participation | Tous les villages du joueur, sauf ceux qu'il tient à l'écart (case « Participe à l'équilibrage ») |
+| Rapports | Aucun rapport de livraison (colonne `commands.automatic`) ; une ligne dans le journal du gestionnaire du donneur et du receveur |
+
+Tables : `manager_balance` et `manager_villages.balance` (migration 030). Routes : `PUT /api/manager/balance`, champ `balance` de `PUT /api/manager/villages/:id`.
+
 ## Offres de marché (joueurs et PNJ)
 
 Valeurs dans `server/src/game/market-rules.ts`, à ajuster librement.

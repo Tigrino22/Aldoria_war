@@ -4,6 +4,7 @@ import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { env } from '../env';
 import { GameError, forbidden, notFound } from '../errors';
+import { DEFAULT_BALANCE, parseBalance } from '../manager/balance';
 import { PRESETS, parsePlan } from '../manager/rules';
 
 const MAX_TEMPLATES = 10;
@@ -13,6 +14,7 @@ const villageBody = z.object({
   enabled: z.boolean().optional(),
   templateId: z.number().int().positive().nullable().optional(),
   custom: z.any().optional(),
+  balance: z.boolean().optional(),
 });
 
 export default async function managerRoutes(app: FastifyInstance) {
@@ -33,7 +35,7 @@ export default async function managerRoutes(app: FastifyInstance) {
       }));
       const villages = (
         await c.query(
-          `SELECT v.id, v.name, v.x, v.y, mv.enabled, mv.template_id, mv.custom, mv.last_blocked,
+          `SELECT v.id, v.name, v.x, v.y, mv.enabled, mv.template_id, mv.custom, mv.last_blocked, coalesce(mv.balance, true) AS balance,
                   COALESCE((SELECT json_agg(json_build_object('at', l.at, 'text', l.text) ORDER BY l.id DESC)
                             FROM (SELECT * FROM manager_log WHERE village_id = v.id ORDER BY id DESC LIMIT 8) l), '[]') AS log
            FROM villages v LEFT JOIN manager_villages mv ON mv.village_id = v.id
@@ -42,9 +44,11 @@ export default async function managerRoutes(app: FastifyInstance) {
         )
       ).rows.map((r) => ({
         id: r.id, name: r.name, x: r.x, y: r.y, enabled: !!r.enabled, templateId: r.template_id ?? null,
-        custom: r.custom ?? null, blocked: r.last_blocked ?? null, log: r.log,
+        custom: r.custom ?? null, blocked: r.last_blocked ?? null, log: r.log, balance: r.balance,
       }));
-      return { available: !!env.accountManager, maxTemplates: MAX_TEMPLATES, templates, villages };
+      const b = (await c.query('SELECT enabled, low, high FROM manager_balance WHERE owner_id = $1', [playerId])).rows[0];
+      const balance = b ? { enabled: b.enabled, low: b.low, high: b.high } : DEFAULT_BALANCE;
+      return { available: !!env.accountManager, maxTemplates: MAX_TEMPLATES, templates, villages, balance };
     });
   });
 
@@ -94,6 +98,22 @@ export default async function managerRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Équilibrage automatique des ressources entre les villages du joueur : interrupteur et seuils. */
+  app.put('/api/manager/balance', async (req) => {
+    const playerId = await requirePlayer(req);
+    const parsed = parseBalance(req.body);
+    if ('error' in parsed) throw new GameError(parsed.error);
+    const { enabled, low, high } = parsed.settings;
+    return act(async (c) => {
+      await c.query(
+        `INSERT INTO manager_balance (owner_id, enabled, low, high) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (owner_id) DO UPDATE SET enabled = $2, low = $3, high = $4, updated_at = now()`,
+        [playerId, enabled, low, high],
+      );
+      return parsed.settings;
+    });
+  });
+
   /** Réglage d'un village : interrupteur, modèle suivi, ou réglage propre (custom: null revient au modèle). */
   app.put('/api/manager/villages/:id', async (req) => {
     const playerId = await requirePlayer(req);
@@ -118,6 +138,7 @@ export default async function managerRoutes(app: FastifyInstance) {
       if (body.enabled !== undefined) await c.query('UPDATE manager_villages SET enabled = $2 WHERE village_id = $1', [id, body.enabled]);
       if (body.templateId !== undefined) await c.query('UPDATE manager_villages SET template_id = $2 WHERE village_id = $1', [id, body.templateId]);
       if (custom !== undefined) await c.query('UPDATE manager_villages SET custom = $2 WHERE village_id = $1', [id, custom]);
+      if (body.balance !== undefined) await c.query('UPDATE manager_villages SET balance = $2 WHERE village_id = $1', [id, body.balance]);
       await c.query('UPDATE manager_villages SET last_blocked = NULL, updated_at = now() WHERE village_id = $1', [id]);
       return { ok: true };
     });

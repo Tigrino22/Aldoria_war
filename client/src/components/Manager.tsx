@@ -27,12 +27,20 @@ export interface ManagerVillage {
   custom: ManagerPlan | null;
   blocked: string | null;
   log: { at: string; text: string }[];
+  /** Le village participe à l'équilibrage des ressources. */
+  balance: boolean;
+}
+export interface BalanceSettings {
+  enabled: boolean;
+  low: number;
+  high: number;
 }
 export interface ManagerData {
   available: boolean;
   maxTemplates: number;
   templates: Template[];
   villages: ManagerVillage[];
+  balance: BalanceSettings;
 }
 
 /** Données du gestionnaire, rechargées toutes les 30 secondes. */
@@ -178,11 +186,70 @@ function VillageCard({ v, data, reload }: { v: ManagerVillage; data: ManagerData
           <button className="btn primary" onClick={async () => { await setVillage(v.id, { custom: clean(plan) }, 'Réglage du village enregistré'); setEditing(false); }}>Enregistrer pour ce village</button>
         </div>
       )}
+      {data.balance.enabled && (
+        <label className="row small mgr-balance-village">
+          <input type="checkbox" checked={v.balance} onChange={(e) => setVillage(v.id, { balance: e.target.checked }, e.target.checked ? 'Le village participe à l’équilibrage' : 'Le village est tenu à l’écart de l’équilibrage')} />
+          Participe à l'équilibrage des ressources
+        </label>
+      )}
       {v.blocked && v.enabled && <p className="warn small">En attente : {v.blocked}</p>}
       {v.log.length > 0 && (
         <ul className="mgr-log small muted">
           {v.log.slice(0, 5).map((l, i) => <li key={i}>{new Date(l.at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} · {l.text}</li>)}
         </ul>
+      )}
+    </Panel>
+  );
+}
+
+/** Ce qui manque ou déborde passe d'un village à l'autre par les marchands, sans rapport de livraison. */
+function BalancePanel({ data, reload }: { data: ManagerData; reload: () => unknown }) {
+  const { run, toast } = useGame();
+  const [draft, setDraft] = useState<BalanceSettings>(data.balance);
+  const save = (next: BalanceSettings, ok: string) =>
+    run(async () => {
+      await api('/api/manager/balance', { method: 'PUT', body: next });
+      setDraft(next);
+      toast(ok);
+      await reload();
+    });
+  const changed = draft.low !== data.balance.low || draft.high !== data.balance.high;
+  const villageCount = data.villages.length;
+  return (
+    <Panel
+      title="Équilibrage des ressources"
+      actions={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={data.balance.enabled}
+          aria-label="Équilibrage des ressources"
+          className={`switch ${data.balance.enabled ? 'on' : ''}`}
+          onClick={() => save({ ...draft, enabled: !data.balance.enabled }, data.balance.enabled ? 'Équilibrage arrêté' : 'Équilibrage activé')}
+        >
+          <span className="switch-track"><span className="switch-knob" /></span>
+          <span className="switch-label">{data.balance.enabled ? 'Actif' : 'Arrêté'}</span>
+        </button>
+      }
+    >
+      <p className="muted small">
+        Chaque minute, les marchands des villages qui débordent livrent ceux qui manquent, au plus près d'abord. Un village piloté reçoit en priorité ce qui manque à son prochain bâtiment, et ne donne jamais ce qu'il garde pour lui. Les livraisons apparaissent dans le journal de chaque village, sans rapport.
+      </p>
+      {villageCount < 2 && <p className="warn small">Il faut au moins deux villages, et un marché dans ceux qui donnent.</p>}
+      <div className="mgr-balance">
+        <label className="stack">
+          <b>Reçoit sous {draft.low} % de l'entrepôt</b>
+          <input type="range" min={0} max={90} step={5} value={draft.low} onChange={(e) => setDraft({ ...draft, low: Math.min(Number(e.target.value), draft.high - 10) })} />
+        </label>
+        <label className="stack">
+          <b>Donne au-dessus de {draft.high} % de l'entrepôt</b>
+          <input type="range" min={10} max={100} step={5} value={draft.high} onChange={(e) => setDraft({ ...draft, high: Math.max(Number(e.target.value), draft.low + 10) })} />
+        </label>
+      </div>
+      {changed && (
+        <button className="btn primary" onClick={() => save({ ...draft, enabled: data.balance.enabled }, 'Seuils enregistrés')}>
+          Enregistrer les seuils
+        </button>
       )}
     </Panel>
   );
@@ -234,6 +301,7 @@ export default function Manager() {
         ]}
       />
       {!data.available && <p className="warn">Le gestionnaire est désactivé sur ce monde par l'administrateur : rien ne s'exécute pour le moment. Vos réglages sont conservés.</p>}
+      <BalancePanel data={data} reload={reload} />
       <h3 className="pg-section">
         <NavIcon name="apercu" size={16} /> Mes villages
       </h3>
