@@ -36,6 +36,7 @@ const PAGES = {
   Raid: () => import('./Raid'),
   Crusade: () => import('./Crusade'),
   Provinces: () => import('./Provinces'),
+  Inventory: () => import('./Inventory'),
 };
 const Messages = lazy(PAGES.Messages);
 const RallyPage = lazy(PAGES.RallyPage);
@@ -54,6 +55,7 @@ const Admin = lazy(PAGES.Admin);
 const Raid = lazy(PAGES.Raid);
 const Crusade = lazy(PAGES.Crusade);
 const Provinces = lazy(PAGES.Provinces);
+const Inventory = lazy(PAGES.Inventory);
 
 interface NavItem {
   path: string;
@@ -72,6 +74,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'marche', label: 'Marché', icon: 'marche' },
       { path: 'marche/offres', label: 'Offres du marché', icon: 'offres' },
       { path: 'apercu', label: 'Mes villages', icon: 'apercu' },
+      { path: 'inventaire', label: 'Inventaire', icon: 'tresor' },
       { path: 'gestionnaire', label: 'Gestionnaire de compte', icon: 'gestionnaire' },
     ],
   },
@@ -210,7 +213,7 @@ export default function Layout() {
       for (const load of Object.values(PAGES)) void load();
     });
   }, []);
-  const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : 0);
+  const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : 0);
 
   if (!me.villages.length) {
     return (
@@ -301,6 +304,7 @@ export default function Layout() {
           {page === 'pillage' && <Raid />}
           {page === 'croisade' && <Crusade />}
           {page === 'provinces' && <Provinces />}
+          {page === 'inventaire' && <Inventory />}
           {page === 'carte' && (
             <Suspense fallback={<p className="muted">Chargement de la carte…</p>}>
               <MapView focus={route[1]} />

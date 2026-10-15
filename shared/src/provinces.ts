@@ -34,6 +34,8 @@ export interface TierRules {
   garrison: number;
   wall: number;
   bonus: number;
+  /** Trésor reçu par chaque membre à la prise de contrôle : part de l'entrepôt remplie (%), 0 = aucun. */
+  treasure: number;
 }
 
 /**
