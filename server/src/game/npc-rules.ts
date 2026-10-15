@@ -15,6 +15,7 @@ import {
 
 import { env } from '../env';
 import { armyTarget, FARM_LEAD, type VillageRole } from './npc-roles';
+import { PRESETS, nextBuilding } from '../manager/rules';
 
 export { FARM_LEAD, NOBLES_PER_CONQUEST } from './npc-roles';
 
@@ -60,8 +61,22 @@ const BUILD_WEIGHTS: Record<NpcProfile, Record<BuildingKey, number>> = {
   conqueror: { townhall: 1.5, woodcutter: 1, claypit: 1, ironmine: 1.2, farm: 1.7, warehouse: 0.9, market: 0.1, barracks: 1.5, wall: 0.5 },
 };
 
-/** Le prochain bâtiment à monter : le plus en retard par rapport à son poids, sous le plafond, conditions remplies. */
-export function chooseBuilding(profile: NpcProfile, levels: Buildings, cap: number): BuildingKey | null {
+/** Modèle du gestionnaire suivi par un village de PNJ selon son rôle (le même que celui des joueurs). */
+export const ROLE_PRESET: Record<VillageRole, string> = { offense: 'Offensif', defense: 'Défensif' };
+
+/**
+ * Le prochain bâtiment à monter. Avec un rôle, le PNJ suit l'ordre du modèle Offensif ou Défensif des joueurs, chaque ligne
+ * bornée par son plafond du jour (la ferme garde son avance). Une fois ce plan atteint, ou sans rôle : le bâtiment le plus en
+ * retard par rapport à son poids, sous le plafond, conditions remplies.
+ */
+export function chooseBuilding(profile: NpcProfile, levels: Buildings, cap: number, role?: VillageRole): BuildingKey | null {
+  if (role) {
+    const plan = PRESETS.find((p) => p.name === ROLE_PRESET[role])?.plan;
+    const limit = (key: BuildingKey) => Math.min(key === 'farm' ? cap + FARM_LEAD : cap, BUILDINGS[key].maxLevel);
+    const targets = (plan?.buildings ?? []).map((t) => ({ building: t.building, level: Math.min(t.level, limit(t.building)) }));
+    const next = nextBuilding(targets, levels);
+    if (next) return next.building;
+  }
   let best: BuildingKey | null = null;
   let bestScore = Infinity;
   for (const key of BUILDING_KEYS) {

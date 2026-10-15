@@ -589,13 +589,13 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   }
 }
 
-/** Construit le prochain bâtiment du plan du PNJ. */
-async function buildStep(c: Db, profile: NpcProfile, villageId: number, cap: number, now: Date) {
+/** Construit le prochain bâtiment du plan du PNJ (le modèle Offensif ou Défensif de son rôle). */
+async function buildStep(c: Db, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
   const v = await syncVillage(c, villageId, now);
   const queued = (await c.query('SELECT building, level FROM build_queue WHERE village_id = $1', [villageId])).rows;
   const levels: Buildings = { ...v.buildings };
   for (const q of queued) levels[q.building as BuildingKey] = Math.max(levels[q.building as BuildingKey], q.level);
-  const next = chooseBuilding(profile, levels, cap);
+  const next = chooseBuilding(profile, levels, cap, role);
   if (!next) return;
   try {
     await enqueueBuild(c, villageId, next, now);
@@ -644,9 +644,9 @@ async function economyStep(c: Db, npcId: number, profile: NpcProfile, role: Vill
   // Le premier servi prend les ressources : par défaut l'armée, sauf si l'administration remet la construction en tête.
   if (env.npcArmyFirst) {
     await recruitStep(c, profile, role, villageId, cap, now);
-    await buildStep(c, profile, villageId, cap, now);
+    await buildStep(c, profile, role, villageId, cap, now);
   } else {
-    await buildStep(c, profile, villageId, cap, now);
+    await buildStep(c, profile, role, villageId, cap, now);
     await recruitStep(c, profile, role, villageId, cap, now);
   }
 }

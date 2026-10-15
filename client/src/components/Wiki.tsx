@@ -580,7 +580,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           La carte se manipule au doigt (glisser, pincer) comme à la souris.
         </p>
         <p>
-          <b>Joueurs PNJ :</b> certains comptes sont pilotés par le serveur. Ils construisent, recrutent, commercent, rejoignent des tribus et attaquent comme n'importe quel joueur, avec les mêmes règles.
+          <b>Joueurs PNJ :</b> certains comptes sont pilotés par le serveur. Ils construisent, recrutent, commercent, rejoignent des tribus et attaquent comme n'importe quel joueur, avec les mêmes règles. Leurs villages suivent l'ordre de construction des modèles « Offensif » ou « Défensif » du gestionnaire, selon leur rôle, sans dépasser un plafond qui monte d'un niveau par jour de monde (30 au plus).
           Pour laisser les nuits tranquilles, aucun PNJ ne vise de joueur entre 22 h et 8 h (heure de Paris) : pas d'attaque ni d'espionnage, et aucune troupe ne doit arriver chez vous à ces heures.
           Ils peuvent en revanche piller les villages barbares à toute heure. Hors heures calmes, un PNJ ne s'en prend sans raison qu'à un joueur de force comparable (70 à 150 % de ses points),
           jamais à un joueur sous protection débutant, mais il riposte contre qui l'a attaqué, lui ou sa tribu.

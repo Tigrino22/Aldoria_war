@@ -59,6 +59,20 @@ describe('règles des PNJ', () => {
     expect(levels.townhall).toBeGreaterThanOrEqual(3);
   });
 
+  it('un village de PNJ suit le modèle de son rôle, borné par son plafond', () => {
+    const levels = { ...STARTING_BUILDINGS };
+    // Le modèle Offensif commence par la mine de fer et l'argilière.
+    expect(chooseBuilding('raider', levels, 5, 'offense')).toBe('ironmine');
+    // Plan atteint au plafond : le PNJ ne dépasse jamais son plafond du jour.
+    for (let n = 0; n < 200; n++) {
+      const next = chooseBuilding('raider', levels, 5, 'offense');
+      if (!next) break;
+      levels[next] += 1;
+    }
+    for (const k of Object.keys(levels) as (keyof typeof levels)[]) expect(levels[k]).toBeLessThanOrEqual(k === 'farm' ? 8 : 5);
+    expect(levels.woodcutter).toBe(5);
+  });
+
   it('recrute d’abord ce qui manque le plus, parmi les unités disponibles', () => {
     const wanted = nextRecruit('raider', 'offense', { ...STARTING_BUILDINGS, barracks: 1 }, emptyUnits(), 4, 1);
     expect(wanted.map((w) => w.unit)).toEqual(['spearman']);
@@ -184,7 +198,7 @@ describe('PNJ en jeu', () => {
     const queue = (await pool.query('SELECT count(*)::int AS n FROM build_queue WHERE village_id = $1', [village])).rows[0].n;
     const v = (await pool.query('SELECT buildings, points FROM villages WHERE id = $1', [village])).rows[0];
     expect(queue + v.points).toBeGreaterThan(0);
-    expect(Object.values(v.buildings as Record<string, number>).reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(9 + 4); // l'armée visée remplit la ferme de 20 000 places : le recrutement prend sa part des ressources
+    expect(Object.values(v.buildings as Record<string, number>).reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(9 + 3); // l'armée visée remplit la ferme de 20 000 places : le recrutement prend sa part des ressources, et le modèle commence par les mines, plus chères
     const recruits = (await pool.query('SELECT count(*)::int AS n FROM recruit_queue WHERE village_id = $1', [village])).rows[0].n;
     const troops = await tx((c) => getTroops(c, village, village));
     expect(recruits + troops.spearman + troops.swordsman).toBeGreaterThan(0);
