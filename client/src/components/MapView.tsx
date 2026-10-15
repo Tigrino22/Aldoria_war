@@ -100,6 +100,12 @@ export default function MapView({ focus }: { focus?: string }) {
   const [showProvinces, setShowProvinces] = useState(() => readPref('provinces', true));
   const [provinces, setProvinces] = useState<ProvincesState | null>(cache?.provinces ?? null);
   const scene = useRef<Scene | null>(null);
+  // Le navigateur peut jeter le contexte graphique de la carte (iOS le fait souvent quand on change d'application) : la scène
+  // est alors reconstruite (`epoch`). La mini-map, dessinée sur des canevas 2D que Safari vide aussi, se refait au retour (`miniEpoch`).
+  const [epoch, setEpoch] = useState(0);
+  const [miniEpoch, setMiniEpoch] = useState(0);
+  /** Position et zoom de la vue, gardés quand la scène est reconstruite. */
+  const viewRef = useRef<{ x: number; y: number; scale: number } | null>(null);
   const villagesRef = useRef<Map<string, MapVillage>>(new Map());
   const [armySel, setArmySel] = useState<MapArmy | null>(null);
   const selectRef = useRef<(v: MapVillage | null) => void>(() => undefined);
@@ -186,7 +192,8 @@ export default function MapView({ focus }: { focus?: string }) {
 
   // Mini-map : un fond précalculé (relief + villages), recopié à chaque image avec le cadre de la vue.
   const miniBase = useRef<HTMLCanvasElement | null>(null);
-  const miniTerrain = useMemo(() => terrainCanvas(world.mapSize, 'mini'), [world.mapSize]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const miniTerrain = useMemo(() => terrainCanvas(world.mapSize, 'mini'), [world.mapSize, miniEpoch, epoch]);
   const drawMini = useCallback(() => {
     const cv = miniRef.current;
     const s = scene.current;
@@ -222,6 +229,9 @@ export default function MapView({ focus }: { focus?: string }) {
     const cleanups: (() => void)[] = [];
 
     (async () => {
+      // Après une perte du contexte, les images sont rechargées : celles du cache ont pu perdre leurs pixels.
+      if (epoch > 0) await Promise.all(Object.values(MAP_IMG).map((src) => Assets.unload(src).catch(() => undefined)));
+      if (destroyed) return;
       const assets = Promise.all(
         Object.entries(MAP_IMG).map(async ([k, src]) => [k, (await Assets.load(k === 'flag' ? { src, data: { resolution: 3 } } : src)) as Texture] as const),
       );
@@ -464,6 +474,10 @@ export default function MapView({ focus }: { focus?: string }) {
       };
       const zoomBy = (factor: number) => zoomAtLocal(app.screen.width / 2, app.screen.height / 2, factor);
       worldC.scale.set(window.innerWidth < 700 ? 0.75 : 0.9);
+      if (viewRef.current) {
+        worldC.scale.set(viewRef.current.scale);
+        worldC.position.set(viewRef.current.x, viewRef.current.y);
+      }
       scene.current = {
         app,
         world: worldC,
@@ -597,6 +611,27 @@ export default function MapView({ focus }: { focus?: string }) {
       canvas.addEventListener('pointerleave', leave);
       canvas.addEventListener('wheel', wheel, { passive: false });
       canvas.style.touchAction = 'none';
+      // Contexte graphique perdu (application en arrière-plan, mémoire saturée) : la carte deviendrait sombre ou vide.
+      // Pixi tente de tout renvoyer à la carte graphique, mais sur iOS les images et la teinte du relief reviennent noires :
+      // on reconstruit toute la scène dès que le contexte revient, à la même position.
+      const lost = (e: Event) => e.preventDefault();
+      const restored = () => setEpoch((n) => n + 1);
+      canvas.addEventListener('webglcontextlost', lost);
+      canvas.addEventListener('webglcontextrestored', restored);
+      const back = () => {
+        if (document.hidden) return;
+        setMiniEpoch((n) => n + 1);
+        const gl = (app.renderer as { gl?: WebGLRenderingContext }).gl;
+        if (!gl?.isContextLost()) request();
+      };
+      document.addEventListener('visibilitychange', back);
+      window.addEventListener('pageshow', back);
+      cleanups.push(() => {
+        canvas.removeEventListener('webglcontextlost', lost);
+        canvas.removeEventListener('webglcontextrestored', restored);
+        document.removeEventListener('visibilitychange', back);
+        window.removeEventListener('pageshow', back);
+      });
       cleanups.push(() => {
         canvas.removeEventListener('pointerdown', down);
         canvas.removeEventListener('pointermove', move);
@@ -611,11 +646,15 @@ export default function MapView({ focus }: { focus?: string }) {
       destroyed = true;
       cleanups.forEach((f) => f());
       if (scene.current) {
+        const w = scene.current.world;
+        viewRef.current = { x: w.x, y: w.y, scale: w.scale.x };
         scene.current = null;
+        setReady(false);
         app.destroy(true, { children: true });
       }
     };
-  }, [world.mapSize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.mapSize, epoch]);
   // Centrage initial : sur la case demandée, sinon sur le village actif.
   const centered = useRef(false);
   useEffect(() => {
