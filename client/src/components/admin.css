@@ -126,20 +126,3 @@
 .app .pg .admin-pl-buildings li b { font-variant-numeric: tabular-nums; }
 .app .pg .admin-pl-buildings li.none { opacity: 0.45; }
 .app .pg .admin-pl-buildings li.max b { color: var(--gold); }
-/* Messages privés d'un joueur (modération) : une ligne par message, le contenu s'ouvre au toucher. */
-.app .pg .admin-pl-msgs { list-style: none; margin: 0; padding: 0; }
-.app .pg .admin-pl-msgs li { border-bottom: 1px solid var(--line); }
-.app .pg .admin-pl-msgs li:last-child { border-bottom: 0; }
-.app .pg .admin-pl-msgs button { display: grid; grid-template-columns: minmax(120px, 200px) 1fr auto; gap: 10px; align-items: baseline; width: 100%; padding: 9px 4px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.app .pg .admin-pl-msgs button:hover { background: color-mix(in srgb, var(--gold) 6%, transparent); }
-.app .pg .admin-pl-msgs b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.app .pg .admin-pl-msgs .t { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.app .pg .admin-pl-dir { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.app .pg .admin-pl-dir.in { color: var(--ok); }
-.app .pg .admin-pl-dir.out { color: var(--gold); }
-.app .pg .admin-pl-msg-body { padding: 4px 8px 12px; border-left: 3px solid var(--gold); margin: 0 4px 10px; }
-.app .pg .admin-pl-msg-body p { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-@media (max-width: 640px) {
-  .app .pg .admin-pl-msgs button { grid-template-columns: 1fr auto; gap: 2px 8px; }
-  .app .pg .admin-pl-msgs b { grid-column: 1 / -1; grid-row: 2; }
-}
