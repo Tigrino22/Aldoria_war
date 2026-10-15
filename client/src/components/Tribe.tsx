@@ -1,11 +1,13 @@
 import './tribe.css';
 import { useCallback, useEffect, useState } from 'react';
+import { PROVINCE_BONUS_LABEL, type ProvinceBonus, type ProvinceTier } from '@aldoria/shared';
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
 import { PlayerLink } from '../ui';
 import TribeAlliances from './TribeAlliances';
 import TribeCrest from './TribeCrest';
+import TribeProvinces from './TribeProvinces';
 import { Broadcast, MemberAttacks, Threats } from './TribeTools';
 import TribeWars from './TribeWars';
 
@@ -32,10 +34,11 @@ interface TribeInfo {
   invites: { id: number; username: string }[];
   allies: { id: number; tag: string; name: string }[];
   wars: number;
+  provinces: { id: number; name: string; kind: 'province' | 'holy'; tier: ProvinceTier | 0; bonus: ProvinceBonus | null; bonusPercent: number; controlled: boolean }[];
   viewer: Viewer;
 }
 
-type Tab = 'tribe' | 'alliances' | 'wars';
+type Tab = 'tribe' | 'provinces' | 'alliances' | 'wars';
 
 const RELATION: Record<Exclude<Viewer['relation'], 'self' | null>, [string, string]> = {
   ally: ['Tribu alliée', 'ally'],
@@ -213,6 +216,44 @@ function AlliesBrief({ tribe, onOpen }: { tribe: TribeInfo; onOpen?: () => void 
   );
 }
 
+/** Provinces tenues par la tribu, en bref (colonne de droite et page publique). */
+function ProvincesBrief({ tribe, onOpen }: { tribe: TribeInfo; onOpen?: () => void }) {
+  const list = tribe.provinces ?? [];
+  if (!list.length && !onOpen) return null;
+  return (
+    <section className="tr-card">
+      <header className="tr-card-head">
+        <h3 className="tr-h">
+          Provinces <span className="tr-count">{list.filter((p) => p.controlled).length}</span>
+        </h3>
+        {onOpen && (
+          <button className="link small" onClick={onOpen}>
+            Suivre la conquête
+          </button>
+        )}
+      </header>
+      {list.length === 0 ? (
+        <p className="muted small">Aucune bannière de la tribu ne flotte sur un bastion.</p>
+      ) : (
+        <ul className="tp-brief">
+          {list.map((p) => (
+            <li key={p.id} className={p.controlled ? '' : 'pending'}>
+              {p.tier ? <span className={`tp-tier t${p.tier}`}>Niv. {p.tier}</span> : <span className="tp-tier holy">Terre sainte</span>}
+              <span className="tr-grow">
+                <b>{p.name}</b>
+                <span className="muted small">
+                  {p.controlled ? 'Contrôlée' : 'Bannière plantée, tenue en cours'}
+                  {p.bonus ? ` · ${PROVINCE_BONUS_LABEL[p.bonus]} +${p.bonusPercent}\u00a0%` : ''}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function InvitePlayer({ tribe, onSent }: { tribe: TribeInfo; onSent: () => void }) {
   const { run, toast } = useGame();
   const [name, setName] = useState('');
@@ -332,6 +373,7 @@ export default function Tribe({ id }: { id?: number }) {
   const [tab, setTab] = useState<Tab>('tribe');
   const [warCount, setWarCount] = useState<number | null>(null);
   const [allyCount, setAllyCount] = useState<{ allies: number; pending: number } | null>(null);
+  const [heldCount, setHeldCount] = useState<number | null>(null);
 
   const load = useCallback(() => tribeId && run(async () => setTribe(await api(`/api/tribes/${tribeId}`))), [tribeId, run]);
   useEffect(() => {
@@ -365,6 +407,7 @@ export default function Tribe({ id }: { id?: number }) {
   const isMember = me.player.tribe?.id === tribe.id;
   const isLeader = tribe.leaderId === me.player.id;
 
+  const provinceCount = heldCount ?? tribe.provinces?.length ?? 0;
   const kick = (memberId: number, name: string) =>
     window.confirm(`Exclure ${name} de la tribu ?`) &&
     run(async () => {
@@ -418,6 +461,7 @@ export default function Tribe({ id }: { id?: number }) {
 
   const tabs: [Tab, string, React.ReactNode][] = [
     ['tribe', 'Tribu', null],
+    ['provinces', 'Provinces', provinceCount ? <span className="tr-badge gold">{provinceCount}</span> : null],
     ['alliances', 'Alliances', allyCount ? (allyCount.pending ? <span className="tr-badge alert">{allyCount.pending}</span> : <span className="tr-badge">{allyCount.allies}</span>) : null],
     ['wars', 'Guerres', warCount ? <span className="tr-badge red">{warCount}</span> : null],
   ];
@@ -436,6 +480,7 @@ export default function Tribe({ id }: { id?: number }) {
           ))}
         </nav>
       )}
+      {isMember && tab === 'provinces' && <TribeProvinces onCount={setHeldCount} />}
       {isMember && tab === 'wars' && <TribeWars onCount={setWarCount} />}
       {isMember && tab === 'alliances' && <TribeAlliances onCount={onAllyCount} />}
       {(!isMember || tab === 'tribe') && (
@@ -448,6 +493,7 @@ export default function Tribe({ id }: { id?: number }) {
           </div>
           <aside className="tr-side">
             <AlliesBrief tribe={tribe} onOpen={isMember ? () => setTab('alliances') : undefined} />
+            <ProvincesBrief tribe={tribe} onOpen={isMember ? () => setTab('provinces') : undefined} />
             {isLeader && <InvitePlayer tribe={tribe} onSent={load} />}
             {isMember && <Broadcast />}
             {isMember && (

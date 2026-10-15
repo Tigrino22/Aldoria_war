@@ -1,0 +1,115 @@
+/* Onglet Provinces de la page Tribu : cartes parchemin de la page Tribu, or pour la tenue et les bonus, couleurs fixes de la carte pour les tribus. */
+.tp-page .tr-sub { margin: 0 0 6px; }
+
+/* Résumé : quatre tuiles et les bonus de la tribu. */
+.tp-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tp-tile {
+  display: flex; flex-direction: column; gap: 1px; padding: 9px 12px; border-radius: 12px; min-width: 0;
+  background: var(--panel-2); border: 1px solid var(--line); box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ok) 70%, transparent);
+}
+.tp-tile b { font: 700 22px var(--display); font-variant-numeric: tabular-nums; }
+.tp-tile span { font-size: 12px; color: var(--muted); }
+.tp-tile.gold { box-shadow: inset 0 -2px 0 var(--gold); }
+.tp-tile.sky { box-shadow: inset 0 -2px 0 var(--sky); }
+.tp-tile.red { box-shadow: inset 0 -2px 0 var(--war); border-color: color-mix(in srgb, var(--war) 45%, var(--line)); }
+.tp-tile.red b { color: var(--danger); }
+.tp-bonuses { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tp-bonus {
+  font-size: 13px; padding: 4px 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent);
+  background: color-mix(in srgb, var(--gold) 16%, var(--panel));
+}
+.tp-bonus.coming { border-style: dashed; background: transparent; color: var(--muted); }
+.tp-bonus.coming span { font-size: 11px; }
+
+/* Niveau des provinces, comme sur la page Provinces. */
+.tp-tier {
+  display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 18px; white-space: nowrap;
+  color: #1c140c; background: #c9b48a; border: 1px solid rgb(20 14 8 / 0.6); vertical-align: 1px;
+}
+.tp-tier.t2 { background: #d9a441; }
+.tp-tier.t3, .tp-tier.holy { background: #e0b23c; box-shadow: 0 0 0 1px rgb(241 204 99 / 0.6), 0 0 8px rgb(224 178 60 / 0.45); }
+
+/* Bastions de la tribu. */
+.tp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.tp-prov {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--panel-2);
+  border: 1px solid var(--line); box-shadow: inset 4px 0 0 var(--accent);
+}
+.tp-prov.pending { box-shadow: inset 4px 0 0 var(--gold); }
+.tp-prov.holy { border-color: color-mix(in srgb, var(--gold) 70%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 14%, var(--panel-2)), var(--panel-2) 70%); }
+.tp-prov.threat { border-color: color-mix(in srgb, var(--war) 55%, var(--line)); }
+.tp-prov-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tp-prov-name { font: 700 16px var(--display); letter-spacing: 0.02em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-coords { flex: none; }
+.tp-prov-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.tp-prov-facts:empty { display: none; }
+.tp-fact { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+.tp-fact.gold { color: var(--ink); border-color: color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 14%, var(--panel)); }
+.tp-status { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tp-status.ok { color: color-mix(in srgb, var(--ok) 80%, var(--ink)); }
+.app .tp-page .nav-svg { display: inline-block; vertical-align: -3px; flex: none; }
+.app .tp-page .tp-empty-icon .nav-svg, .app .tp-page .tp-unused .nav-svg { vertical-align: middle; }
+.tp-hold { display: flex; flex-direction: column; gap: 5px; }
+.tp-hold-line { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.tp-hold-line .countdown { font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+.tp-gauge { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--line) 70%, transparent); overflow: hidden; }
+.tp-gauge i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #b8871a, #f0c64e); }
+.tp-gauge.thin { height: 4px; flex-basis: 100%; }
+.tp-garrison { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; font-size: 13px; }
+.tp-defenders { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.tp-defenders li { padding: 2px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; }
+.tp-defenders a { color: var(--ink); }
+.tp-warn { color: var(--warn); font-weight: 600; }
+.tp-incoming {
+  margin: 0; padding: 6px 10px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #fff;
+  background: linear-gradient(90deg, #8c1c1c, #b8392c);
+}
+.tp-incoming .countdown { font-variant-numeric: tabular-nums; }
+
+/* Assauts des membres. */
+.tp-assaults { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tp-assaults li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); box-shadow: inset 4px 0 0 var(--sky); }
+.tp-assault-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.tp-assault-main a { color: var(--ink); }
+.tp-noble { font-size: 12px; color: var(--muted); }
+.tp-noble.yes { color: color-mix(in srgb, var(--gold) 75%, var(--ink)); font-weight: 600; }
+.tp-assaults .mv-time .countdown { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Route de la Terre sainte. */
+.tp-holy { border-top: 3px solid var(--gold); }
+.tp-steps { display: flex; gap: 6px; }
+.tp-steps i { flex: 1; height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--line) 80%, transparent); border: 1px solid var(--line); }
+.tp-steps i.on { background: linear-gradient(90deg, #b8871a, #f0c64e); border-color: #a77a14; box-shadow: 0 0 8px rgb(224 178 60 / 0.45); }
+.tp-holy p { margin: 0; }
+.tp-ok { color: color-mix(in srgb, var(--ok) 80%, var(--ink)); }
+.tp-around { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tp-around li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: var(--panel-2); }
+.tp-around-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-dot { flex: none; width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgb(20 14 8 / 0.8); box-shadow: 0 0 0 1px rgb(224 178 60 / 0.35); }
+.tp-dot.pale { opacity: 0.55; }
+
+/* Trésors. */
+.tp-unused {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; text-decoration: none; color: var(--ink); font-size: 13px;
+  border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 14%, var(--panel));
+}
+.tp-unused svg { color: var(--gold); flex: none; }
+.tp-treasures { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tp-treasures li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+
+/* Résumé des provinces dans l'onglet Tribu et sur la page publique. */
+.tp-brief { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tp-brief li { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 6px 10px; border-radius: 10px; background: var(--panel-2); }
+.tp-brief li.pending { opacity: 0.8; }
+
+@media (max-width: 640px) {
+  .tp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .tp-tile { padding: 7px 10px; }
+  .tp-tile b { font-size: 18px; }
+  .tp-prov { padding: 10px; }
+  .tp-assaults .mv-time { margin-left: 0; flex-direction: row; align-items: baseline; gap: 8px; }
+}
+@media (max-width: 640px) {
+  .tp-assault-main { flex-basis: 100%; }
+  .tp-assaults .mv-time { flex-direction: row; gap: 8px; }
+}
