@@ -238,7 +238,7 @@ Migrations 034, 035, 036 (`letters_minted`, qui reprend les lettres déjà en st
 
 ## Succès et badges
 
-Page `#/succes` (menu Village > Succès). Définitions dans `shared/src/achievements.ts` (`ACHIEVEMENTS`), attribution dans `server/src/game/achievements.ts` : toutes les 5 minutes pour tous les joueurs (hors PNJ), et tout de suite quand le joueur ouvre la page ou récupère une quête.
+Page `#/succes` (menu Mon compte > Mon profil, onglet Succès). Définitions dans `shared/src/achievements.ts` (`ACHIEVEMENTS`), attribution dans `server/src/game/achievements.ts` : toutes les 5 minutes pour tous les joueurs (hors PNJ), et tout de suite quand le joueur ouvre la page ou récupère une quête.
 
 | Succès | Compteur | Bronze | Argent | Or |
 |---|---|---|---|---|
@@ -309,7 +309,7 @@ Les ressources offertes sont retirées du village à la publication et rendues �
 
 ## Administration
 
-Page `#/admin` (menu « Aide » > « Administration ») : signalements et bugs remontés par les joueurs (voir plus bas), activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
+Page `#/admin` (menu « Mon compte » > « Administration », administrateurs seulement) : signalements et bugs remontés par les joueurs (voir plus bas), activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
 
 Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).
 
@@ -328,7 +328,7 @@ Code : table `moderation_reports` (migration 029), `server/src/game/moderation.t
 
 ### Bugs (Administration > Bugs)
 
-Entrée « Signaler un bug » du menu (groupe Aide, `#/bug`, `BugReport.tsx`) : le joueur décrit le problème (10 à 2 000 caractères) ; la page d'où il vient, son navigateur et la taille de son écran sont joints tout seuls. En dessous, il retrouve ses derniers bugs, leur état (En attente, Corrigé, Non retenu) et la réponse de l'administrateur. 10 bugs par joueur et par jour au plus (`BUGS_PER_DAY`).
+Onglet « Signaler un bug » de la rubrique Aide (menu Mon compte, `#/bug`, `BugReport.tsx`) : le joueur décrit le problème (10 à 2 000 caractères) ; la page d'où il vient, son navigateur et la taille de son écran sont joints tout seuls. En dessous, il retrouve ses derniers bugs, leur état (En attente, Corrigé, Non retenu) et la réponse de l'administrateur. 10 bugs par joueur et par jour au plus (`BUGS_PER_DAY`).
 
 Onglet « Bugs » de l'administration (`AdminBugs.tsx`), compteur compris dans celui du menu : « À traiter » et « Historique », boutons « Corrigé » et « Non retenu » avec une réponse facultative montrée au joueur, « Rouvrir ». Code : table `bug_reports` (migration 031), `server/src/game/bugs.ts`, routes `POST /api/bugs`, `GET /api/bugs/mine`, `GET/PUT /api/admin/bugs`.
 
@@ -432,7 +432,7 @@ Désormais (`recruitStep` dans `npc.ts`) : la file se remplit dès qu'il lui res
 
 ## Point de ralliement : ordres planifiés et train de nobles
 
-Page « Point de ralliement » du menu, distincte de « Troupes » (`#/ralliement`, ou `#/ralliement/x,y` depuis la carte). Code : `server/src/game/orders.ts` (base de données), `shared/src/orders.ts` (découpe des ordres, aussi utilisée par le client pour afficher le plan avant l'envoi), `client/src/components/RallyOrders.tsx`.
+Onglet « Ralliement » de la rubrique Troupes, distinct de la page « Troupes » (`#/ralliement`, ou `#/ralliement/x,y` depuis la carte). Code : `server/src/game/orders.ts` (base de données), `shared/src/orders.ts` (découpe des ordres, aussi utilisée par le client pour afficher le plan avant l'envoi), `client/src/components/RallyOrders.tsx`.
 
 | Règle | Valeur |
 |---|---|

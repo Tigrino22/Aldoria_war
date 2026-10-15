@@ -56,3 +56,24 @@
 .app .sheet-grid a.active { border-color: var(--nav-gold); box-shadow: inset 0 0 0 1px var(--nav-gold); color: #fff6dc; }
 .app .sheet-grid a.active .nav-medal { background: radial-gradient(circle at 35% 30%, #f1cc63, #a77a14 75%); color: #2b2018; }
 .app .sheet-quit { display: inline-flex; align-items: center; gap: 8px; color: var(--nav-ink); border-color: var(--nav-line); }
+
+/* Onglets de rubrique : pages regroupées sous une même entrée du menu (Troupes, Monde, Mon profil…), en haut de la page. */
+.app .section-tabs {
+  display: flex; gap: 4px; padding: 4px; border-radius: 12px; overflow-x: auto; scrollbar-width: none; flex: none;
+  background: linear-gradient(180deg, rgb(20 14 9 / 0.86), rgb(20 14 9 / 0.94)), url('../assets/map/ground.jpg') center / 420px;
+  border: 1px solid #1a130c; box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+}
+.app .section-tabs::-webkit-scrollbar { display: none; }
+.app .section-tabs a {
+  flex: 1 0 auto; text-align: center; white-space: nowrap; padding: 8px 14px; border-radius: 9px; border: 1px solid transparent;
+  color: var(--nav-muted); text-decoration: none; font: 600 13px var(--body); letter-spacing: 0.02em; transition: background 0.15s, color 0.15s;
+}
+.app .section-tabs a:hover { color: var(--nav-ink); background: rgb(255 255 255 / 0.05); }
+.app .section-tabs a.active {
+  color: #fff6dc; border-color: rgb(224 178 60 / 0.5); box-shadow: inset 0 -2px 0 var(--nav-gold);
+  background: linear-gradient(180deg, rgb(224 178 60 / 0.22), rgb(224 178 60 / 0.06));
+}
+@media (max-width: 640px) {
+  .app .section-tabs { border-radius: 10px; }
+  .app .section-tabs a { padding: 10px 12px; font-size: 12.5px; min-height: 40px; display: grid; place-items: center; }
+}
