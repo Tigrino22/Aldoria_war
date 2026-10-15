@@ -235,7 +235,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
     debuter: (
       <>
         <p>
-          <b>S'orienter :</b> le menu est organisé en groupes (village, armée, carte, social, aide) ; sur téléphone, il s'ouvre depuis le bouton en haut de l'écran.
+          <b>S'orienter :</b> le menu est organisé en quatre groupes (Village, Armée, Social, Mon compte) ; les pages voisines sont regroupées en onglets en haut de la page (par exemple Troupes, Ralliement et Pillage). Sur téléphone, Village, Carte, Troupes et Rapports sont en bas de l'écran, le reste est dans le bouton « Menu ».
         </p>
         <p>
           À l'inscription, vous recevez un village placé autour du centre de la carte, avec <Cost cost={STARTING_RESOURCES} /> et ces bâtiments au niveau 1 :{' '}
@@ -305,7 +305,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           </li>
           <li>
             <b>Ordres du Point de ralliement :</b> on y envoie une attaque ou un soutien vers des coordonnées, tout de suite ou pour une heure d'arrivée précise : les troupes sont alors réservées et partent seules à l'heure
-            qui convient, et l'on peut annuler l'ordre tant qu'il n'est pas parti. Le Point de ralliement est une page à part du menu (distincte de « Troupes ») ; depuis la carte, « Ouvrir au point de ralliement » y mène avec la cible déjà remplie. Les unités les plus rapides partent plus tard que les lentes pour que tous les mouvements arrivent à l'heure choisie.
+            qui convient, et l'on peut annuler l'ordre tant qu'il n'est pas parti. Le Point de ralliement est un onglet de la rubrique Troupes, distinct de la page « Troupes » ; depuis la carte, « Ouvrir au point de ralliement » y mène avec la cible déjà remplie. Les unités les plus rapides partent plus tard que les lentes pour que tous les mouvements arrivent à l'heure choisie.
           </li>
           <li>
             <b>Assistant de pillage :</b> une page dédiée pour piller les villages barbares en un clic, avec deux modèles de troupes. Voir <a href="#/wiki/pillage">le guide de l'assistant de pillage</a>.
@@ -524,7 +524,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </ul>
         <h3>Offres du marché</h3>
         <p>
-          L'onglet « Offres » (aussi dans le menu, « Offres du marché ») permet d'échanger avec les autres joueurs sans connaître leur pseudo : vous publiez ce que vous donnez et ce que vous voulez en échange, et
+          L'onglet « Offres » de la page Marché permet d'échanger avec les autres joueurs sans connaître leur pseudo : vous publiez ce que vous donnez et ce que vous voulez en échange, et
           n'importe quel joueur peut accepter.
         </p>
         <ul>
@@ -624,7 +624,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
             (3 guerres déclarées à la fois au plus) et y mettre fin quand il veut. Une tribu de PNJ peut aussi vous déclarer la guerre sans provocation, ou en riposte quand l'un des vôtres attaque un de ses membres (si la riposte est activée) : ses membres frappent alors les villages de votre tribu, jamais pendant les
             heures calmes, et vous êtes prévenus par message. Entre deux tribus de joueurs, la guerre est un état déclaré, visible des deux camps.
             Chaque guerre affiche son bilan depuis la déclaration, pour votre tribu et pour l'adversaire : batailles gagnées (en attaque et en défense), villages conquis et adversaires battus. Un panneau « Statistiques de guerre » totalise les guerres en cours et celles de la semaine, et classe les cinq meilleurs guerriers de votre tribu.
-            La page « Guerres du monde » (menu Social) est ouverte à tous : fronts en cours entre toutes les tribus, batailles et conquêtes des dernières heures (jusqu'à 72 h), rythme par heure, journal des déclarations et tribus de PNJ en trêve. Les attaques en route n'y sont pas détaillées.
+            L'onglet « Guerres » de la rubrique Monde (menu Social) est ouverte à tous : fronts en cours entre toutes les tribus, batailles et conquêtes des dernières heures (jusqu'à 72 h), rythme par heure, journal des déclarations et tribus de PNJ en trêve. Les attaques en route n'y sont pas détaillées.
           </li>
         </ul>
         <h3>Vue d'ensemble et aides à l'attaque</h3>
@@ -637,7 +637,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         <ul>
           <li><b>Joueurs et Tribus :</b> classement général par points, avec deux variantes, « Attaque » et « Défense », qui comptent les adversaires battus.</li>
           <li><b>Guerre :</b> classement de guerre (conquêtes, villages perdus, victoires), podium, dernières conquêtes du monde et guerres de tribus en cours.</li>
-          <li>La page « Statistiques du monde », dans le menu Social, donne les totaux et moyennes de toute la carte.</li>
+          <li>L'onglet « Statistiques » de la rubrique Monde, dans le menu Social, donne les totaux et moyennes de toute la carte.</li>
         </ul>
         <p>
           Les points d'un joueur sont la somme des points de ses villages, et ceux d'un village les ressources investies dans ses bâtiments : un point pour {fmt(RESOURCES_PER_POINT)} ressources (bois, argile, fer et blé). Le
@@ -655,7 +655,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </p>
         <h3>Statistiques du monde</h3>
         <p>
-          La page « Statistiques du monde » (menu Social) est ouverte à tous les joueurs : nombre de joueurs, de PNJ, de tribus et de villages, points moyens par village, activité des dernières 24 heures (attaques, conquêtes, joueurs actifs),
+          L'onglet « Statistiques » de la rubrique Monde (menu Social) est ouverte à tous les joueurs : nombre de joueurs, de PNJ, de tribus et de villages, points moyens par village, activité des dernières 24 heures (attaques, conquêtes, joueurs actifs),
           troupes et ressources de tout le monde, taille des villages et niveau moyen des bâtiments. Ce ne sont que des totaux et des moyennes : jamais le détail d'un joueur ou d'un village, ni leurs troupes ou leurs ressources.
         </p>
       </>
@@ -677,7 +677,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
       <>
         <p>
           Le <b>gestionnaire de compte</b> est un pilote automatique : vous fixez une fois ce que chaque village doit construire et recruter, et il le fait à votre place, dès que les ressources le
-          permettent, même quand vous n'êtes pas connecté. Vous gardez vos connexions pour la stratégie militaire. Il se trouve dans le menu, sous « Gestionnaire de compte », et chaque village de
+          permettent, même quand vous n'êtes pas connecté. Vous gardez vos connexions pour la stratégie militaire. Il se trouve dans le menu, rubrique « Mes villages », onglet « Gestionnaire », et chaque village de
           « Mes villages » a aussi son interrupteur.
         </p>
         <p><b>Comment ça marche</b></p>

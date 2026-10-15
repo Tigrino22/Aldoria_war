@@ -63,38 +63,42 @@ const Provinces = lazy(PAGES.Provinces);
 const Inventory = lazy(PAGES.Inventory);
 const Achievements = lazy(PAGES.Achievements);
 
+interface NavTab {
+  path: string;
+  label: string;
+}
+
 interface NavItem {
   path: string;
   label: string;
   icon: NavIconName;
+  /** Pages regroupées sous cette entrée : elles s'affichent en onglets en haut de la page. */
+  tabs?: NavTab[];
 }
 
-// Menu complet, groupé : menu latéral sur ordinateur, tiroir « Menu » sur mobile.
+// Menu complet, groupé par thème : menu latéral sur ordinateur, tiroir « Menu » sur mobile.
+// Une entrée par rubrique ; les pages voisines d'une même rubrique sont regroupées en onglets (`tabs`).
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Village',
     items: [
-      { path: 'village', label: 'Vue du village', icon: 'village' },
-      { path: 'hotel', label: 'Hôtel de ville', icon: 'hotel' },
+      { path: 'village', label: 'Village', icon: 'village', tabs: [{ path: 'village', label: 'Vue du village' }, { path: 'hotel', label: 'Hôtel de ville' }] },
       { path: 'caserne', label: 'Caserne', icon: 'caserne' },
       { path: 'marche', label: 'Marché', icon: 'marche' },
-      { path: 'marche/offres', label: 'Offres du marché', icon: 'offres' },
-      { path: 'apercu', label: 'Mes villages', icon: 'apercu' },
-      { path: 'inventaire', label: 'Inventaire', icon: 'tresor' },
-      { path: 'profil', label: 'Mon profil', icon: 'compte' },
-      { path: 'succes', label: 'Succès', icon: 'medaille' },
-      { path: 'gestionnaire', label: 'Gestionnaire de compte', icon: 'gestionnaire' },
+      { path: 'apercu', label: 'Mes villages', icon: 'apercu', tabs: [{ path: 'apercu', label: 'Mes villages' }, { path: 'gestionnaire', label: 'Gestionnaire' }] },
     ],
   },
   {
     title: 'Armée',
     items: [
-      { path: 'troupes', label: 'Troupes', icon: 'troupes' },
-      { path: 'ralliement', label: 'Point de ralliement', icon: 'ralliement' },
-      { path: 'pillage', label: 'Assistant de pillage', icon: 'pillage' },
-      { path: 'croisade', label: 'Croisades', icon: 'croisade' },
-      { path: 'provinces', label: 'Provinces', icon: 'province' },
       { path: 'carte', label: 'Carte', icon: 'carte' },
+      {
+        path: 'troupes',
+        label: 'Troupes',
+        icon: 'troupes',
+        tabs: [{ path: 'troupes', label: 'Troupes' }, { path: 'ralliement', label: 'Ralliement' }, { path: 'pillage', label: 'Pillage' }],
+      },
+      { path: 'croisade', label: 'Croisades', icon: 'croisade', tabs: [{ path: 'croisade', label: 'Croisades' }, { path: 'provinces', label: 'Provinces' }] },
     ],
   },
   {
@@ -103,25 +107,59 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'rapports', label: 'Rapports', icon: 'rapports' },
       { path: 'messages', label: 'Messages', icon: 'messages' },
       { path: 'tribu', label: 'Tribu', icon: 'tribu' },
-      { path: 'classement', label: 'Classement', icon: 'classement' },
-      { path: 'guerres', label: 'Guerres du monde', icon: 'guerres' },
-      { path: 'monde', label: 'Statistiques du monde', icon: 'monde' },
+      {
+        path: 'classement',
+        label: 'Monde',
+        icon: 'monde',
+        tabs: [{ path: 'classement', label: 'Classement' }, { path: 'guerres', label: 'Guerres' }, { path: 'monde', label: 'Statistiques' }],
+      },
     ],
   },
   {
-    title: 'Aide',
+    title: 'Mon compte',
     items: [
-      { path: 'wiki', label: 'Wiki', icon: 'wiki' },
-      { path: 'compte', label: 'Mon compte', icon: 'compte' },
-      { path: 'bug', label: 'Signaler un bug', icon: 'bug' },
+      {
+        path: 'profil',
+        label: 'Mon profil',
+        icon: 'compte',
+        tabs: [{ path: 'profil', label: 'Profil' }, { path: 'succes', label: 'Succès' }, { path: 'inventaire', label: 'Inventaire' }, { path: 'compte', label: 'Paramètres' }],
+      },
+      { path: 'wiki', label: 'Aide', icon: 'wiki', tabs: [{ path: 'wiki', label: 'Wiki' }, { path: 'bug', label: 'Signaler un bug' }] },
     ],
   },
 ];
 const ADMIN_ITEM: NavItem = { path: 'admin', label: 'Administration', icon: 'admin' };
 const ALL_ITEMS = [...GROUPS.flatMap((g) => g.items), ADMIN_ITEM];
+/** Chemins couverts par une entrée du menu : la sienne et ceux de ses onglets. */
+const pathsOf = (n: NavItem) => (n.tabs ? n.tabs.map((t) => t.path) : [n.path]);
 /** Les quatre entrées toujours visibles en bas de l'écran sur mobile, le reste est dans « Menu ». */
 const TAB_PATHS = ['village', 'carte', 'troupes', 'rapports'];
 const TAB_ITEMS = TAB_PATHS.map((p) => ALL_ITEMS.find((n) => n.path === p)!);
+
+/** Page du menu correspondant à l'adresse : « village/hotel » est l'hôtel de ville, « marche/offres » reste le marché. */
+function currentPath(route: string[]) {
+  const page = route[0] ?? 'village';
+  return page === 'village' && route[1] === 'hotel' ? 'hotel' : page;
+}
+
+/** Onglets de la rubrique en cours, en haut de la page. */
+function SectionTabs({ item, here }: { item: NavItem; here: string }) {
+  const ref = useRef<HTMLElement>(null);
+  // Sur téléphone, la barre défile : l'onglet actif est ramené en vue.
+  useEffect(() => {
+    const active = ref.current?.querySelector<HTMLElement>('a.active');
+    if (active && ref.current) ref.current.scrollLeft = active.offsetLeft - (ref.current.clientWidth - active.offsetWidth) / 2;
+  }, [here]);
+  return (
+    <nav ref={ref} className="section-tabs" aria-label={item.label}>
+      {item.tabs!.map((t) => (
+        <a key={t.path} href={`#/${t.path}`} className={here === t.path ? 'active' : ''} aria-current={here === t.path ? 'page' : undefined}>
+          {t.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
 
 /** Ressources du village actif, dans la barre du haut (ordinateur). */
 function TopResources() {
@@ -227,7 +265,9 @@ export default function Layout() {
       for (const load of Object.values(PAGES)) void load();
     });
   }, []);
-  const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : path === 'admin' ? (me.openModerationReports ?? 0) + (me.openBugReports ?? 0) : 0);
+  const pageBadge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : path === 'admin' ? (me.openModerationReports ?? 0) + (me.openBugReports ?? 0) : 0);
+  /** Pastille d'une entrée du menu : la somme de ses onglets. */
+  const badge = (n: NavItem) => pathsOf(n).reduce((sum, p) => sum + pageBadge(p), 0);
 
   if (!me.villages.length) {
     return (
@@ -244,9 +284,11 @@ export default function Layout() {
   }
 
   // L'entrée « Administration » n'existe que pour les pseudos listés côté serveur (ADMIN_USERNAMES).
-  const groups = me.isAdmin ? GROUPS.map((g) => (g.title === 'Aide' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g)) : GROUPS;
-  const here = route.length > 1 && ALL_ITEMS.some((n) => n.path === route.slice(0, 2).join('/')) ? route.slice(0, 2).join('/') : page;
-  const drawerBadge = badge('messages') + badge('tribu');
+  const groups = me.isAdmin ? GROUPS.map((g) => (g.title === 'Mon compte' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g)) : GROUPS;
+  const here = currentPath(route);
+  const section = (me.isAdmin ? ALL_ITEMS : ALL_ITEMS.slice(0, -1)).find((n) => pathsOf(n).includes(here));
+  // Le bouton « Menu » reprend les pastilles des entrées qui ne sont pas dans la barre du bas.
+  const drawerBadge = groups.flatMap((g) => g.items).filter((n) => !TAB_PATHS.includes(n.path)).reduce((sum, n) => sum + badge(n), 0);
   const shiftVillage = (d: number) => {
     const i = me.villages.findIndex((x) => x.id === villageId);
     setVillageId(me.villages[(i + d + me.villages.length) % me.villages.length].id);
@@ -295,10 +337,10 @@ export default function Layout() {
             <nav key={g.title} className="side-group" aria-label={g.title}>
               <h4>{g.title}</h4>
               {g.items.map((n) => (
-                <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''}>
+                <a key={n.path} href={`#/${n.path}`} className={section === n ? 'active' : ''}>
                   <span className="nav-medal"><NavIcon name={n.icon} /></span>
                   <span>{n.label}</span>
-                  {badge(n.path) > 0 && <span className="badge-pill">{badge(n.path)}</span>}
+                  {badge(n) > 0 && <span className="badge-pill">{badge(n)}</span>}
                 </a>
               ))}
             </nav>
@@ -309,6 +351,7 @@ export default function Layout() {
           </button>
         </aside>
         <main className="content">
+          {section?.tabs && <SectionTabs item={section} here={here} />}
           <Suspense fallback={<p className="muted">Chargement…</p>}>
           {page === 'village' && route[1] !== 'hotel' && <VillageView />}
           {(page === 'hotel' || (page === 'village' && route[1] === 'hotel')) && (village ? <TownHall v={village} /> : <p className="muted">Chargement du village…</p>)}
@@ -346,10 +389,10 @@ export default function Layout() {
       </div>
       <nav className="nav" aria-label="Navigation">
         {TAB_ITEMS.map((n) => (
-          <button key={n.path} className={page === n.path && !drawer ? 'active' : ''} onClick={() => (setDrawer(false), go(n.path))}>
+          <button key={n.path} className={section === n && !drawer ? 'active' : ''} onClick={() => (setDrawer(false), go(n.path))}>
             <span className="nav-icon"><NavIcon name={n.icon} size={24} /></span>
-            <span className="nav-label">{n.path === 'village' ? 'Village' : n.label}</span>
-            {badge(n.path) > 0 && <span className="badge">{badge(n.path)}</span>}
+            <span className="nav-label">{n.label}</span>
+            {badge(n) > 0 && <span className="badge">{badge(n)}</span>}
           </button>
         ))}
         <button className={drawer ? 'active' : ''} aria-expanded={drawer} onClick={() => setDrawer((d) => !d)}>
@@ -376,10 +419,10 @@ export default function Layout() {
                 <h4>{g.title}</h4>
                 <div className="sheet-grid">
                   {g.items.map((n) => (
-                    <a key={n.path} href={`#/${n.path}`} className={here === n.path ? 'active' : ''} onClick={() => setDrawer(false)}>
+                    <a key={n.path} href={`#/${n.path}`} className={section === n ? 'active' : ''} onClick={() => setDrawer(false)}>
                       <span className="nav-medal"><NavIcon name={n.icon} size={26} /></span>
                       <span>{n.label}</span>
-                      {badge(n.path) > 0 && <span className="badge">{badge(n.path)}</span>}
+                      {badge(n) > 0 && <span className="badge">{badge(n)}</span>}
                     </a>
                   ))}
                 </div>
