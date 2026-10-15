@@ -6,8 +6,6 @@ import { createSession, hashPassword, requirePlayer, verifyPassword, bearer } fr
 import { pool, type Db } from '../db';
 import { env } from '../env';
 import { GameError } from '../errors';
-import { openBugCount } from '../game/bugs';
-import { openModerationCount } from '../game/moderation';
 import { createVillage } from '../game/village';
 import { ensureWorld, spawnLocation } from '../game/world';
 import { leaveTribe } from './social';
@@ -46,11 +44,22 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
   ).rows[0];
   if (!p) throw new GameError('Joueur introuvable', 401);
   const villages = (await c.query('SELECT id, name, x, y, points FROM villages WHERE owner_id = $1 ORDER BY id', [playerId])).rows;
+  // Les pastilles ne comptent que ce qui est arrivé depuis la dernière visite de la page (table player_seen).
   const counts = (
     await c.query(
-      `SELECT (SELECT count(*)::int FROM reports WHERE player_id = $1 AND NOT read AND NOT archived) AS reports,
-              (SELECT count(*)::int FROM messages WHERE to_id = $1 AND NOT read) AS messages,
-              (SELECT count(*)::int FROM player_items WHERE player_id = $1 AND used_at IS NULL) AS items`,
+      `WITH seen AS (SELECT kind, last_id FROM player_seen WHERE player_id = $1)
+       SELECT (SELECT count(*)::int FROM reports WHERE player_id = $1 AND NOT read AND NOT archived
+                 AND id > COALESCE((SELECT last_id FROM seen WHERE kind = 'reports'), 0)) AS reports,
+              (SELECT count(*)::int FROM messages WHERE to_id = $1 AND NOT read
+                 AND id > COALESCE((SELECT last_id FROM seen WHERE kind = 'messages'), 0)) AS messages,
+              (SELECT count(*)::int FROM player_items WHERE player_id = $1 AND used_at IS NULL
+                 AND id > COALESCE((SELECT last_id FROM seen WHERE kind = 'items'), 0)) AS items,
+              (SELECT count(*)::int FROM tribe_invites WHERE player_id = $1
+                 AND id > COALESCE((SELECT last_id FROM seen WHERE kind = 'invites'), 0)) AS invites,
+              (SELECT count(*)::int FROM moderation_reports WHERE status = 'open'
+                 AND id > COALESCE((SELECT last_id FROM seen WHERE kind = 'moderation'), 0)) AS moderation,
+              (SELECT count(*)::int FROM bug_reports WHERE status = 'open'
+                 AND id > COALESCE((SELECT last_id FROM seen WHERE kind = 'bugs'), 0)) AS bugs`,
       [playerId],
     )
   ).rows[0];
@@ -74,7 +83,8 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
     unreadMessages: counts.messages,
     items: counts.items,
     isAdmin,
-    ...(isAdmin ? { openModerationReports: await openModerationCount(c), openBugReports: await openBugCount(c) } : {}),
+    ...(isAdmin ? { openModerationReports: counts.moderation, openBugReports: counts.bugs } : {}),
+    newInvites: counts.invites,
     invites: invites.map((i) => ({ id: i.id, tribeId: i.tribe_id, tribeName: i.name, tribeTag: i.tag })),
   };
 }
@@ -120,6 +130,36 @@ export default async function authRoutes(app: FastifyInstance) {
   app.get('/api/me', async (req) => {
     const playerId = await requirePlayer(req);
     return act((c) => loadMe(c, playerId));
+  });
+
+  /**
+   * Le joueur vient d'ouvrir une page du menu : ses notifications sont vues, la pastille disparaît.
+   * Les rapports et messages restent « non lus » dans leur liste tant qu'ils ne sont pas ouverts.
+   */
+  app.post('/api/me/seen', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { page } = z.object({ page: z.enum(['rapports', 'messages', 'tribu', 'inventaire', 'admin']) }).parse(req.body);
+    const kinds: Record<typeof page, [string, string][]> = {
+      rapports: [['reports', 'SELECT max(id) AS m FROM reports WHERE player_id = $1']],
+      messages: [['messages', 'SELECT max(id) AS m FROM messages WHERE to_id = $1']],
+      tribu: [['invites', 'SELECT max(id) AS m FROM tribe_invites WHERE player_id = $1']],
+      inventaire: [['items', 'SELECT max(id) AS m FROM player_items WHERE player_id = $1']],
+      admin: [
+        ['moderation', 'SELECT max(id) AS m FROM moderation_reports WHERE $1::int IS NOT NULL'],
+        ['bugs', 'SELECT max(id) AS m FROM bug_reports WHERE $1::int IS NOT NULL'],
+      ],
+    };
+    return act(async (c) => {
+      for (const [kind, sql] of kinds[page]) {
+        const last = (await c.query(sql, [playerId])).rows[0].m ?? 0;
+        await c.query(
+          `INSERT INTO player_seen (player_id, kind, last_id) VALUES ($1, $2, $3)
+           ON CONFLICT (player_id, kind) DO UPDATE SET last_id = GREATEST(player_seen.last_id, EXCLUDED.last_id)`,
+          [playerId, kind, last],
+        );
+      }
+      return { ok: true };
+    });
   });
 
   /** Un joueur qui a perdu tous ses villages peut recommencer ailleurs sur la carte. */

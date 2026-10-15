@@ -39,10 +39,6 @@ export async function myBugReports(c: Pick<Db, 'query'>, playerId: number, limit
   return rows.map(view);
 }
 
-export async function openBugCount(c: Pick<Db, 'query'>): Promise<number> {
-  return (await c.query("SELECT count(*)::int AS n FROM bug_reports WHERE status = 'open'")).rows[0].n;
-}
-
 /** Bugs pour l'administration : en attente (les plus anciens d'abord), ou déjà traités (les plus récents d'abord). */
 export async function listBugReports(c: Pick<Db, 'query'>, status: 'open' | 'closed', limit = 200): Promise<AdminBugReportView[]> {
   const { rows } = await c.query(
