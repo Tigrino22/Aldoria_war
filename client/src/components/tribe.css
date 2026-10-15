@@ -65,6 +65,7 @@
 .tr-badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-size: 11px; font-weight: 700; letter-spacing: 0; background: rgb(98 200 255 / 0.2); color: inherit; }
 .tr-badge.alert { background: var(--sky); color: var(--sky-ink); }
 .tr-badge.red { background: var(--war); color: #fff; }
+.tr-badge.gold { background: var(--gold); color: #2b2018; }
 
 /* Grille : contenu principal et colonne latérale. */
 .tr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; align-items: start; }
@@ -166,7 +167,9 @@
   .tr-stat { padding: 7px 9px; }
   .tr-stat b { font-size: 17px; }
   .tr-stat span { font-size: 10px; }
-  .tr-tabs button { font-size: 12px; letter-spacing: 0.03em; min-height: 44px; }
+  .tr-tabs { gap: 2px; padding: 3px; }
+  .tr-tabs button { font-size: 11px; letter-spacing: 0.02em; min-height: 44px; gap: 4px; padding: 0 4px; min-width: 0; }
+  .tr-tabs .tr-badge { min-width: 18px; height: 18px; padding: 0 5px; }
   .tr-card, .tr-page .panel { padding: 14px 12px; }
   .tr-members li { gap: 10px; padding: 8px; }
   .tr-rank { display: none; }

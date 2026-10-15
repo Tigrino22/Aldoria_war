@@ -231,3 +231,61 @@ export interface ProvincesState {
   mine: { tribeId: number; holyNeighbours: number; canAttackHoly: boolean } | null;
   victory: WorldVictoryView | null;
 }
+
+/** Relation d'une tribu avec celle du joueur, pour les couleurs fixes de la carte. */
+export type TribeRelation = 'mine' | 'ally' | 'war' | 'other';
+
+/** Un bastion tenu par la tribu du joueur, vu depuis l'onglet Provinces de la page Tribu. */
+export interface TribeHeldProvince {
+  id: number;
+  name: string;
+  kind: ProvinceKind;
+  tier: ProvinceTier | 0;
+  bonus: ProvinceBonus | null;
+  bonusPercent: number;
+  bastion: { id: number; name: string; x: number; y: number; wall: number } | null;
+  holderSince: string;
+  controlAt: string;
+  controlled: boolean;
+  /** Borde la Terre sainte. */
+  holyNeighbour: boolean;
+  /** Troupes qui gardent le bastion (population), par joueur qui les a envoyées. */
+  garrison: { population: number; defenders: { name: string; tag: string | null; population: number }[] };
+  /** Attaques extérieures en approche (les effectifs restent secrets). */
+  incoming: { count: number; next: string | null };
+}
+
+/** Assaut d'un membre en route vers un bastion que la tribu ne tient pas encore. */
+export interface TribeProvinceAssault {
+  id: number;
+  attacker: string;
+  province: string;
+  tier: ProvinceTier | 0;
+  bastion: { name: string; x: number; y: number };
+  holder: { tag: string; relation: TribeRelation } | null;
+  withNoble: boolean;
+  sentAt: string;
+  arriveAt: string;
+}
+
+/** Onglet Provinces de la page Tribu : où en est la conquête de la tribu. */
+export interface TribeProvincesView {
+  enabled: boolean;
+  holdHours: number;
+  holyAccess: number;
+  holyHoldDays: number;
+  held: TribeHeldProvince[];
+  assaults: TribeProvinceAssault[];
+  /** Provinces qui bordent la Terre sainte, et qui les tient : la route vers le Sanctuaire. */
+  holy: {
+    name: string;
+    bastion: { x: number; y: number } | null;
+    holder: { tag: string; name: string; relation: TribeRelation } | null;
+    neighboursHeld: number;
+    canAttack: boolean;
+    around: { id: number; name: string; bastion: { x: number; y: number } | null; holder: { tag: string; relation: TribeRelation } | null; controlled: boolean }[];
+  } | null;
+  /** Trésors de bastion reçus par la tribu (une fois par province), et ceux que le joueur n'a pas encore utilisés. */
+  treasures: { province: string; tier: ProvinceTier | 0; at: string }[];
+  myUnusedTreasures: number;
+}

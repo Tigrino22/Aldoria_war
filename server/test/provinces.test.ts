@@ -18,7 +18,7 @@ import { env } from '../src/env';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents, sendCommand } from '../src/game/commands';
-import { bastionName, ensureProvinces, processProvinces, provinceBonuses, provincesState, refreshNeutralBastions, tierRules } from '../src/game/provinces';
+import { bastionName, ensureProvinces, tribeHeldBrief, tribeProvincesView, processProvinces, provinceBonuses, provincesState, refreshNeutralBastions, tierRules } from '../src/game/provinces';
 import { listItems, useItem } from '../src/game/items';
 import { createVillage, enqueueRecruit, getTroops, loadVillage } from '../src/game/village';
 
@@ -155,6 +155,39 @@ describe('provinces : bastions, bannière et Terre sainte', () => {
     expect(holyView.neighbours.length).toBeGreaterThanOrEqual(2);
     for (const id of holyView.neighbours) expect(map.provinces.find((p) => p.id === id)).toMatchObject({ tier: 3, bonusPercent: 15 });
     expect(map.tiers.map((t) => t.bonus)).toEqual([5, 10, 15]);
+  });
+
+  it('l’onglet Provinces de la tribu montre ses bastions, leur garnison, les attaques en approche, les assauts et les trésors', async () => {
+    const t = await tribe('Les Cerfs', 'CERF');
+    const p = await player('Gontran', t);
+    const enemy = await player('Ermengarde', await tribe('Les Corbeaux', 'CORB'));
+    const [held, target] = (await pool.query("SELECT * FROM provinces WHERE kind = 'province' ORDER BY id LIMIT 2")).rows;
+    const v = await villageNear(p, held.x, held.y, { swordsman: 500, noble: 1 });
+    const ev = await villageNear(enemy, held.x, held.y, { swordsman: 300 });
+    await pool.query('UPDATE provinces SET holder_tribe_id = $2, holder_since = $3 WHERE id = $1', [held.id, t, at(-13 * HOUR)]);
+    await pool.query('DELETE FROM troops WHERE village_id = $1', [held.bastion_village_id]);
+    await pool.query('INSERT INTO troops (village_id, home_village_id, units) VALUES ($1, $2, $3)', [held.bastion_village_id, v, units({ spearman: 200 })]);
+    await pool.query('INSERT INTO province_rewards (province_id, tribe_id, at) VALUES ($1, $2, $3)', [held.id, t, at(-HOUR)]);
+    await send(enemy, ev, held.bastion_village_id, 'attack', { swordsman: 100 }, T0);
+    await send(p, v, target.bastion_village_id, 'attack', { swordsman: 200, noble: 1 }, T0);
+
+    const view = await tx((c) => tribeProvincesView(c, p, T0));
+    expect(view.held).toHaveLength(1);
+    expect(view.held[0]).toMatchObject({ id: held.id, controlled: true, garrison: { population: 200, defenders: [{ name: 'Gontran', tag: 'CERF', population: 200 }] } });
+    expect(view.held[0].incoming.count).toBe(1);
+    expect(view.assaults).toHaveLength(1);
+    expect(view.assaults[0]).toMatchObject({ attacker: 'Gontran', province: target.name, withNoble: true, holder: null });
+    expect(view.treasures.map((r) => r.province)).toEqual([held.name]);
+    expect(view.holy?.around.find((a) => a.id === held.id)?.holder).toMatchObject({ tag: 'CERF', relation: 'mine' });
+    expect(await tx((c) => tribeHeldBrief(c, t, T0))).toMatchObject([{ id: held.id, controlled: true }]);
+    const loner = await player('Sans tribu');
+    await expect(tx((c) => tribeProvincesView(c, loner, T0))).rejects.toThrow(/pas de tribu/);
+
+    // Remise à zéro pour la suite.
+    await pool.query('DELETE FROM commands');
+    await pool.query('DELETE FROM troops WHERE village_id = $1', [held.bastion_village_id]);
+    await pool.query('UPDATE provinces SET holder_tribe_id = NULL, holder_since = NULL WHERE id = $1', [held.id]);
+    await tx((c) => refreshNeutralBastions(c));
   });
 
   it('plante la bannière avec un noble, contrôle la province après la tenue et donne son bonus', async () => {

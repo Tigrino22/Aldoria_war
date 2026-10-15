@@ -7,6 +7,7 @@ import { pool, type Db } from '../db';
 import { GameError, forbidden, notFound } from '../errors';
 import { allianceRelation, allyTribeIdsOf } from '../game/tribe-alliances';
 import { declareWar, endWar, tribeWarsView } from '../game/tribe-wars';
+import { tribeHeldBrief, tribeProvincesView } from '../game/provinces';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
@@ -216,6 +217,12 @@ export default async function socialRoutes(app: FastifyInstance) {
     });
   });
 
+  /** Onglet « Provinces » de la tribu : bastions tenus, assauts en route, route vers la Terre sainte et trésors reçus. */
+  app.get('/api/tribes/mine/provinces', async (req) => {
+    const playerId = await requirePlayer(req);
+    return act((c, _o, now) => tribeProvincesView(c, playerId, now));
+  });
+
   // ---------- Guerres de tribu ----------
   /** Onglet « Guerres » de la tribu : guerres en cours (déclarées ou subies), récentes, et tribus à qui déclarer la guerre. */
   app.get('/api/tribes/mine/wars', async (req) => {
@@ -279,6 +286,7 @@ export default async function socialRoutes(app: FastifyInstance) {
       invites,
       allies,
       wars,
+      provinces: await tribeHeldBrief(pool, id, new Date()),
       viewer: await allianceRelation(pool, playerId, id, new Date()),
       createdAt: t.created_at ? new Date(t.created_at).toISOString() : null,
       points: members.reduce((s, m) => s + m.points, 0),

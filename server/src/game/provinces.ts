@@ -27,6 +27,9 @@ import {
   type TierRules,
   type ProvinceView,
   type ProvincesState,
+  type TribeHeldProvince,
+  type TribeProvincesView,
+  type TribeRelation,
   type UnitCounts,
   type WorldVictoryView,
 } from '@aldoria/shared';
@@ -38,7 +41,7 @@ import { addKills, insertCommand } from './commands';
 import { grantTitle } from './crusades';
 import { grantItem } from './items';
 import { createReport } from './reports';
-import { areAllied } from './tribe-alliances';
+import { allyTribeIdsOf, areAllied } from './tribe-alliances';
 import { addTroops, createVillage, loadVillage, saveVillage, setTroops, type VillageRow } from './village';
 import { findFreeSpot } from './world';
 
@@ -546,4 +549,166 @@ export async function provincesState(c: Db, playerId: number, now: Date): Promis
     mine: tribeId ? { tribeId, holyNeighbours, canAttackHoly: holyNeighbours >= env.holyAccess } : null,
     victory: await worldVictory(c),
   };
+}
+
+/**
+ * Onglet Provinces de la page Tribu : bastions tenus par la tribu (tenue, garnison, attaques en approche), assauts des membres
+ * en route, route vers la Terre sainte et trésors reçus. Les effectifs des attaques ennemies restent secrets, comme ailleurs.
+ */
+export async function tribeProvincesView(c: Db, playerId: number, now: Date): Promise<TribeProvincesView> {
+  const tribeId = await tribeOf(c, playerId);
+  if (!tribeId) throw new GameError("Vous n'avez pas de tribu");
+  const allies = await allyTribeIdsOf(c, tribeId);
+  const wars = (
+    await c.query(
+      `SELECT CASE WHEN declarer_id = $1 THEN target_id ELSE declarer_id END AS id FROM tribe_wars
+       WHERE $1 IN (declarer_id, target_id) AND ended_at IS NULL AND until > $2`,
+      [tribeId, now],
+    )
+  ).rows.map((r) => r.id as number);
+  const relation = (id: number): TribeRelation => (id === tribeId ? 'mine' : allies.includes(id) ? 'ally' : wars.includes(id) ? 'war' : 'other');
+
+  const { rows } = await c.query(
+    `SELECT pr.*, t.tag, t.name AS tribe_name, v.name AS b_name, v.x AS b_x, v.y AS b_y, (v.buildings->>'wall')::int AS b_wall
+     FROM provinces pr LEFT JOIN tribes t ON t.id = pr.holder_tribe_id LEFT JOIN villages v ON v.id = pr.bastion_village_id ORDER BY pr.id`,
+  );
+  const holyRow = rows.find((r) => r.kind === 'holy');
+  const around = new Set(holyRow && rows.length ? ((await geography(c)).neighbours.get(holyRow.id) ?? []) : []);
+  const isControlled = (r: ProvinceRow) => controlled(r, now);
+  const mine = rows.filter((r) => r.holder_tribe_id === tribeId);
+  const bastionIds = mine.map((r) => r.bastion_village_id).filter((id): id is number => !!id);
+
+  // Garnisons : troupes présentes dans nos bastions, par joueur qui les a envoyées.
+  const garrisons = new Map<number, TribeHeldProvince['garrison']>();
+  if (bastionIds.length) {
+    const troops = (
+      await c.query(
+        `SELECT tr.village_id, tr.home_village_id, tr.units, p.username, t.tag
+         FROM troops tr LEFT JOIN villages h ON h.id = tr.home_village_id LEFT JOIN players p ON p.id = h.owner_id LEFT JOIN tribes t ON t.id = p.tribe_id
+         WHERE tr.village_id = ANY($1::int[])`,
+        [bastionIds],
+      )
+    ).rows;
+    for (const r of troops) {
+      const pop = populationOf(normalizeUnits(r.units));
+      if (pop <= 0) continue;
+      const g = garrisons.get(r.village_id) ?? { population: 0, defenders: [] };
+      g.population += pop;
+      const name = r.username ?? 'Garde neutre';
+      const d = g.defenders.find((x) => x.name === name);
+      if (d) d.population += pop;
+      else g.defenders.push({ name, tag: r.username ? (r.tag ?? null) : null, population: pop });
+      garrisons.set(r.village_id, g);
+    }
+    for (const g of garrisons.values()) g.defenders.sort((a, b) => b.population - a.population);
+  }
+
+  // Attaques extérieures en approche sur nos bastions (ni de la tribu ni de ses alliées, qui deviennent des renforts).
+  const incoming = new Map<number, { count: number; next: string | null }>();
+  if (bastionIds.length) {
+    const friends = [tribeId, ...allies];
+    const { rows: inc } = await c.query(
+      `SELECT c.target_village_id AS id, count(*)::int AS n, min(c.arrive_at) AS next
+       FROM commands c JOIN players p ON p.id = c.player_id
+       WHERE c.type = 'attack' AND NOT c.processed AND c.target_village_id = ANY($1::int[]) AND (p.tribe_id IS NULL OR NOT p.tribe_id = ANY($2::int[]))
+       GROUP BY c.target_village_id`,
+      [bastionIds, friends],
+    );
+    for (const r of inc) incoming.set(r.id, { count: r.n, next: new Date(r.next).toISOString() });
+  }
+
+  const held: TribeHeldProvince[] = mine
+    .map((r) => {
+      const hold = r.kind === 'holy' ? env.holyHoldDays * 24 : env.provinceHoldHours;
+      return {
+        id: r.id,
+        name: r.name,
+        kind: r.kind,
+        tier: r.kind === 'holy' ? 0 : (r.tier ?? 1),
+        bonus: r.bonus,
+        bonusPercent: r.kind === 'holy' ? 0 : tierBonus(r.tier ?? 1),
+        bastion: r.bastion_village_id ? { id: r.bastion_village_id, name: r.b_name, x: r.b_x, y: r.b_y, wall: r.b_wall ?? 0 } : null,
+        holderSince: new Date(r.holder_since).toISOString(),
+        controlAt: controlAt(r.holder_since, hold).toISOString(),
+        controlled: isControlled(r),
+        holyNeighbour: around.has(r.id),
+        garrison: (r.bastion_village_id && garrisons.get(r.bastion_village_id)) || { population: 0, defenders: [] },
+        incoming: (r.bastion_village_id && incoming.get(r.bastion_village_id)) || { count: 0, next: null },
+      } satisfies TribeHeldProvince;
+    })
+    // La Terre sainte d'abord, puis les provinces contrôlées, puis celles dont la tenue court encore.
+    .sort((a, b) => (a.kind === 'holy' ? -1 : 0) - (b.kind === 'holy' ? -1 : 0) || Number(b.controlled) - Number(a.controlled) || b.tier - a.tier || a.name.localeCompare(b.name));
+
+  // Assauts des membres en route vers un bastion que ni la tribu ni ses alliées ne tiennent.
+  const { rows: asl } = await c.query(
+    `SELECT c.id, c.sent_at, c.arrive_at, (c.units->>'noble')::int > 0 AS with_noble, p.username, pr.name AS province, pr.kind, pr.tier,
+            pr.holder_tribe_id, t.tag, v.name AS b_name, v.x, v.y
+     FROM commands c JOIN players p ON p.id = c.player_id JOIN villages v ON v.id = c.target_village_id
+     JOIN provinces pr ON pr.bastion_village_id = v.id LEFT JOIN tribes t ON t.id = pr.holder_tribe_id
+     WHERE c.type = 'attack' AND NOT c.processed AND p.tribe_id = $1 AND (pr.holder_tribe_id IS NULL OR NOT pr.holder_tribe_id = ANY($2::int[]))
+       AND EXISTS (SELECT 1 FROM jsonb_each_text(c.units) u WHERE u.key <> 'scout' AND u.value::int > 0)
+     ORDER BY c.arrive_at LIMIT 50`,
+    [tribeId, [tribeId, ...allies]],
+  );
+  const assaults = asl.map((r) => ({
+    id: r.id,
+    attacker: r.username,
+    province: r.province,
+    tier: r.kind === 'holy' ? 0 : (r.tier ?? 1),
+    bastion: { name: r.b_name, x: r.x, y: r.y },
+    holder: r.holder_tribe_id ? { tag: r.tag, relation: relation(r.holder_tribe_id) } : null,
+    withNoble: !!r.with_noble,
+    sentAt: new Date(r.sent_at).toISOString(),
+    arriveAt: new Date(r.arrive_at).toISOString(),
+  }));
+
+  const neighboursHeld = await holyNeighboursHeld(c, tribeId, now);
+  const pos = (r: { bastion_village_id: number | null; b_x: number; b_y: number }) => (r.bastion_village_id ? { x: r.b_x, y: r.b_y } : null);
+  const holy: TribeProvincesView['holy'] = holyRow
+    ? {
+        name: holyRow.name,
+        bastion: pos(holyRow),
+        holder: holyRow.holder_tribe_id ? { tag: holyRow.tag, name: holyRow.tribe_name, relation: relation(holyRow.holder_tribe_id) } : null,
+        neighboursHeld,
+        canAttack: neighboursHeld >= env.holyAccess,
+        around: rows
+          .filter((r) => around.has(r.id))
+          .map((r) => ({ id: r.id, name: r.name, bastion: pos(r), holder: r.holder_tribe_id ? { tag: r.tag, relation: relation(r.holder_tribe_id) } : null, controlled: isControlled(r) }))
+          .sort((a, b) => {
+            const rank = (x: typeof a) => (x.holder?.relation === 'mine' ? (x.controlled ? 0 : 1) : x.holder ? 3 : 2);
+            return rank(a) - rank(b) || a.name.localeCompare(b.name);
+          }),
+      }
+    : null;
+
+  const treasures = (
+    await c.query('SELECT pr.name, pr.kind, pr.tier, r.at FROM province_rewards r JOIN provinces pr ON pr.id = r.province_id WHERE r.tribe_id = $1 ORDER BY r.at DESC LIMIT 30', [tribeId])
+  ).rows.map((r) => ({ province: r.name, tier: r.kind === 'holy' ? 0 : (r.tier ?? 1), at: new Date(r.at).toISOString() }));
+  const myUnusedTreasures = (await c.query("SELECT count(*)::int AS n FROM player_items WHERE player_id = $1 AND kind = 'treasure' AND used_at IS NULL", [playerId])).rows[0].n as number;
+
+  return {
+    enabled: env.provinces === 1,
+    holdHours: env.provinceHoldHours,
+    holyAccess: env.holyAccess,
+    holyHoldDays: env.holyHoldDays,
+    held,
+    assaults,
+    holy,
+    treasures,
+    myUnusedTreasures,
+  };
+}
+
+/** Provinces tenues par une tribu, pour sa page publique. */
+export async function tribeHeldBrief(c: Pick<Db, 'query'>, tribeId: number, now: Date) {
+  const { rows } = await c.query("SELECT id, name, kind, tier, bonus, holder_tribe_id, holder_since FROM provinces WHERE holder_tribe_id = $1 ORDER BY kind = 'holy' DESC, tier DESC, name", [tribeId]);
+  return rows.map((r) => ({
+    id: r.id as number,
+    name: r.name as string,
+    kind: r.kind as 'province' | 'holy',
+    tier: (r.kind === 'holy' ? 0 : (r.tier ?? 1)) as ProvinceTier | 0,
+    bonus: r.bonus as ProvinceBonus | null,
+    bonusPercent: r.kind === 'holy' ? 0 : tierBonus(r.tier ?? 1),
+    controlled: controlled(r, now),
+  })).sort((a, b) => Number(b.kind === 'holy') - Number(a.kind === 'holy') || Number(b.controlled) - Number(a.controlled));
 }
