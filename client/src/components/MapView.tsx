@@ -902,14 +902,24 @@ export default function MapView({ focus }: { focus?: string }) {
         style: s.textStyle(`province-title-${titleFill}`, () => ({ fontFamily: 'Cinzel, serif', fontSize: 15, fontWeight: '700', fill: titleFill, stroke: { color: 0x140e08, width: 4 }, letterSpacing: 1 })),
       });
       title.anchor.set(0.5, 1);
-      const subFill = p.holder ? hexToNum(tribeColor(p.holder.tribeId, colors) ?? '#f3e2b3') : 0xe9dcc0;
+      // Le niveau et le bonus restent affichés quand une tribu tient la province ; sa bannière s'ajoute sur une ligne à ses couleurs.
       const sub = new BitmapText({
-        text: p.holder ? `[${p.holder.tag}]${p.controlled ? '' : ' · bannière'}` : p.kind === 'holy' ? 'Victoire du monde' : `Niveau ${p.tier}${p.bonus ? ` · ${PROVINCE_BONUS_LABEL[p.bonus]} +${p.bonusPercent} %` : ''}`,
-        style: s.textStyle(`province-sub-${subFill}`, () => ({ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: subFill, stroke: { color: 0x140e08, width: 3 } })),
+        text: p.kind === 'holy' ? 'Victoire du monde' : `Niveau ${p.tier}${p.bonus ? ` · ${PROVINCE_BONUS_LABEL[p.bonus]} +${p.bonusPercent} %` : ''}`,
+        style: s.textStyle(`province-sub-${0xe9dcc0}`, () => ({ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: 0xe9dcc0, stroke: { color: 0x140e08, width: 3 } })),
       });
       sub.anchor.set(0.5, 0);
       sub.y = 2;
       box.addChild(title, sub);
+      if (p.holder) {
+        const holderFill = hexToNum(tribeColor(p.holder.tribeId, colors) ?? '#f3e2b3');
+        const holder = new BitmapText({
+          text: `[${p.holder.tag}]${p.controlled ? '' : ' · bannière'}`,
+          style: s.textStyle(`province-sub-${holderFill}`, () => ({ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: holderFill, stroke: { color: 0x140e08, width: 3 } })),
+        });
+        holder.anchor.set(0.5, 0);
+        holder.y = sub.y + 15;
+        box.addChild(holder);
+      }
       box.position.set((m.x / m.n) * TILE, (m.y / m.n) * TILE);
       box.alpha = 0.92;
       labels.addChild(box);
