@@ -71,8 +71,16 @@ interface Scene {
   still: boolean;
   /** Calque des armées en marche (au-dessus des villages). */
   armyLayer: Container;
-  /** Provinces : teinte des provinces tenues, frontières (fines de près, épaisses en vue d'ensemble) et noms. */
-  provinceLayer: { root: Container; fill: Graphics; near: Graphics; far: Graphics; labels: Container };
+  /** Provinces : teinte des provinces tenues, frontières (fines de près, épaisses en vue d'ensemble), halo des bastions et noms. */
+  provinceLayer: { root: Container; fill: Graphics; halos: Graphics; near: Graphics; far: Graphics; labels: Container };
+  /**
+   * Styles de texte partagés, un par apparence. Avec un contour, Pixi fabrique une police bitmap (et ses canevas) pour chaque objet
+   * de style et ne la libère jamais : recréer les styles à chaque mise à jour de la carte remplissait la mémoire jusqu'au plantage
+   * de l'onglet sur iPhone.
+   */
+  /** Halos des bastions tenus, par case « x,y » : repris en vue d'ensemble à taille constante sous les pastilles. */
+  halos: Map<string, { color: number; alpha: number }>;
+  textStyle: (key: string, make: () => ConstructorParameters<typeof TextStyle>[0]) => TextStyle;
   centerOn: (x: number, y: number) => void;
   zoomBy: (factor: number) => void;
 }
@@ -328,8 +336,14 @@ export default function MapView({ focus }: { focus?: string }) {
       worldC.addChild(strongGrid);
 
       // Provinces : sous les villages, au-dessus du décor.
-      const provinceLayer = { root: new Container(), fill: new Graphics(), near: new Graphics(), far: new Graphics(), labels: new Container() };
-      provinceLayer.root.addChild(provinceLayer.fill, provinceLayer.near, provinceLayer.far, provinceLayer.labels);
+      const provinceLayer = { root: new Container(), fill: new Graphics(), halos: new Graphics(), near: new Graphics(), far: new Graphics(), labels: new Container() };
+      provinceLayer.root.addChild(provinceLayer.fill, provinceLayer.halos, provinceLayer.near, provinceLayer.far, provinceLayer.labels);
+      const styles = new Map<string, TextStyle>();
+      const textStyle = (key: string, make: () => ConstructorParameters<typeof TextStyle>[0]) => {
+        let st = styles.get(key);
+        if (!st) styles.set(key, (st = new TextStyle(make())));
+        return st;
+      };
       worldC.addChild(provinceLayer.root);
 
       const dots = new Graphics();
@@ -393,6 +407,11 @@ export default function MapView({ focus }: { focus?: string }) {
             const px = citadel ? 7 : bastion ? (v.holy ? 7 : 5.5) : !v.ownerId ? 2.2 : st.rel === 'own' || st.rel === 'active' || st.mark ? 5 : 3.8;
             const cx = (v.x + 0.5) * TILE;
             const cy = (v.y + 0.5) * TILE;
+            const halo = bastion && provinceLayer.root.visible ? sc0.halos.get(`${v.x},${v.y}`) : undefined;
+            if (halo) {
+              dots.circle(cx, cy, 16 / sc).fill({ color: halo.color, alpha: 0.24 * halo.alpha });
+              dots.circle(cx, cy, 16 / sc).stroke({ width: 1.5 / sc, color: halo.color, alpha: 0.6 * halo.alpha });
+            }
             dots.circle(cx, cy, (px + 1.2) / sc).fill({ color: 0x140e08, alpha: v.ownerId || citadel || bastion ? 0.75 : 0.4 });
             if (bastion) dots.rect(cx - px / sc, cy - px / sc, (2 * px) / sc, (2 * px) / sc).fill({ color: 0xc9a24a }).stroke({ width: 1.5 / sc, color: 0x140e08 });
             else dots.circle(cx, cy, px / sc).fill({ color: citadel ? 0xf1cc63 : hexToNum(st.color) });
@@ -401,6 +420,8 @@ export default function MapView({ focus }: { focus?: string }) {
         fineGrid.visible = sc >= LOD_ZOOM;
         provinceLayer.near.visible = !lod;
         provinceLayer.far.visible = lod;
+        // En vue d'ensemble, les halos des bastions sont redessinés à taille constante avec les pastilles.
+        provinceLayer.halos.visible = !lod;
         // Noms des provinces : à taille lisible quel que soit le zoom, cachés de tout près (les noms des villages prennent le relais).
         provinceLayer.labels.visible = sc < 0.75;
         const k = Math.min(7, Math.max(1, 0.85 / sc));
@@ -499,6 +520,8 @@ export default function MapView({ focus }: { focus?: string }) {
         still,
         armyLayer,
         provinceLayer,
+        halos: new Map(),
+        textStyle,
         centerOn,
         zoomBy,
       };
@@ -759,19 +782,78 @@ export default function MapView({ focus }: { focus?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [seedsKey, world.mapSize],
   );
+  // Frontières : ne changent qu'avec le découpage. Les bords de case voisins sont fusionnés en longs traits (bien moins de géométrie).
   useEffect(() => {
     const s = scene.current;
     if (!s) return;
-    const { fill, near, far, labels } = s.provinceLayer;
-    fill.clear();
+    const { near, far } = s.provinceLayer;
     near.clear();
     far.clear();
+    if (!grid || !provinces) return s.request();
+    const size = world.mapSize;
+    const holyIdx = provinces.provinces.findIndex((p) => p.kind === 'holy');
+    const plain: number[][] = [];
+    const holy: number[][] = [];
+    // `edge(i, j)` : null sans frontière, sinon true si elle touche la Terre sainte. Les segments consécutifs de même nature sont fusionnés.
+    const runs = (count: number, length: number, edge: (i: number, j: number) => boolean | null, seg: (i: number, j0: number, j1: number) => number[]) => {
+      for (let i = 0; i < count; i++) {
+        let j = 0;
+        while (j < length) {
+          const e = edge(i, j);
+          if (e === null) {
+            j++;
+            continue;
+          }
+          let k = j + 1;
+          while (k < length && edge(i, k) === e) k++;
+          (e ? holy : plain).push(seg(i, j, k));
+          j = k;
+        }
+      }
+    };
+    const at = (x: number, y: number) => grid[y * size + x];
+    const kind = (a: number, b: number) => (a === b ? null : a === holyIdx || b === holyIdx);
+    // Bords verticaux entre les colonnes x et x + 1, puis bords horizontaux entre les lignes y et y + 1.
+    runs(size - 1, size, (x, y) => kind(at(x, y), at(x + 1, y)), (x, y0, y1) => [(x + 1) * TILE, y0 * TILE, (x + 1) * TILE, y1 * TILE]);
+    runs(size - 1, size, (y, x) => kind(at(x, y), at(x, y + 1)), (y, x0, x1) => [x0 * TILE, (y + 1) * TILE, x1 * TILE, (y + 1) * TILE]);
+    const stroke = (g: Graphics, segs: number[][], width: number, color: number, alpha: number) => {
+      if (!segs.length) return;
+      for (const [x0, y0, x1, y1] of segs) g.moveTo(x0, y0).lineTo(x1, y1);
+      g.stroke({ width, color, alpha, cap: 'round' });
+    };
+    stroke(near, plain, 7, 0x140e08, 0.28);
+    stroke(near, plain, 3, 0xe0b23c, 0.6);
+    stroke(near, holy, 11, 0x140e08, 0.3);
+    stroke(near, holy, 5, 0xf1cc63, 0.9);
+    stroke(far, plain, 18, 0x140e08, 0.3);
+    stroke(far, plain, 9, 0xe0b23c, 0.65);
+    stroke(far, holy, 26, 0x140e08, 0.3);
+    stroke(far, holy, 14, 0xf1cc63, 0.95);
+    s.request();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid, world.mapSize, ready]);
+
+  // Teinte, halos des bastions et noms : redessinés seulement quand une bannière, un nom ou une couleur change, pas à chaque
+  // rechargement de la carte (toutes les 10 à 30 secondes).
+  const provinceSig =
+    provinces?.provinces
+      .map((p) => `${p.id}|${p.name}|${p.tier}|${p.bonus}|${p.bonusPercent}|${p.holder?.tag ?? ''}|${tribeColor(p.holder?.tribeId, colors) ?? ''}|${+p.controlled}|${p.bastion ? `${p.bastion.x},${p.bastion.y}` : ''}`)
+      .join(';') ?? '';
+  const provincesRef = useRef(provinces);
+  provincesRef.current = provinces;
+  useEffect(() => {
+    const s = scene.current;
+    const provinces = provincesRef.current;
+    if (!s) return;
+    const { fill, halos, labels } = s.provinceLayer;
+    fill.clear();
+    halos.clear();
+    s.halos.clear();
+    s.dotsScale = 0;
     labels.removeChildren().forEach((c) => c.destroy());
-    s.provinceLayer.root.visible = showProvinces;
     if (!grid || !provinces) return s.request();
     const size = world.mapSize;
     const list = provinces.provinces;
-    const holyIdx = list.findIndex((p) => p.kind === 'holy');
     // Teinte : la couleur fixe de la tribu qui tient la bannière (plus marquée une fois la province contrôlée), or pâle pour la Terre sainte.
     const tints = list.map((p) => {
       const c = p.holder ? tribeColor(p.holder.tribeId, colors) : null;
@@ -789,35 +871,18 @@ export default function MapView({ focus }: { focus?: string }) {
         x = end;
       }
     }
-    // Frontières : un segment sur chaque bord de case entre deux provinces ; celles de la Terre sainte plus épaisses.
-    const plain: number[][] = [];
-    const holy: number[][] = [];
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const a = grid[y * size + x];
-        if (x + 1 < size && grid[y * size + x + 1] !== a) {
-          const b = grid[y * size + x + 1];
-          (a === holyIdx || b === holyIdx ? holy : plain).push([(x + 1) * TILE, y * TILE, (x + 1) * TILE, (y + 1) * TILE]);
-        }
-        if (y + 1 < size && grid[(y + 1) * size + x] !== a) {
-          const b = grid[(y + 1) * size + x];
-          (a === holyIdx || b === holyIdx ? holy : plain).push([x * TILE, (y + 1) * TILE, (x + 1) * TILE, (y + 1) * TILE]);
-        }
-      }
+    // Halo derrière le bastion d'une province tenue par votre tribu (bleu), une alliée (bleu ciel) ou un ennemi (rouge) ; rien sinon.
+    for (const p of list) {
+      const halo = p.bastion && p.holder ? bastionHalo(p.holder.tribeId, colors) : null;
+      if (!halo || !p.bastion) continue;
+      const cx = (p.bastion.x + 0.5) * TILE;
+      const cy = (p.bastion.y + 0.6) * TILE;
+      const a = p.controlled ? 1 : 0.7;
+      s.halos.set(`${p.bastion.x},${p.bastion.y}`, { color: halo, alpha: a });
+      halos.circle(cx, cy, TILE * 1.25).fill({ color: halo, alpha: 0.14 * a });
+      halos.circle(cx, cy, TILE * 0.85).fill({ color: halo, alpha: 0.2 * a });
+      halos.circle(cx, cy, TILE * 1.25).stroke({ width: 2, color: halo, alpha: 0.45 * a });
     }
-    const stroke = (g: Graphics, segs: number[][], width: number, color: number, alpha: number) => {
-      if (!segs.length) return;
-      for (const [x0, y0, x1, y1] of segs) g.moveTo(x0, y0).lineTo(x1, y1);
-      g.stroke({ width, color, alpha, cap: 'round' });
-    };
-    stroke(near, plain, 7, 0x140e08, 0.28);
-    stroke(near, plain, 3, 0xe0b23c, 0.6);
-    stroke(near, holy, 11, 0x140e08, 0.3);
-    stroke(near, holy, 5, 0xf1cc63, 0.9);
-    stroke(far, plain, 18, 0x140e08, 0.3);
-    stroke(far, plain, 9, 0xe0b23c, 0.65);
-    stroke(far, holy, 26, 0x140e08, 0.3);
-    stroke(far, holy, 14, 0xf1cc63, 0.95);
     // Noms au centre de chaque province (moyenne de ses cases), avec le bonus ou la bannière.
     const sums = list.map(() => ({ x: 0, y: 0, n: 0 }));
     for (let y = 0; y < size; y++)
@@ -831,14 +896,16 @@ export default function MapView({ focus }: { focus?: string }) {
       const m = sums[i];
       if (!m.n) return;
       const box = new Container();
+      const titleFill = p.kind === 'holy' ? 0xf7d778 : 0xf3e2b3;
       const title = new BitmapText({
         text: p.name.toUpperCase(),
-        style: { fontFamily: 'Cinzel, serif', fontSize: 15, fontWeight: '700', fill: p.kind === 'holy' ? 0xf7d778 : 0xf3e2b3, stroke: { color: 0x140e08, width: 4 }, letterSpacing: 1 },
+        style: s.textStyle(`province-title-${titleFill}`, () => ({ fontFamily: 'Cinzel, serif', fontSize: 15, fontWeight: '700', fill: titleFill, stroke: { color: 0x140e08, width: 4 }, letterSpacing: 1 })),
       });
       title.anchor.set(0.5, 1);
+      const subFill = p.holder ? hexToNum(tribeColor(p.holder.tribeId, colors) ?? '#f3e2b3') : 0xe9dcc0;
       const sub = new BitmapText({
         text: p.holder ? `[${p.holder.tag}]${p.controlled ? '' : ' · bannière'}` : p.kind === 'holy' ? 'Victoire du monde' : `Niveau ${p.tier}${p.bonus ? ` · ${PROVINCE_BONUS_LABEL[p.bonus]} +${p.bonusPercent} %` : ''}`,
-        style: { fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: p.holder ? hexToNum(tribeColor(p.holder.tribeId, colors) ?? '#f3e2b3') : 0xe9dcc0, stroke: { color: 0x140e08, width: 3 } },
+        style: s.textStyle(`province-sub-${subFill}`, () => ({ fontFamily: 'Inter, sans-serif', fontSize: 11, fontWeight: '700', fill: subFill, stroke: { color: 0x140e08, width: 3 } })),
       });
       sub.anchor.set(0.5, 0);
       sub.y = 2;
@@ -847,12 +914,20 @@ export default function MapView({ focus }: { focus?: string }) {
       box.alpha = 0.92;
       labels.addChild(box);
     });
-    s.dotsScale = 0;
     // Échelle des noms selon le zoom actuel.
     const k = Math.min(7, Math.max(1, 0.85 / s.world.scale.x));
     for (const l of labels.children) l.scale.set(k);
     s.request();
-  }, [grid, provinces, colors, showProvinces, world.mapSize, ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid, provinceSig, world.mapSize, ready]);
+
+  useEffect(() => {
+    const s = scene.current;
+    if (!s) return;
+    s.provinceLayer.root.visible = showProvinces;
+    s.dotsScale = 0;
+    s.request();
+  }, [showProvinces, ready]);
 
   // Village choisi et case survolée : un simple calque par-dessus.
   useEffect(() => {
@@ -1117,6 +1192,13 @@ function tribeColor(tribeId: number | null | undefined, ctx: ColorContext): stri
   if (ctx.allies.has(tribeId)) return REL_COLORS.ally;
   if (ctx.wars.has(tribeId)) return REL_COLORS.war;
   return REL_COLORS.other;
+}
+
+/** Couleur du halo d'un bastion : votre tribu, une alliée ou un ennemi (toute autre tribu, en guerre ou non, en rouge vif). */
+function bastionHalo(tribeId: number, ctx: ColorContext): number {
+  if (tribeId === ctx.tribeId) return hexToNum(REL_COLORS.tribe);
+  if (ctx.allies.has(tribeId)) return hexToNum(REL_COLORS.ally);
+  return hexToNum(REL_COLORS.war);
 }
 
 /** Couleur du camp qui tient la bannière de la Citadelle ou d'un bastion, avec les couleurs fixes de la carte (vous, tribu, alliés, guerre, autres). */
