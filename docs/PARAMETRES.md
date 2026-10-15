@@ -212,30 +212,29 @@ Tables : `manager_balance` et `manager_villages.balance` (migration 030). Routes
 
 ## Lettres de noblesse
 
-Chaque noble demande, en plus de son coût en ressources (10 000 bois, 12 000 argile, 12 000 fer, 3 000 blé, dans `shared/src/config.ts`), une lettre de noblesse. Prix dans `shared/src/nobility.ts` (`letterPriceFor`), serveur dans `server/src/game/nobility.ts`. Carte « Lettres de noblesse » de l'hôtel de ville : versement à la cagnotte (`POST /api/villages/:id/treasury`) et frappe (`POST /api/villages/:id/letters`).
+Chaque noble coûte 10 000 bois, 12 000 argile, 12 000 fer et 3 000 blé (`shared/src/config.ts`) et demande des lettres de noblesse frappées. Règle dans `shared/src/nobility.ts` (`lettersRequired`, `freeLetters`, `letterPriceAt`), serveur dans `server/src/game/nobility.ts`. Carte « Lettres de noblesse » de l'hôtel de ville : versement à la cagnotte (`POST /api/villages/:id/treasury`) et frappe (`POST /api/villages/:id/letters`).
 
 | Règle | Valeur |
 |---|---|
+| Lettres nécessaires | Pour recruter un noble, lettres frappées ≥ villages + nobles. Les nobles comptés sont ceux en vie, en route, en renfort, planifiés ou en formation. Recruter n nobles d'un coup demande villages + nobles + n − 1 lettres |
+| Les lettres ne s'usent pas | `players.letters_minted` ne fait que monter. Une conquête ne change rien (le noble s'installe, un village s'ajoute) ; un noble mort ou un recrutement annulé libère sa place |
+| Prix d'une lettre | La lettre n° k coûte le prix de base × (1 + `letterIncrease` % × (k − 1)) : à 100 %, 1, 2, 3, 4… fois le prix de base |
 | Cagnotte | Commune à tout le compte (`players.treasury_wood`, `treasury_clay`, `treasury_iron`), sans plafond. Tout village du joueur peut y verser du bois, de l'argile et du fer, au plus son stock ; un versement ne revient pas au village |
 | Frappe | À l'hôtel de ville niveau 10 (`LETTER_TOWNHALL`), instantanée, 20 lettres au plus d'un coup (`LETTER_BATCH_MAX`), payée par la cagnotte |
-| Prix d'une lettre | Prix de base × (1 + `letterGrowth` %)^(villages − 1). Les nobles d'une même conquête paient donc le même prix, et chaque village gagné renchérit les suivants |
-| Réserve | Commune à tout le compte (`players.noble_letters`), utilisable depuis n'importe quelle caserne ; une lettre par noble |
-| Annulation | Les lettres des nobles pas encore formés reviennent dans la réserve (`recruit_queue.letters`) |
-| Noble mort | Sa lettre est perdue |
 | PNJ | Même règle : avant de recruter des nobles, un PNJ verse à la cagnotte ce qui manque depuis le village puis frappe (`ensureLetters`). S'il ne peut pas tout payer d'un coup, il verse la moitié de son stock utile et recrute moins de nobles |
-| Gestionnaire de compte | Ne verse pas et ne frappe pas : sans lettres en réserve, le noble prévu attend (« Recrutement impossible » au journal) |
+| Gestionnaire de compte | Ne verse pas et ne frappe pas : sans lettre libre, le noble prévu attend (« Recrutement impossible » au journal) |
 
-Coût d'une conquête de 4 nobles (noble + lettre, 25 % par village, vitesse ×1) : environ 340 000 ressources avec 1 village, 620 000 avec 5, 1,6 million avec 10, 13,5 millions avec 20. Pour comparer, un village aux mines de niveau 20 produit environ 69 000 ressources par jour, 122 000 au niveau 25.
+Coût d'un noble qui demande une nouvelle lettre (réglages par défaut) : 53 000 ressources avec la 1re lettre, 69 000 avec la 2e, 117 000 avec la 5e, 197 000 avec la 10e, 357 000 avec la 20e (un joueur à 15 villages et 5 nobles en est là). Un noble mort se remplace au seul prix du noble (37 000). Pour comparer, un village aux mines de niveau 20 produit environ 69 000 ressources par jour à vitesse ×1, 122 000 au niveau 25.
 
 Réglages de l'administration (onglet Monde) :
 
 | Réglage | Défaut | Effet |
 |---|---|---|
 | Lettres de noblesse (`nobleLetters`) | activées | Désactivées : les nobles ne coûtent que leurs ressources, les lettres et la cagnotte sont gardées |
-| Prix d'une lettre (`letterWood`, `letterClay`, `letterIron`) | 15 000 / 18 000 / 15 000 | Ressources payées par la cagnotte pour une lettre avec un seul village (pas de blé) |
-| Hausse du prix par village (`letterGrowth`) | 25 % | ×1,25 au 2e village, ×3 au 6e, ×9 au 11e, ×87 au 21e ; 0 = prix fixe |
+| Prix de base d'une lettre (`letterWood`, `letterClay`, `letterIron`) | 5 000 / 6 000 / 5 000 | Prix de la 1re lettre du joueur, payé par la cagnotte (pas de blé) |
+| Hausse à chaque lettre (`letterIncrease`) | 100 % | Part du prix de base ajoutée à chaque lettre : 100 = 1, 2, 3… fois ; 50 = 1, 1,5, 2… fois ; 0 = prix fixe |
 
-Migrations 034 et 035.
+Migrations 034, 035 et 036 (`letters_minted`, qui reprend les lettres déjà en stock).
 
 ## Succès et badges
 

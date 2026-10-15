@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LETTER_BATCH_MAX, LETTER_TOWNHALL, lettersAffordable, scaleResources, type Resources, type VillageState } from '@aldoria/shared';
+import { LETTER_TOWNHALL, letterFactor, letterPriceAt, lettersAffordable, lettersCost, type Resources, type VillageState } from '@aldoria/shared';
 import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
@@ -11,8 +11,8 @@ type Gift = Record<(typeof TREASURY)[number], string>;
 const NO_GIFT: Gift = { wood: '', clay: '', iron: '' };
 
 /**
- * Carte de l'hôtel de ville : la cagnotte de noblesse, commune à tous les villages du compte, et la frappe des lettres
- * (une par noble) dont le prix monte à chaque village possédé.
+ * Carte de l'hôtel de ville : la cagnotte de noblesse, commune à tous les villages du compte, et la frappe des lettres,
+ * qui doivent couvrir villages + nobles ; chacune renchérit la suivante d'une part du prix de base.
  */
 export default function NobleLetters({ v, res }: { v: VillageState; res: Resources }) {
   const { run, setVillage } = useGame();
@@ -21,7 +21,9 @@ export default function NobleLetters({ v, res }: { v: VillageState; res: Resourc
   const n = v.nobility;
   if (!n.enabled) return null;
   const locked = v.buildings.townhall < LETTER_TOWNHALL;
-  const max = Math.min(LETTER_BATCH_MAX, lettersAffordable(n.treasury, n.price));
+  const max = lettersAffordable(n.treasury, n.base, n.increase, n.minted);
+  const rank = n.minted + 1;
+  const times = (k: number) => letterFactor(k, n.increase).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
   const wanted = Number(count || 0);
   const giving = TREASURY.some((r) => Number(gift[r] || 0) > 0);
 
@@ -40,23 +42,27 @@ export default function NobleLetters({ v, res }: { v: VillageState; res: Resourc
   return (
     <section className="pg-card th-letters">
       <header className="pg-card-head">
-        <CardTitle icon="couronne" count={fmt(n.letters)}>
+        <CardTitle icon="couronne" count={fmt(n.minted)}>
           Lettres de noblesse
         </CardTitle>
       </header>
 
       <div className="th-letters-body">
         <div className="th-letters-stock">
-          <b>{fmt(n.letters)}</b>
-          <span className="muted small">lettre{n.letters > 1 ? 's' : ''} en réserve</span>
+          <b>{fmt(n.free)}</b>
+          <span className="muted small">noble{n.free > 1 ? 's' : ''} recrutable{n.free > 1 ? 's' : ''}</span>
         </div>
         <div className="th-letters-rule">
           <p>
-            Chaque noble demande <b>une lettre</b>, frappée avec la cagnotte que tous vos villages remplissent.
+            Pour recruter un noble, il faut avoir frappé autant de lettres que vos villages et vos nobles réunis :{' '}
+            <b>
+              {n.villages} village{n.villages > 1 ? 's' : ''} + {n.nobles} noble{n.nobles > 1 ? 's' : ''} = {n.villages + n.nobles} lettre{n.villages + n.nobles > 1 ? 's' : ''}
+            </b>
+            . Vous en avez frappé <b>{fmt(n.minted)}</b>.
           </p>
           <p className="muted small">
-            Avec {n.villages} village{n.villages > 1 ? 's' : ''}, une lettre coûte <Cost cost={n.price} />. Après votre prochaine conquête, elle coûtera{' '}
-            <Cost cost={n.nextPrice} /> (+{n.growth} % par village). Un noble mort en route ne rend pas sa lettre.
+            Les lettres ne s’usent pas : un noble mort se recrute sans nouvelle lettre, et une conquête ne change rien (le noble s’installe, un village s’ajoute). Votre prochaine lettre est la n° {rank} : elle coûte <Cost cost={n.price} /> ({times(rank)} fois le prix de base), la suivante{' '}
+            <Cost cost={letterPriceAt(n.base, n.increase, rank + 1)} />.
           </p>
         </div>
       </div>
@@ -71,7 +77,7 @@ export default function NobleLetters({ v, res }: { v: VillageState; res: Resourc
             </span>
           ))}
           <span className="muted small">
-            de quoi frapper {fmt(lettersAffordable(n.treasury, n.price))} lettre{lettersAffordable(n.treasury, n.price) > 1 ? 's' : ''}
+            de quoi frapper {fmt(max)} lettre{max > 1 ? 's' : ''}
           </span>
         </div>
         <div className="th-treasury-give">
@@ -124,7 +130,7 @@ export default function NobleLetters({ v, res }: { v: VillageState; res: Resourc
           </button>
           {wanted > 0 && (
             <span className="muted small">
-              Payé par la cagnotte : <Cost cost={scaleResources(n.price, wanted)} have={n.treasury} />
+              Payé par la cagnotte : <Cost cost={lettersCost(n.base, n.increase, n.minted, wanted)} have={n.treasury} />
             </span>
           )}
         </div>
