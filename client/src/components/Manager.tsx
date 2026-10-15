@@ -75,7 +75,7 @@ function PlanEditor({ plan, onChange }: { plan: ManagerPlan; onChange: (p: Manag
     <div className="stack">
       <div>
         <b>Bâtiments, par ordre de priorité</b>
-        <p className="muted small">Le premier bâtiment qui n'a pas atteint son niveau est monté. Il passe devant les troupes tant que sa part réservée n'est pas réunie. Un prérequis manquant est construit automatiquement.</p>
+        <p className="muted small">Le premier bâtiment qui n'a pas atteint son niveau est monté. Son coût est mis de côté avant les troupes. Un prérequis manquant, ou un entrepôt trop petit pour ce niveau, est construit automatiquement.</p>
         {plan.buildings.map((b, i) => (
           <div className="mgr-row" key={i}>
             <span className="muted">{i + 1}.</span>
@@ -90,7 +90,7 @@ function PlanEditor({ plan, onChange }: { plan: ManagerPlan; onChange: (p: Manag
             <button className="btn small danger" onClick={() => onChange({ ...plan, buildings: plan.buildings.filter((_, k) => k !== i) })} aria-label="Retirer">×</button>
           </div>
         ))}
-        <button className="btn small" disabled={plan.buildings.length >= 40} onClick={() => onChange({ ...plan, buildings: [...plan.buildings, { building: 'farm', level: 10 }] })}>+ Ajouter un bâtiment</button>
+        <button className="btn small" disabled={plan.buildings.length >= 60} onClick={() => onChange({ ...plan, buildings: [...plan.buildings, { building: 'farm', level: 10 }] })}>+ Ajouter un bâtiment</button>
       </div>
       <div>
         <b>Troupes voulues</b>
@@ -105,9 +105,9 @@ function PlanEditor({ plan, onChange }: { plan: ManagerPlan; onChange: (p: Manag
         </div>
       </div>
       <label className="stack">
-        <b>Part du prochain bâtiment utilisable par les troupes : {plan.troopsShare} %</b>
+        <b>Part de la production pour les troupes : {plan.troopsShare} %</b>
         <input type="range" min={0} max={100} step={5} value={plan.troopsShare} onChange={(e) => onChange({ ...plan, troopsShare: Number(e.target.value) })} />
-        <span className="muted small">0 % : bâtiments d'abord, les troupes n'utilisent que l'excédent. 100 % : troupes d'abord. Entre les deux, les troupes peuvent déjà dépenser cette part du coût du bâtiment en attente, ce qui évite qu'elles passent toujours en premier ou jamais.</span>
+        <span className="muted small">0 % : bâtiments d'abord, les troupes n'utilisent que l'excédent. 100 % : troupes d'abord. Entre les deux, les troupes prennent cette part de la production pendant que le bâtiment attend ses ressources : il avance toujours, juste un peu moins vite.</span>
       </label>
     </div>
   );

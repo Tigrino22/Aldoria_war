@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { STARTING_BUILDINGS, buildingCost, emptyUnits } from '@aldoria/shared';
+import { STARTING_BUILDINGS, UNITS, buildingCost, emptyUnits, populationCapacity } from '@aldoria/shared';
 import { buildApp } from '../src/app';
 import { env } from '../src/env';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { processManager } from '../src/manager/engine';
-import { nextBuilding, nextTroopLot, reserveFor, troopBudget } from '../src/manager/rules';
+import { PRESETS, nextBuilding, nextTroopLot, parsePlan, reserveFor, troopBudget } from '../src/manager/rules';
 import { saveSettings } from '../src/settings';
 
 // Identifiants jetables des comptes de test, générés à chaque exécution.
@@ -48,6 +48,32 @@ describe('règles du gestionnaire', () => {
     expect(nextTroopLot({ spearman: 100 }, emptyUnits(), B({ barracks: 1 }), R(0, 0, 0, 0), 1000, 1)).toBeNull();
     expect(nextTroopLot({ spearman: 100 }, emptyUnits(), B({ barracks: 1 }), R(99999, 99999, 99999, 99999), 5, 1)?.count).toBe(5);
     expect(nextTroopLot({ spearman: 100 }, emptyUnits(), B({ barracks: 0 }), R(99999, 99999, 99999, 99999), 1000, 1)).toBeNull();
+  });
+
+  it('les troupes ne prennent sur la réserve du bâtiment que leur part de la production', () => {
+    const stock = R(600, 600, 600, 600);
+    const rates = R(100, 100, 100, 100);
+    // Sans excédent et sans part : rien.
+    expect(nextTroopLot({ spearman: 100 }, emptyUnits(), B({ barracks: 1 }), R(0, 0, 0, 0), 1000, 1, { stock, rates, share: 0 })).toBeNull();
+    // 25 % de 2 h de production = 50 bois : un lancier, puis une pause le temps de rendre cette part.
+    const lot = nextTroopLot({ spearman: 100 }, emptyUnits(), B({ barracks: 1 }), R(0, 0, 0, 0), 1000, 1, { stock, rates, share: 25 });
+    expect(lot?.count).toBe(1);
+    expect(lot?.dipSeconds).toBe(7200);
+    // L'excédent seul ne crée aucune pause.
+    expect(nextTroopLot({ spearman: 10 }, emptyUnits(), B({ barracks: 1 }), R(600, 600, 600, 600), 1000, 1, { stock, rates, share: 25 })?.dipSeconds).toBe(0);
+  });
+
+  it("monte l'entrepôt d'abord quand le niveau visé coûte plus qu'il ne peut contenir", () => {
+    expect(nextBuilding([{ building: 'barracks', level: 15 }], B({ townhall: 3, barracks: 14, warehouse: 8 }))).toEqual({ building: 'warehouse', level: 9 });
+  });
+
+  it('les modèles de départ montent tout le village et remplissent la ferme', () => {
+    for (const p of PRESETS) {
+      expect(parsePlan(p.plan)).toHaveProperty('plan');
+      const pop = Object.entries(p.plan.troops).reduce((n, [u, c]) => n + UNITS[u as keyof typeof UNITS].population * (c ?? 0), 0);
+      expect(pop).toBeLessThanOrEqual(populationCapacity(20));
+      expect(pop).toBeGreaterThan(populationCapacity(20) * 0.95);
+    }
   });
 });
 

@@ -92,7 +92,7 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
   warehouse: {
     name: 'Entrepôt',
     description: 'Augmente le stockage et cache une partie des ressources aux pillards.',
-    maxLevel: 20,
+    maxLevel: 30,
     baseCost: { wood: 60, clay: 50, iron: 40, wheat: 20 },
     costFactor: 1.26,
     baseTime: 400,
@@ -297,8 +297,11 @@ export const ATTACK_WHEAT_PER_POPULATION = 1;
 export const BASE_VILLAGE_DEFENSE = 20;
 /** Bonus de défense par niveau de muraille. */
 export const WALL_BONUS_PER_LEVEL = 0.05;
-/** Part de la capacité de l'entrepôt cachée aux pillards. */
+/** Part de la capacité de l'entrepôt cachée aux pillards, plafonnée à HIDDEN_MAX. */
 export const HIDDEN_SHARE = 0.1;
+export const HIDDEN_MAX = 5000;
+/** Capacité de l'entrepôt au niveau 30 (les niveaux 1 à 20 gardent +23 % par niveau). */
+export const WAREHOUSE_MAX = 500000;
 /** Baisse de loyauté par noble ayant survécu à une attaque victorieuse. */
 export const NOBLE_LOYALTY_MIN = 20;
 export const NOBLE_LOYALTY_MAX = 35;

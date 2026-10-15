@@ -4,7 +4,9 @@ import {
   CANCEL_GRACE_SECONDS,
   CANCEL_REFUND_SHARE,
   Buildings,
+  HIDDEN_MAX,
   HIDDEN_SHARE,
+  WAREHOUSE_MAX,
   MERCHANT_CAPACITY,
   MERCHANT_SPEED,
   POPULATION_BASE,
@@ -82,11 +84,15 @@ export function resourceProduction(level: number): number {
   return Math.round(knee * Math.pow(PRODUCTION_MAX / knee, (level - PRODUCTION_KNEE) / (lastLevel - PRODUCTION_KNEE)));
 }
 
+/** Capacité de l'entrepôt : 1 000 au niveau 1, +23 % par niveau jusqu'au 20, puis +25,6 % environ jusqu'à 500 000 au niveau 30. */
 export function warehouseCapacity(level: number): number {
-  return Math.round(1000 * Math.pow(1.23, Math.max(0, level - 1)));
+  const knee = 1000 * Math.pow(1.23, 19);
+  if (level <= 20) return Math.round(1000 * Math.pow(1.23, Math.max(0, level - 1)));
+  return Math.round(knee * Math.pow(WAREHOUSE_MAX / knee, (Math.min(level, BUILDINGS.warehouse.maxLevel) - 20) / (BUILDINGS.warehouse.maxLevel - 20)));
 }
 
-export const hiddenResources = (warehouseLevel: number) => Math.round(warehouseCapacity(warehouseLevel) * HIDDEN_SHARE);
+/** Ressources cachées aux pillards : 10 % de l'entrepôt, 5 000 au plus. */
+export const hiddenResources = (warehouseLevel: number) => Math.min(HIDDEN_MAX, Math.round(warehouseCapacity(warehouseLevel) * HIDDEN_SHARE));
 
 export function populationOf(units: UnitCounts): number {
   return UNIT_KEYS.reduce((sum, k) => sum + units[k] * UNITS[k].population, 0);
