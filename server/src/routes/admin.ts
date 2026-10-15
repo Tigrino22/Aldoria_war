@@ -6,6 +6,8 @@ import { env } from '../env';
 import { forbidden } from '../errors';
 import { fillNpcWarehouses } from '../game/npc-fill';
 import { worldStats } from '../game/world-stats';
+import { adminPlayerDetail } from '../game/admin-player';
+import { WAR_SCORE_SQL } from '../game/war-stats';
 import { isQuiet } from '../game/npc-rules';
 import { warOverview } from '../game/npc-war-report';
 import { GameError } from '../errors';
@@ -102,15 +104,18 @@ export default async function adminRoutes(app: FastifyInstance) {
     return warOverview(hours);
   });
 
-  /** Joueurs et PNJ : points, villages, dernière connexion. */
+  /** Joueurs et PNJ : points, villages, tribu, guerre, gloire, inscription et dernière connexion. */
   app.get('/api/admin/players', async (req) => {
     await requireAdmin(req);
     const { rows } = await pool.query(
-      `SELECT p.id, p.username, p.is_npc, p.npc_profile, p.created_at, t.tag AS tribe_tag,
+      `SELECT p.id, p.username, p.is_npc, p.npc_profile, p.created_at, t.tag AS tribe_tag, t.name AS tribe_name,
               count(v.id)::int AS villages, coalesce(sum(v.points), 0)::int AS points,
-              p.last_seen_at AS last_seen
+              p.last_seen_at AS last_seen, ${WAR_SCORE_SQL}::int AS war_score,
+              (SELECT coalesce(sum(s.glory), 0)::int FROM crusade_scores s WHERE s.player_id = p.id) AS glory,
+              (SELECT count(*)::int FROM commands cm JOIN villages tv ON tv.id = cm.target_village_id
+                 WHERE NOT cm.processed AND cm.type = 'attack' AND tv.owner_id = p.id) AS attacks_in
        FROM players p LEFT JOIN villages v ON v.owner_id = p.id LEFT JOIN tribes t ON t.id = p.tribe_id
-       GROUP BY p.id, t.tag ORDER BY points DESC, p.id LIMIT 300`,
+       GROUP BY p.id, t.tag, t.name ORDER BY points DESC, p.id LIMIT 500`,
     );
     return rows.map((r) => ({
       id: r.id,
@@ -118,11 +123,22 @@ export default async function adminRoutes(app: FastifyInstance) {
       isNpc: r.is_npc,
       profile: r.npc_profile,
       tribe: r.tribe_tag,
+      tribeName: r.tribe_name,
       villages: r.villages,
       points: r.points,
+      warScore: r.war_score,
+      glory: r.glory,
+      attacksIn: r.attacks_in,
       createdAt: r.created_at,
       lastSeen: r.last_seen,
     }));
+  });
+
+  /** Fiche détaillée d'un joueur ou d'un PNJ (lecture seule). */
+  app.get('/api/admin/players/:id', async (req) => {
+    await requireAdmin(req);
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
+    return adminPlayerDetail(id);
   });
 
   /** Statistiques anonymes : troupes, ressources, bâtiments et activité, sans aucun nom de joueur. */

@@ -6,6 +6,7 @@ import { useGame } from '../game';
 import { Panel } from '../ui';
 import { PageBanner } from './PageBanner';
 import AdminWars from './AdminWars';
+import AdminPlayers from './AdminPlayers';
 import './admin.css';
 
 type Tab = 'npc' | 'wars' | 'players' | 'stats' | 'world';
@@ -25,17 +26,6 @@ interface NpcLog {
   hours: number;
   stats: { npcCount: number; attacks: number; onBarbarians: number; onPlayers: number; scouts: number; offers: number; quietAttacks: number };
   events: NpcEvent[];
-}
-interface AdminPlayer {
-  id: number;
-  username: string;
-  isNpc: boolean;
-  profile: string | null;
-  tribe: string | null;
-  villages: number;
-  points: number;
-  createdAt: string;
-  lastSeen: string | null;
 }
 interface AdminStats {
   villages: number;
@@ -97,12 +87,10 @@ export default function Admin() {
   const [hours, setHours] = useState(24);
   const [kind, setKind] = useState<Kind>('all');
   const [log, setLog] = useState<NpcLog | null>(null);
-  const [players, setPlayers] = useState<AdminPlayer[] | null>(null);
   const [world, setWorld] = useState<AdminWorld | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [settings, setSettings] = useState<AdminSetting[] | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [showNpc, setShowNpc] = useState(true);
   const [fill, setFill] = useState(50);
   const [crusadeIn, setCrusadeIn] = useState(10);
 
@@ -110,7 +98,6 @@ export default function Admin() {
     () =>
       run(async () => {
         if (tab === 'npc') setLog(await api<NpcLog>(`/api/admin/npc?hours=${hours}`));
-        if (tab === 'players') setPlayers(await api<AdminPlayer[]>('/api/admin/players'));
         if (tab === 'stats') setStats(await api<AdminStats>('/api/admin/stats'));
         if (tab === 'world') setWorld(await api<AdminWorld>('/api/admin/world'));
       }),
@@ -260,50 +247,7 @@ export default function Admin() {
 
       {tab === 'wars' && <AdminWars hours={hours} />}
 
-      {tab === 'players' && (
-        <Panel
-          title="Joueurs et PNJ"
-          actions={
-            <label className="small">
-              <input type="checkbox" checked={showNpc} onChange={(e) => setShowNpc(e.target.checked)} /> Afficher les PNJ
-            </label>
-          }
-        >
-          {!players ? (
-            <p className="muted">Chargement…</p>
-          ) : (
-            <div className="admin-scroll">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Pseudo</th>
-                    <th>Tribu</th>
-                    <th>Villages</th>
-                    <th>Points</th>
-                    <th className="hide-m">Dernière activité</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {players
-                    .filter((p) => showNpc || !p.isNpc)
-                    .map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          {p.username}
-                          {p.isNpc && <span className="chip">PNJ{p.profile ? ` · ${p.profile}` : ''}</span>}
-                        </td>
-                        <td>{p.tribe ? `[${p.tribe}]` : '—'}</td>
-                        <td>{p.villages}</td>
-                        <td>{fmt(p.points)}</td>
-                        <td className="t hide-m">{p.isNpc ? '—' : p.lastSeen ? clockTime(p.lastSeen) : 'jamais'}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Panel>
-      )}
+      {tab === 'players' && <AdminPlayers />}
 
       {tab === 'stats' && (
         <>

@@ -131,7 +131,7 @@ const boosted = (rates: Resources, bonus: Resources): Resources =>
 const NO_BONUS: Resources = { wood: 0, clay: 0, iron: 0, wheat: 0 };
 
 /** Bonus de production d'un village : la relique (toutes ressources) et les provinces que contrôle la tribu de son propriétaire. */
-async function productionBonus(c: Db, ownerId: number | null, at: Date): Promise<{ relic: number; province: Resources; total: Resources }> {
+export async function productionBonus(c: Db, ownerId: number | null, at: Date): Promise<{ relic: number; province: Resources; total: Resources }> {
   const relic = await relicBonus(c, ownerId, at);
   const p = await provinceBonuses(c, ownerId, at);
   const province = { wood: p.wood, clay: p.clay, iron: p.iron, wheat: p.wheat };
@@ -150,6 +150,16 @@ function produce(v: VillageRow, from: Date, to: Date, bonus: Resources = NO_BONU
     else v[r] = Math.max(0, next);
   }
 }
+
+/** Estimation des ressources d'un village à l'instant `at`, sans rien enregistrer (constructions en cours ignorées). */
+export function estimateResources(v: VillageRow, at: Date, bonus: Resources = NO_BONUS): Resources {
+  const copy = { ...v, buildings: { ...v.buildings } };
+  produce(copy, new Date(v.resources_at), at, bonus);
+  return resourcesOf(copy);
+}
+
+/** Production horaire d'un village, bonus compris (relique, provinces). */
+export const boostedRates = (buildings: Buildings, bonus: Resources = NO_BONUS): Resources => boosted(productionRates(buildings, env.worldSpeed), bonus);
 
 /**
  * Amène un village à l'instant `at` : production de ressources, constructions terminées,

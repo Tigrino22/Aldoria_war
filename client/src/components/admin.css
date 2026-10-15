@@ -81,3 +81,41 @@
 /* Administration : onglets et période sous la bannière. */
 .app .pg .admin-toolbar { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .app .pg .admin-toolbar .admin-chips { margin: 0; align-items: center; }
+
+/* Administration > Joueurs : liste filtrable et fiche d'un joueur. */
+.app .pg .admin-pl-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.app .pg .admin-pl-tools input[type='search'] { flex: 1 1 200px; min-width: 0; }
+.app .pg .admin-pl-tools .admin-chips { margin: 0; }
+.app .pg .admin-pl-sort { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.app .pg .admin-pl-list tbody tr { cursor: pointer; }
+.app .pg .admin-pl-list tbody tr:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.app .pg .admin-pl-name { white-space: nowrap; }
+.app .pg .admin-pl-back { align-self: flex-start; }
+.app .pg .admin-pl-head { display: flex; flex-direction: column; gap: 12px; }
+.app .pg .admin-pl-id { display: flex; flex-direction: column; gap: 6px; }
+.app .pg .admin-pl-id h2 { margin: 0; font: 700 26px var(--display); color: var(--gold); letter-spacing: 0.02em; }
+.app .pg .admin-pl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.app .pg .admin-kpi small { display: block; font-size: 11px; margin-top: 2px; }
+.app .pg .admin-dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; margin: 0; }
+.app .pg .admin-dl dt { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 2px; }
+.app .pg .admin-dl dd { margin: 0; min-width: 0; }
+.app .pg .admin-pl-total { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 8px 12px; margin-bottom: 10px; border-radius: 10px; background: var(--panel-2); border-left: 3px solid var(--gold); }
+.app .pg .admin-pl-total span, .app .pg .admin-pl-res span { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.app .pg .admin-pl-total i { font-style: normal; font-size: 12px; }
+.app .pg .admin-pl-villages { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.app .pg .admin-pl-village { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); min-width: 0; }
+.app .pg .admin-pl-village header { display: flex; flex-direction: column; gap: 2px; }
+.app .pg .admin-pl-res { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.app .pg .admin-pl-res .full { color: var(--warn); font-weight: 700; }
+.app .pg .admin-pl-reports .t { width: 1%; }
+.app .pg .admin-unread { font-weight: 700; }
+@media (max-width: 640px) {
+  .app .pg .admin-pl-villages { grid-template-columns: 1fr; }
+  .app .pg .admin-dl { grid-template-columns: 1fr; gap: 2px; }
+  .app .pg .admin-dl dd { margin-bottom: 8px; }
+  .app .pg .admin-pl-id h2 { font-size: 22px; }
+  .app .pg .admin-pl-reports tr { display: flex; flex-direction: column; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .app .pg .admin-pl-reports td { border: 0; padding: 0; }
+  .app .pg .admin-pl-reports .t { width: auto; font-size: 12px; }
+}
+.app .pg .admin-kpi-text b { font: 700 17px var(--body); color: var(--ink); }
