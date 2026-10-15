@@ -476,6 +476,8 @@ function PlayerDetail({ id, onBack }: { id: number; onBack: () => void }) {
         )}
       </Panel>
 
+      <PlayerMessages id={d.id} />
+
       <Panel title="Rapports récents">
         {d.reports.length === 0 ? (
           <p className="muted">Aucun rapport.</p>
@@ -493,6 +495,70 @@ function PlayerDetail({ id, onBack }: { id: number; onBack: () => void }) {
         )}
       </Panel>
     </>
+  );
+}
+
+interface AdminMessage {
+  id: number;
+  sent: boolean;
+  from: string | null;
+  to: string | null;
+  subject: string;
+  body: string;
+  read: boolean;
+  at: string;
+}
+
+/** Messages privés du joueur (modération), chargés à l'ouverture de la fiche et sans actualisation automatique. */
+function PlayerMessages({ id }: { id: number }) {
+  const { run } = useGame();
+  const [messages, setMessages] = useState<AdminMessage[] | null>(null);
+  const [box, setBox] = useState<'all' | 'in' | 'out'>('all');
+  const [open, setOpen] = useState<number | null>(null);
+  useEffect(() => {
+    run(async () => setMessages(await api<AdminMessage[]>(`/api/admin/players/${id}/messages`)));
+  }, [run, id]);
+  const shown = (messages ?? []).filter((m) => (box === 'all' ? true : box === 'out' ? m.sent : !m.sent));
+  const boxes: ['all' | 'in' | 'out', string][] = [
+    ['all', 'Tous'],
+    ['in', 'Reçus'],
+    ['out', 'Envoyés'],
+  ];
+  return (
+    <Panel title={`Messages${messages ? ` (${messages.length})` : ''}`} actions={<span className="muted small">Lecture seule · le joueur ne voit rien</span>}>
+      <div className="row admin-chips">
+        {boxes.map(([k, label]) => (
+          <button key={k} className={`chip chip-btn ${box === k ? 'chip-ok' : ''}`} aria-pressed={box === k} onClick={() => setBox(k)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {!messages ? (
+        <p className="muted">Chargement…</p>
+      ) : shown.length === 0 ? (
+        <p className="muted">Aucun message.</p>
+      ) : (
+        <ul className="admin-pl-msgs">
+          {shown.map((m) => (
+            <li key={m.id} className={open === m.id ? 'open' : ''}>
+              <button type="button" aria-expanded={open === m.id} onClick={() => setOpen(open === m.id ? null : m.id)}>
+                <span className={`admin-pl-dir ${m.sent ? 'out' : 'in'}`}>{m.sent ? `→ ${m.to ?? 'compte supprimé'}` : `← ${m.from ?? 'compte supprimé'}`}</span>
+                <b>{m.subject}</b>
+                <span className="t">{clockTime(m.at)}</span>
+              </button>
+              {open === m.id && (
+                <div className="admin-pl-msg-body">
+                  <p className="muted small">
+                    De {m.from ?? 'compte supprimé'} à {m.to ?? 'compte supprimé'} · {m.read ? 'lu' : 'non lu'} par le destinataire
+                  </p>
+                  <p>{m.body}</p>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 

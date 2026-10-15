@@ -141,6 +141,28 @@ export default async function adminRoutes(app: FastifyInstance) {
     return adminPlayerDetail(id);
   });
 
+  /** Messages privés envoyés et reçus par un joueur, pour la modération (lecture seule : l'état « lu » ne change pas). */
+  app.get('/api/admin/players/:id/messages', async (req) => {
+    await requireAdmin(req);
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT m.id, m.from_id, m.subject, m.body, m.read, m.created_at, pf.username AS from_name, pt.username AS to_name
+       FROM messages m LEFT JOIN players pf ON pf.id = m.from_id LEFT JOIN players pt ON pt.id = m.to_id
+       WHERE m.from_id = $1 OR m.to_id = $1 ORDER BY m.created_at DESC, m.id DESC LIMIT 200`,
+      [id],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      sent: r.from_id === id,
+      from: r.from_name,
+      to: r.to_name,
+      subject: r.subject,
+      body: r.body,
+      read: r.read,
+      at: r.created_at,
+    }));
+  });
+
   /** Statistiques anonymes : troupes, ressources, bâtiments et activité, sans aucun nom de joueur. */
   app.get('/api/admin/stats', async (req) => {
     await requireAdmin(req);
