@@ -678,24 +678,30 @@ export default function MapView({ focus }: { focus?: string }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world.mapSize, epoch]);
-  // Centrage initial : sur la case demandée, sinon sur le village actif.
-  const centered = useRef(false);
+  // Centrage initial : sur la case demandée, sinon sur le village actif. Il n'a lieu qu'une fois par cible : les
+  // rechargements de la carte (toutes les 10 ou 30 s) et du village actif ne doivent plus ramener la vue ni rouvrir
+  // la fiche pendant que le joueur se déplace ou agit ailleurs.
+  const centered = useRef<string | null>(null);
+  const picked = useRef<string | null>(null);
   useEffect(() => {
     const s = scene.current;
-    if (!s || !village) return;
-    if (focus) {
-      const [fx, fy] = focus.split(',').map(Number);
-      if (Number.isFinite(fx) && Number.isFinite(fy)) {
-        s.centerOn(fx, fy);
-        const target = villages.find((v) => v.x === fx && v.y === fy);
-        if (target) setSelected(target);
-        centered.current = true;
-        return;
-      }
+    if (!s || !ready) return;
+    const [fx, fy] = (focus ?? '').split(',').map(Number);
+    const target = focus && Number.isFinite(fx) && Number.isFinite(fy) ? focus : null;
+    const key = target ?? '';
+    if (centered.current !== key) {
+      if (target) s.centerOn(fx, fy);
+      else if (village) s.centerOn(village.x, village.y);
+      else return;
+      centered.current = key;
     }
-    if (!centered.current) {
-      s.centerOn(village.x, village.y);
-      centered.current = true;
+    // La fiche de la cible s'ouvre dès que la liste des villages la contient, une seule fois elle aussi.
+    if (target && picked.current !== target) {
+      const found = villages.find((v) => v.x === fx && v.y === fy);
+      if (found) {
+        setSelected(found);
+        picked.current = target;
+      } else if (villages.length) picked.current = target;
     }
   }, [focus, village, villages, ready]);
 
