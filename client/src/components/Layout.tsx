@@ -265,9 +265,16 @@ export default function Layout() {
       for (const load of Object.values(PAGES)) void load();
     });
   }, []);
-  const pageBadge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : path === 'admin' ? (me.openModerationReports ?? 0) + (me.openBugReports ?? 0) : 0);
+  const pageBadge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? (me.newInvites ?? 0) : path === 'inventaire' ? (me.items ?? 0) : path === 'admin' ? (me.openModerationReports ?? 0) + (me.openBugReports ?? 0) : 0);
   /** Pastille d'une entrée du menu : la somme de ses onglets. */
   const badge = (n: NavItem) => pathsOf(n).reduce((sum, p) => sum + pageBadge(p), 0);
+
+  // Ouvrir une page fait disparaître sa pastille : ses notifications sont marquées comme vues côté serveur.
+  const herePath = currentPath(route);
+  const hereBadge = pageBadge(herePath);
+  useEffect(() => {
+    if (hereBadge > 0) void api('/api/me/seen', { method: 'POST', body: { page: herePath } }).then(refreshMe, () => {});
+  }, [herePath, hereBadge, refreshMe]);
 
   if (!me.villages.length) {
     return (
@@ -285,7 +292,7 @@ export default function Layout() {
 
   // L'entrée « Administration » n'existe que pour les pseudos listés côté serveur (ADMIN_USERNAMES).
   const groups = me.isAdmin ? GROUPS.map((g) => (g.title === 'Mon compte' ? { ...g, items: [...g.items, ADMIN_ITEM] } : g)) : GROUPS;
-  const here = currentPath(route);
+  const here = herePath;
   const section = (me.isAdmin ? ALL_ITEMS : ALL_ITEMS.slice(0, -1)).find((n) => pathsOf(n).includes(here));
   // Le bouton « Menu » reprend les pastilles des entrées qui ne sont pas dans la barre du bas.
   const drawerBadge = groups.flatMap((g) => g.items).filter((n) => !TAB_PATHS.includes(n.path)).reduce((sum, n) => sum + badge(n), 0);

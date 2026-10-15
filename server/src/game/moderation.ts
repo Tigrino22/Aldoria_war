@@ -76,10 +76,6 @@ export async function createModerationReport(c: Db, reporterId: number, input: M
   return rows[0].id;
 }
 
-export async function openModerationCount(c: Pick<Db, 'query'>): Promise<number> {
-  return (await c.query("SELECT count(*)::int AS n FROM moderation_reports WHERE status = 'open'")).rows[0].n;
-}
-
 /** Signalements pour l'administration : en attente d'abord (les plus anciens en tête), ou déjà traités (les plus récents en tête). */
 export async function listModerationReports(c: Pick<Db, 'query'>, status: 'open' | 'closed', limit = 200): Promise<ModerationReportView[]> {
   const { rows } = await c.query(

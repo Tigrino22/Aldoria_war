@@ -31,7 +31,9 @@ export interface VillageListItem {
 export interface MeResponse {
   player: PlayerSummary;
   villages: VillageListItem[];
+  /** Rapports non lus arrivés depuis la dernière visite de la page (pastille du menu). */
   unreadReports: number;
+  /** Messages non lus arrivés depuis la dernière visite de la page (pastille du menu). */
   unreadMessages: number;
   /** Objets de l'inventaire pas encore utilisés. */
   items?: number;
@@ -41,6 +43,8 @@ export interface MeResponse {
   openModerationReports?: number;
   /** Bugs en attente dans l'administration (seulement pour un administrateur). */
   openBugReports?: number;
+  /** Invitations de tribu arrivées depuis la dernière visite de la page Tribu (pastille du menu). */
+  newInvites?: number;
   invites: { id: number; tribeId: number; tribeName: string; tribeTag: string }[];
 }
 
