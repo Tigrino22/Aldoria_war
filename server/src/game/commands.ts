@@ -70,11 +70,13 @@ export async function insertCommand(
     merchants?: number;
     sentAt: Date;
     arriveAt: Date;
+    /** Convoi de l'équilibrage automatique : livré sans rapport. */
+    automatic?: boolean;
   },
 ) {
   const { rows } = await c.query(
-    `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, loot, sent_at, arrive_at, merchants)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+    `INSERT INTO commands (type, origin_village_id, target_village_id, home_village_id, player_id, units, loot, sent_at, arrive_at, merchants, automatic)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
     [
       cmd.type,
       cmd.originId,
@@ -86,6 +88,7 @@ export async function insertCommand(
       cmd.sentAt,
       cmd.arriveAt,
       cmd.merchants ?? 0,
+      cmd.automatic ?? false,
     ],
   );
   return rows[0].id as number;
@@ -263,6 +266,7 @@ export async function sendTrade(
   originId: number,
   input: { targetId: number; resources: Resources },
   now: Date,
+  opts: { automatic?: boolean } = {},
 ) {
   const origin = await syncVillage(c, originId, now);
   if (origin.owner_id !== playerId) throw forbidden("Ce village n'est pas à vous");
@@ -291,6 +295,7 @@ export async function sendTrade(
     merchants: needed,
     sentAt: now,
     arriveAt,
+    automatic: opts.automatic,
   });
   outbox.push(playerId, { type: 'village', villageId: origin.id });
   if (target.owner_id !== playerId) outbox.push(target.owner_id, { type: 'village', villageId: target.id });
@@ -324,7 +329,8 @@ async function handleTrade(c: Db, outbox: Outbox, cmd: any) {
     to: { id: target.id, name: target.name, x: target.x, y: target.y, playerName: await playerName(c, target.owner_id) },
     resources: cargo,
   };
-  await createReport(c, outbox, cmd.player_id, 'trade', `Livraison arrivée à ${label(target)}`, data, at);
+  // L'équilibrage automatique livre en silence : son journal est dans le gestionnaire.
+  if (!cmd.automatic) await createReport(c, outbox, cmd.player_id, 'trade', `Livraison arrivée à ${label(target)}`, data, at);
   if (target.owner_id && target.owner_id !== cmd.player_id) {
     await createReport(c, outbox, target.owner_id, 'trade', `${data.from.playerName ?? 'Un joueur'} vous livre des ressources à ${label(target)}`, data, at);
   }
