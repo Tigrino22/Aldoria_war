@@ -77,6 +77,11 @@ export const env = {
   provinceBonus2: count('PROVINCE_BONUS_2', 10),
   provinceBonus3: count('PROVINCE_BONUS_3', 15),
   /** Trésor reçu par chaque membre de la tribu qui prend le contrôle d'une province : part de l'entrepôt remplie (%), 0 = aucun. */
+  nobleLetters: count('NOBLE_LETTERS', 1) > 0 ? 1 : 0,
+  letterWood: count('LETTER_WOOD', 3000),
+  letterClay: count('LETTER_CLAY', 3500),
+  letterIron: count('LETTER_IRON', 3000),
+  letterStep: count('LETTER_STEP', 1),
   achievements: count('ACHIEVEMENTS', 1) > 0 ? 1 : 0,
   achievementScale: count('ACHIEVEMENT_SCALE', 100),
   achievementRewardBronze: count('ACHIEVEMENT_REWARD_BRONZE', 5),

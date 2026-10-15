@@ -44,3 +44,15 @@
   .app .pg .th-stats { grid-template-columns: minmax(0, 1fr); }
   .app .pg .th-stats .th-res-tile { display: none; }
 }
+
+/* Lettres de noblesse : réserve du compte, règle du prochain noble, frappe. */
+.app .pg .th-letters { display: grid; gap: 10px; }
+.app .pg .th-letters-body { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+.app .pg .th-letters-stock {
+  display: grid; justify-items: center; min-width: 110px; padding: 10px 14px; border-radius: 12px;
+  background: radial-gradient(circle at 35% 25%, #fff6dc, #f1dfae 80%); border: 1px solid rgb(167 122 20 / 0.45);
+}
+.app .pg .th-letters-stock b { font: 700 28px var(--display); color: #7a5410; font-variant-numeric: tabular-nums; }
+.app .pg .th-letters-rule { flex: 1 1 280px; min-width: 0; }
+.app .pg .th-letters-rule p { margin: 0 0 4px; }
+.app .pg .th-letters input[type='number'] { width: 110px; }
