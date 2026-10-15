@@ -46,6 +46,8 @@ export interface ModerationReportView {
   targetTribe: { id: number | null; name: string } | null;
   /** Copie du message au moment du signalement. */
   message: { subject: string; body: string } | null;
+  /** Présentation du joueur signalé au moment du signalement (null si elle était vide). */
+  bio: string | null;
   /** Signalements déjà reçus contre la même cible (tous statuts confondus), celui-ci compris. */
   sameTarget: number;
   adminNote: string | null;

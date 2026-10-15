@@ -1,4 +1,5 @@
 import type { ReportTone } from './report-tone';
+import type { ProfileConquest, WarRecord } from './profile';
 import type { BuildingKey, Buildings, Resource, Resources, UnitCounts, UnitKey } from './config';
 
 /** Types échangés entre l'API et le client. */
@@ -306,6 +307,11 @@ export interface PlayerProfile {
   title?: string | null;
   titles?: string[];
   glory?: number;
+  /** Présentation écrite par le joueur (vide s'il n'en a pas). */
+  bio: string;
+  war: WarRecord;
+  /** Dernières conquêtes et pertes de villages, les plus récentes d'abord. */
+  conquests: ProfileConquest[];
 }
 
 /** Offre publique du marché : « je donne X contre Y ». */

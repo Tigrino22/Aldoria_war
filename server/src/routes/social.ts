@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { BUG_DESCRIPTION_MAX, BUG_DESCRIPTION_MIN, CRUSADE_TITLES, MODERATION_COMMENT_MAX, MODERATION_KINDS, MODERATION_REASONS, reportTone, type CrusadeTitleKey, type PlayerProfile } from '@aldoria/shared';
+import { BUG_DESCRIPTION_MAX, BUG_DESCRIPTION_MIN, MODERATION_COMMENT_MAX, MODERATION_KINDS, MODERATION_REASONS, PROFILE_BIO_MAX, reportTone, type PlayerProfile } from '@aldoria/shared';
 import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
@@ -10,6 +10,7 @@ import { declareWar, endWar, tribeWarsView } from '../game/tribe-wars';
 import { tribeHeldBrief, tribeProvincesView } from '../game/provinces';
 import { createBugReport, myBugReports } from '../game/bugs';
 import { createModerationReport } from '../game/moderation';
+import { playerProfile, setBio } from '../game/profile';
 import { env } from '../env';
 import type { Outbox } from '../notify';
 
@@ -417,51 +418,23 @@ export default async function socialRoutes(app: FastifyInstance) {
   app.get('/api/players/:name', async (req) => {
     const viewerId = await requirePlayer(req);
     const { name } = z.object({ name: z.string().trim().min(1).max(60) }).parse(req.params);
-    const p = (
-      await pool.query(
-        `SELECT p.id, p.username, p.is_npc, p.created_at, p.protection_until, p.kills_attack::float8 AS kills_attack, p.kills_defense::float8 AS kills_defense, p.title, t.id AS tribe_id, t.tag, t.name AS tribe_name
-         FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE lower(p.username) = lower($1)`,
-        [name],
-      )
-    ).rows[0];
-    if (!p) throw notFound('Joueur introuvable');
-    const villages = (
-      await pool.query('SELECT id, name, x, y, points FROM villages WHERE owner_id = $1 ORDER BY points DESC, id', [p.id])
-    ).rows;
-    const points = villages.reduce((sum, v) => sum + v.points, 0);
-    const rank = (
-      await pool.query(
-        `SELECT count(*)::int + 1 AS rank FROM (
-           SELECT p2.id, coalesce(sum(v.points), 0) AS pts FROM players p2 LEFT JOIN villages v ON v.owner_id = p2.id GROUP BY p2.id
-         ) s WHERE s.pts > $1`,
-        [points],
-      )
-    ).rows[0].rank as number;
+    const { isNpc, tribeId, ...profile } = await playerProfile(pool, name, new Date());
     // Le chef d'une tribu peut inviter un joueur sans tribu depuis son profil ; seul lui voit ce bouton.
-    let invite: PlayerProfile['invite'] = 'none';
-    if (p.id !== viewerId && !p.is_npc && !p.tribe_id) {
+    if (profile.id !== viewerId && !isNpc && !tribeId) {
       const viewer = await tribeOf(pool, viewerId);
       if (viewer.tribeId && viewer.isLeader) {
-        const pending = (await pool.query('SELECT 1 FROM tribe_invites WHERE tribe_id = $1 AND player_id = $2', [viewer.tribeId, p.id])).rowCount;
-        invite = pending ? 'pending' : 'can';
+        const pending = (await pool.query('SELECT 1 FROM tribe_invites WHERE tribe_id = $1 AND player_id = $2', [viewer.tribeId, profile.id])).rowCount;
+        profile.invite = pending ? 'pending' : 'can';
       }
     }
-    return {
-      id: p.id,
-      username: p.username,
-      invite,
-      createdAt: p.created_at,
-      protected: !!p.protection_until && new Date(p.protection_until) > new Date(),
-      points,
-      rank,
-      killsAttack: p.kills_attack,
-      killsDefense: p.kills_defense,
-      tribe: p.tribe_id ? { id: p.tribe_id, tag: p.tag, name: p.tribe_name } : null,
-      villages,
-      title: p.title ? CRUSADE_TITLES[p.title as CrusadeTitleKey] : null,
-      titles: (await pool.query('SELECT title FROM player_titles WHERE player_id = $1 ORDER BY earned_at', [p.id])).rows.map((r) => CRUSADE_TITLES[r.title as CrusadeTitleKey]).filter(Boolean),
-      glory: (await pool.query('SELECT coalesce(sum(glory), 0)::int AS g FROM crusade_scores WHERE player_id = $1', [p.id])).rows[0].g as number,
-    } satisfies PlayerProfile;
+    return profile satisfies PlayerProfile;
+  });
+
+  /** Présentation du joueur sur son profil (texte vide pour l'effacer). */
+  app.put('/api/me/bio', async (req) => {
+    const playerId = await requirePlayer(req);
+    const { bio } = z.object({ bio: z.string().max(PROFILE_BIO_MAX * 2) }).parse(req.body);
+    return { bio: await setBio(pool, playerId, bio) };
   });
 
   // ---------- Classements ----------

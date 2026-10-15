@@ -11,3 +11,4 @@ export * from './provinces';
 export * from './items';
 export * from './moderation';
 export * from './bugs';
+export * from './profile';
