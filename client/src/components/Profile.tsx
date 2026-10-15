@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { PlayerProfile } from '@aldoria/shared';
+import { PROFILE_BIO_MAX, type PlayerProfile } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame } from '../game';
-import { Panel } from '../ui';
+import { Panel, PlayerLink } from '../ui';
 import { CardTitle, PageBanner } from './PageBanner';
 import ReportButton from './ReportButton';
 import './account.css';
@@ -101,6 +101,16 @@ export default function Profile({ name }: { name: string }) {
           ...(profile.glory ? [{ value: profile.glory, label: 'Gloire des croisades', tone: 'gold' as const }] : []),
         ]}
       />
+      <div className="pf-grid">
+        {(mine || profile.bio) && (
+          <Bio
+            bio={profile.bio}
+            editable={mine}
+            onSaved={(bio) => setProfile({ ...profile, bio })}
+          />
+        )}
+        <WarRecordCard profile={profile} />
+      </div>
       <section className="panel">
         <header className="panel-head">
           <CardTitle icon="village" count={profile.villages.length}>Villages</CardTitle>
@@ -127,5 +137,99 @@ export default function Profile({ name }: { name: string }) {
         )}
       </section>
     </div>
+  );
+}
+
+/** Présentation écrite par le joueur ; il la modifie depuis son propre profil. */
+function Bio({ bio, editable, onSaved }: { bio: string; editable: boolean; onSaved: (bio: string) => void }) {
+  const { run, toast } = useGame();
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const save = () =>
+    run(async () => {
+      const res = await api<{ bio: string }>('/api/me/bio', { method: 'PUT', body: { bio: draft ?? '' } });
+      onSaved(res.bio);
+      setDraft(null);
+      toast('Présentation enregistrée');
+    });
+
+  return (
+    <section className="pg-card pf-bio">
+      <CardTitle icon="compte">Présentation</CardTitle>
+      {draft !== null ? (
+        <div className="stack">
+          <textarea
+            aria-label="Votre présentation"
+            rows={7}
+            maxLength={PROFILE_BIO_MAX}
+            value={draft}
+            placeholder="Votre histoire, vos ambitions, ce que vous cherchez dans une tribu…"
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="row wrap pf-bio-actions">
+            <span className="muted small">
+              {draft.length} / {PROFILE_BIO_MAX}
+            </span>
+            <button className="btn ghost small" onClick={() => setDraft(null)}>
+              Annuler
+            </button>
+            <button className="btn primary small" onClick={save}>
+              Enregistrer
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {bio ? <p className="pf-bio-text">{bio}</p> : <p className="pg-empty">Présentez-vous aux autres seigneurs : ils la liront sur votre profil.</p>}
+          {editable && (
+            <button className="btn small" onClick={() => setDraft(bio)}>
+              {bio ? 'Modifier' : 'Écrire ma présentation'}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Faits d'armes : compteurs de batailles et dernières conquêtes ou pertes de villages. */
+function WarRecordCard({ profile }: { profile: PlayerProfile }) {
+  const w = profile.war;
+  const tiles = [
+    { value: w.conquests, label: 'Villages conquis', tone: 'gold' },
+    { value: w.villagesLost, label: 'Villages perdus', tone: 'red' },
+    { value: w.attackWins, label: 'Attaques gagnées', tone: '' },
+    { value: w.defenseWins, label: 'Défenses tenues', tone: 'sky' },
+  ];
+  return (
+    <section className="pg-card">
+      <CardTitle icon="banniere">Faits d’armes</CardTitle>
+      <div className="pf-war">
+        {tiles.map((t) => (
+          <div key={t.label} className={`pf-war-tile ${t.tone}`}>
+            <b>{fmt(t.value)}</b>
+            <span className="muted small">{t.label}</span>
+          </div>
+        ))}
+      </div>
+      {profile.conquests.length > 0 && (
+        <ul className="pf-conquests">
+          {profile.conquests.map((k, i) => (
+            <li key={i} className={k.won ? 'won' : 'lost'}>
+              <span className="dot" />
+              <span>
+                {k.won ? 'A pris ' : 'A perdu '}
+                <a href={`#/fiche/${k.village.x},${k.village.y}`}>
+                  {k.village.name} ({k.village.x}|{k.village.y})
+                </a>
+                {k.won ? ' à ' : ' contre '}
+                <PlayerLink name={k.other} />
+              </span>
+              <span className="muted small">{clockTime(k.at)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

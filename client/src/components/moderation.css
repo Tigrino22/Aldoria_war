@@ -34,3 +34,4 @@
 .mod-tag.open { border-color: var(--gold); }
 .mod-device { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .bugs .mod-card.open { border-left-color: var(--gold); }
+.mod-message .btn { justify-self: start; margin-top: 4px; }

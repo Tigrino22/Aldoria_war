@@ -82,6 +82,7 @@ function ReportCard({ r, onDecide }: { r: ModerationReportView; onDecide: (id: n
           <p>{r.message.body}</p>
         </div>
       )}
+      {r.bio && <BioCopy playerId={r.targetPlayer?.id ?? null} bio={r.bio} />}
       {r.status === 'open' ? (
         <div className="mod-actions">
           <input
@@ -105,5 +106,32 @@ function ReportCard({ r, onDecide }: { r: ModerationReportView; onDecide: (id: n
         </div>
       )}
     </li>
+  );
+}
+
+/** Présentation du joueur signalé, telle qu'elle était au signalement, avec de quoi l'effacer de son profil. */
+function BioCopy({ playerId, bio }: { playerId: number | null; bio: string }) {
+  const { run, toast } = useGame();
+  const [cleared, setCleared] = useState(false);
+  return (
+    <div className="mod-message">
+      <span className="muted small">Présentation du profil au moment du signalement</span>
+      <p>{bio}</p>
+      {playerId && (
+        <button
+          className="btn small ghost"
+          disabled={cleared}
+          onClick={() =>
+            run(async () => {
+              await api(`/api/admin/players/${playerId}/bio`, { method: 'DELETE' });
+              setCleared(true);
+              toast('Présentation effacée du profil');
+            })
+          }
+        >
+          {cleared ? 'Présentation effacée' : 'Effacer la présentation du profil'}
+        </button>
+      )}
+    </div>
   );
 }

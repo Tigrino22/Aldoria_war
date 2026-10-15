@@ -210,6 +210,19 @@ Page « Gestionnaire de compte », panneau « Équilibrage des ressources ». R�
 
 Tables : `manager_balance` et `manager_villages.balance` (migration 030). Routes : `PUT /api/manager/balance`, champ `balance` de `PUT /api/manager/villages/:id`.
 
+## Profil joueur
+
+Page `#/joueur/<pseudo>`. Serveur : `playerProfile` et `setBio` (`server/src/game/profile.ts`), route `GET /api/players/:name`. Constantes dans `shared/src/profile.ts`.
+
+| Bloc | Règle |
+|---|---|
+| Présentation | Écrite par le joueur depuis son propre profil (`PUT /api/me/bio`) : 500 caractères (`PROFILE_BIO_MAX`) et 8 lignes (`PROFILE_BIO_LINES`) au plus, espaces et lignes vides en trop retirés |
+| Modération | Un signalement d'un joueur recopie sa présentation (colonne `moderation_reports.target_bio`) ; Administration > Signalements peut l'effacer du profil (`DELETE /api/admin/players/:id/bio`), la copie reste dans le signalement |
+| Faits d'armes | Villages conquis, villages perdus, attaques gagnées, défenses tenues (colonnes de `players`, tenues par `recordBattle`) ; batailles entre joueurs seulement, les barbares ne comptent pas |
+| Conquêtes | Les 10 dernières conquêtes ou pertes de villages du joueur (`PROFILE_CONQUESTS`, journal `conquest_log`) |
+
+Migration 032.
+
 ## Fiche d'un village
 
 Page `#/fiche/x,y`, ouverte depuis la carte (« Fiche du village »), les rapports ou le profil d’un joueur. Serveur : `villageSheet` (`server/src/game/village-sheet.ts`), route `GET /api/village-sheet/:x/:y`. Aucun réglage dans l'administration : la fiche ne montre que ce que le joueur sait déjà.

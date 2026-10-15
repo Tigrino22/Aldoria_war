@@ -17,6 +17,7 @@ import { announceCrusade, endCrusade } from '../game/crusades';
 import { refreshNeutralBastions } from '../game/provinces';
 import { listBugReports, resolveBugReport } from '../game/bugs';
 import { listModerationReports, resolveModerationReport } from '../game/moderation';
+import { clearBio } from '../game/profile';
 import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
 /** Réservé aux pseudos listés dans ADMIN_USERNAMES : vérifié à chaque requête, côté serveur. */
@@ -221,6 +222,14 @@ export default async function adminRoutes(app: FastifyInstance) {
       .object({ status: z.enum(['open', 'done', 'rejected']), note: z.string().max(MODERATION_COMMENT_MAX).nullable().optional() })
       .parse(req.body);
     await tx((c) => resolveModerationReport(c, id, admin.name, body.status, body.note ?? null, new Date()));
+    return { ok: true };
+  });
+
+  /** Efface la présentation d'un joueur (signalée comme inappropriée). */
+  app.delete('/api/admin/players/:id/bio', async (req) => {
+    await requireAdmin(req);
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
+    await clearBio(pool, id);
     return { ok: true };
   });
 

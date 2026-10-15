@@ -4,7 +4,7 @@ import { GameError, notFound } from '../errors';
 
 /**
  * Signalements : un joueur signale un joueur, un message qu'il a reçu ou une tribu ; l'administration les traite.
- * Seul le message signalé est recopié dans le signalement : l'administration ne lit jamais la messagerie elle-même.
+ * Seul le message signalé (ou la présentation du joueur signalé) est recopié : l'administration ne lit jamais la messagerie elle-même.
  */
 
 /** Signalements qu'un joueur peut envoyer par période glissante, pour éviter les avalanches. */
@@ -15,14 +15,16 @@ interface Target {
   tribeId: number | null;
   name: string;
   message: { id: number; subject: string; body: string } | null;
+  /** Présentation du joueur visé, recopiée telle qu'elle était au moment du signalement. */
+  bio: string | null;
 }
 
 async function resolveTarget(c: Db, reporterId: number, input: ModerationReportInput): Promise<Target> {
   if (input.kind === 'player') {
-    const p = (await c.query('SELECT id, username, is_npc FROM players WHERE lower(username) = lower($1)', [String(input.target)])).rows[0];
+    const p = (await c.query('SELECT id, username, is_npc, bio FROM players WHERE lower(username) = lower($1)', [String(input.target)])).rows[0];
     if (!p) throw notFound('Joueur introuvable');
     if (p.id === reporterId) throw new GameError('Vous ne pouvez pas vous signaler vous-même');
-    return { playerId: p.id, tribeId: null, name: p.username, message: null };
+    return { playerId: p.id, tribeId: null, name: p.username, message: null, bio: p.bio || null };
   }
   if (input.kind === 'message') {
     // Seul le destinataire peut signaler un message : c'est lui qui choisit de le montrer à l'administration.
@@ -35,11 +37,11 @@ async function resolveTarget(c: Db, reporterId: number, input: ModerationReportI
     ).rows[0];
     if (!m) throw notFound('Message introuvable');
     if (m.from_id === reporterId) throw new GameError('Vous ne pouvez pas signaler votre propre message');
-    return { playerId: m.from_id, tribeId: null, name: m.from_name ?? 'joueur supprimé', message: { id: m.id, subject: m.subject, body: m.body } };
+    return { playerId: m.from_id, tribeId: null, name: m.from_name ?? 'joueur supprimé', message: { id: m.id, subject: m.subject, body: m.body }, bio: null };
   }
   const t = (await c.query('SELECT id, tag, name FROM tribes WHERE id = $1', [Number(input.target)])).rows[0];
   if (!t) throw notFound('Tribu introuvable');
-  return { playerId: null, tribeId: t.id, name: `[${t.tag}] ${t.name}`, message: null };
+  return { playerId: null, tribeId: t.id, name: `[${t.tag}] ${t.name}`, message: null, bio: null };
 }
 
 export async function createModerationReport(c: Db, reporterId: number, input: ModerationReportInput, now: Date): Promise<number> {
@@ -63,11 +65,11 @@ export async function createModerationReport(c: Db, reporterId: number, input: M
 
   const { rows } = await c.query(
     `INSERT INTO moderation_reports (reporter_id, reporter_name, kind, target_player_id, target_tribe_id, target_name,
-                                     message_id, message_subject, message_body, reason, comment, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+                                     message_id, message_subject, message_body, target_bio, reason, comment, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
     [
       reporterId, reporter.username, input.kind, target.playerId, target.tribeId, target.name,
-      target.message?.id ?? null, target.message?.subject ?? null, target.message?.body ?? null,
+      target.message?.id ?? null, target.message?.subject ?? null, target.message?.body ?? null, target.bio,
       input.reason, input.comment?.trim() ?? '', now,
     ],
   );
@@ -101,6 +103,7 @@ export async function listModerationReports(c: Pick<Db, 'query'>, status: 'open'
     targetPlayer: r.kind === 'tribe' ? null : { id: r.target_player_id, name: r.target_name },
     targetTribe: r.kind === 'tribe' ? { id: r.target_tribe_id, name: r.target_name } : null,
     message: r.kind === 'message' ? { subject: r.message_subject ?? '', body: r.message_body ?? '' } : null,
+    bio: r.target_bio,
     sameTarget: Math.max(1, r.same_target),
     adminNote: r.admin_note,
     handledBy: r.handled_by,
