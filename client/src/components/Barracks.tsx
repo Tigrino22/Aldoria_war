@@ -254,9 +254,11 @@ export default function Barracks() {
                 {k === 'noble' && v.nobility.enabled && (
                   <p className={`small ${v.nobility.free >= Math.max(1, n) ? 'muted' : 'warn'}`}>
                     {v.nobility.free > 0
-                      ? `Vos lettres de noblesse permettent ${fmt(v.nobility.free)} noble${v.nobility.free > 1 ? 's' : ''} de plus`
-                      : `Il faut frapper une lettre de noblesse de plus (${v.nobility.villages} village${v.nobility.villages > 1 ? 's' : ''} + ${v.nobility.nobles} noble${v.nobility.nobles > 1 ? 's' : ''}, ${v.nobility.minted} lettre${v.nobility.minted > 1 ? 's' : ''} frappée${v.nobility.minted > 1 ? 's' : ''})`}{' '}:{' '}
-                    <a href="#/hotel">{v.nobility.free > 0 ? "en frapper d’autres" : "la frapper"} à l’hôtel de ville</a>
+                      ? v.nobility.free > 1
+                        ? `Lettres déjà frappées pour ${fmt(v.nobility.free)} nobles`
+                        : 'Lettre déjà frappée pour votre prochain noble'
+                      : `Votre prochain noble demande la lettre n° ${v.nobility.minted + 1}`}{' '}:{' '}
+                    <a href="#/hotel">{v.nobility.free > 0 ? 'en frapper d’autres' : 'la frapper'} à l’hôtel de ville</a>
                   </p>
                 )}
                 {n > 0 && ok && (
