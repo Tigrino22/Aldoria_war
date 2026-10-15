@@ -1152,7 +1152,7 @@ function drawVillage(s: Scene, v: MapVillage, color: string, mine: boolean, mv?:
     c.addChild(halo);
   }
   // Hameau, bourg puis cité fortifiée selon les points du village ; la Citadelle déborde de sa case.
-  const tex = citadel ? s.textures.citadel : bastion ? (v.holy ? s.textures.sanctuary : s.textures.bastion) : !v.ownerId ? s.textures.barbarian : v.points < 120 ? s.textures.village1 : v.points < 600 ? s.textures.village2 : s.textures.village3;
+  const tex = citadel ? s.textures.citadel : bastion ? (v.holy ? s.textures.sanctuary : s.textures.bastion) : !v.ownerId ? s.textures.barbarian : v.points < 80 ? s.textures.village1 : v.points < 500 ? s.textures.village2 : s.textures.village3;
   const sp = new Sprite(tex);
   const scale = citadel ? 1.6 : bastion ? (v.holy ? 1.6 : 1.35) : v.ownerId ? 1.12 : 0.95;
   sp.width = sp.height = TILE * scale;

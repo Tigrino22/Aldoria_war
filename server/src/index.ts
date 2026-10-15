@@ -12,6 +12,7 @@ import { skipIfBusy, withGameLock } from './lock';
 import { processManager } from './manager/engine';
 import { migrate } from './migrate';
 import { loadSettings } from './settings';
+import { recomputeVillagePoints } from './game/village';
 
 async function main() {
   await migrate();
@@ -21,6 +22,7 @@ async function main() {
   await tx((c) => ensureNpcs(c, new Date()));
   await tx((c) => ensureNpcTribes(c, new Date()));
   await tx((c) => assignTriblessNpcs(c));
+  await tx((c) => recomputeVillagePoints(c));
 
   const app = await buildApp({ logger: true });
   await app.listen({ port: env.port, host: '0.0.0.0' });

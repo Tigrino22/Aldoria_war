@@ -9,6 +9,12 @@ import {
   MERCHANT_SPEED,
   POPULATION_BASE,
   POPULATION_GROWTH,
+  PRODUCTION_BASE,
+  PRODUCTION_EMPTY,
+  PRODUCTION_GROWTH,
+  PRODUCTION_KNEE,
+  PRODUCTION_MAX,
+  RESOURCES_PER_POINT,
   ATTACK_WHEAT_PER_POPULATION,
   RESOURCES,
   Resources,
@@ -67,9 +73,13 @@ export function buildingTime(key: BuildingKey, level: number, townhallLevel: num
   return Math.max(1, Math.round(raw / worldSpeed));
 }
 
-/** Production horaire d'un bâtiment de ressource, à vitesse x1. */
+/** Production horaire d'un bâtiment de ressource, à vitesse x1 : +20 % par niveau jusqu'au 20, puis +12 % environ jusqu'à 3 000 au niveau 30. */
 export function resourceProduction(level: number): number {
-  return level <= 0 ? 5 : Math.round(30 * Math.pow(1.2, level - 1));
+  if (level <= 0) return PRODUCTION_EMPTY;
+  const knee = PRODUCTION_BASE * Math.pow(PRODUCTION_GROWTH, PRODUCTION_KNEE - 1);
+  if (level <= PRODUCTION_KNEE) return Math.round(PRODUCTION_BASE * Math.pow(PRODUCTION_GROWTH, level - 1));
+  const lastLevel = BUILDINGS.woodcutter.maxLevel;
+  return Math.round(knee * Math.pow(PRODUCTION_MAX / knee, (level - PRODUCTION_KNEE) / (lastLevel - PRODUCTION_KNEE)));
 }
 
 export function warehouseCapacity(level: number): number {
@@ -114,13 +124,23 @@ export function meetsRequirements(buildings: Buildings, requires: Partial<Buildi
   return Object.entries(requires).every(([k, lvl]) => buildings[k as BuildingKey] >= (lvl ?? 0));
 }
 
-export function villagePoints(buildings: Buildings): number {
-  let points = 0;
-  for (const key of Object.keys(buildings) as BuildingKey[]) {
-    const lvl = buildings[key];
-    points += (lvl * (lvl + 1)) / 2;
+/** Ressources (bois + argile + fer + blé) dépensées pour monter un bâtiment du niveau 0 au niveau `level`. */
+export function buildingInvestment(key: BuildingKey, level: number): number {
+  let total = 0;
+  for (let lvl = 1; lvl <= level; lvl++) {
+    const cost = buildingCost(key, lvl);
+    total += cost.wood + cost.clay + cost.iron + cost.wheat;
   }
-  return points;
+  return total;
+}
+
+/** Points d'un village : proportionnels aux ressources investies dans ses bâtiments (un point pour RESOURCES_PER_POINT). */
+export function villagePoints(buildings: Buildings): number {
+  let invested = 0;
+  for (const key of Object.keys(buildings) as BuildingKey[]) {
+    if (BUILDINGS[key]) invested += buildingInvestment(key, buildings[key] ?? 0);
+  }
+  return Math.round(invested / RESOURCES_PER_POINT);
 }
 
 export function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {

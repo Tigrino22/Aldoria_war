@@ -43,6 +43,7 @@ import {
   populationCapacity,
   ATTACK_WHEAT_PER_POPULATION,
   resourceProduction,
+  RESOURCES_PER_POINT,
   villagePoints,
   wallBonus,
   warehouseCapacity,
@@ -132,7 +133,7 @@ function bonusSummary(key: BuildingKey, speed: number): string {
       key === 'farm'
         ? ` La ferme loge aussi votre armée : chaque soldat occupe des places de population (1 pour un lancier, 4 pour un cavalier). Elle en offre ${fmt(populationCapacity(1))} au niveau 1, soit ${fmt(populationCapacity(1))} lanciers, et ${fmt(populationCapacity(20))} au niveau 20. Chaque attaque emporte aussi ses rations : ${ATTACK_WHEAT_PER_POPULATION} blé par place de population envoyée, rendu si vous annulez.`
         : '';
-    return `Produit ${fmt(resourceProduction(1) * speed)} ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} par heure au niveau 1, ${fmt(resourceProduction(20) * speed)} au niveau 20 (sans bâtiment : ${fmt(resourceProduction(0) * speed)} par heure).${extra}`;
+    return `Produit ${fmt(resourceProduction(1) * speed)} ${RESOURCE_NAMES[RESOURCE_BUILDING[key]!].toLowerCase()} par heure au niveau 1, ${fmt(resourceProduction(20) * speed)} au niveau 20${BUILDINGS[key].maxLevel > 20 ? ` et ${fmt(resourceProduction(BUILDINGS[key].maxLevel) * speed)} au niveau ${BUILDINGS[key].maxLevel}` : ''} (sans bâtiment : ${fmt(resourceProduction(0) * speed)} par heure).${extra}`;
   }
   switch (key) {
     case 'townhall': return 'Chaque niveau au-delà du premier réduit de 5 % la durée de toutes les constructions du village. Il débloque le marché, la caserne et, au niveau 10, le noble.';
@@ -260,7 +261,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           l'{B('claypit')}, la {B('ironmine')} et la {B('farm')} les produisent en continu, même quand vous n'êtes pas connecté.
         </p>
         <p>
-          Un bâtiment de ressource produit {fmt(resourceProduction(1) * s)} par heure au niveau 1 et +20 % par niveau, jusqu'à {fmt(resourceProduction(20) * s)} par heure au niveau 20.
+          Un bâtiment de ressource produit {fmt(resourceProduction(1) * s)} par heure au niveau 1 et +20 % par niveau, jusqu'à {fmt(resourceProduction(20) * s)} par heure au niveau 20. Le {B('woodcutter')}, l'{B('claypit')} et la {B('ironmine')} montent ensuite jusqu'au niveau {BUILDINGS.woodcutter.maxLevel} (+12 % par niveau environ) : {fmt(resourceProduction(BUILDINGS.woodcutter.maxLevel) * s)} par heure au niveau {BUILDINGS.woodcutter.maxLevel}.
         </p>
         <p>
           <b>Le blé</b> sert à construire et à recruter. Il ne nourrit pas l'armée : la taille de vos troupes est limitée par la population que loge votre {B('farm')}.
@@ -276,10 +277,10 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         <p>Touchez un emplacement de la vue du village pour construire ou améliorer un bâtiment. Le coût est payé tout de suite.</p>
         <ul>
           <li>La file de construction accepte {BUILD_QUEUE_LIMIT} chantiers à la fois ; le second commence quand le premier est terminé.</li>
-          <li>Chaque bâtiment monte jusqu'au niveau 20. Le coût est multiplié par 1,25 ou 1,26 et la durée par 1,2 à chaque niveau.</li>
+          <li>Les bâtiments montent jusqu'au niveau 20, sauf les trois mines (niveau {BUILDINGS.woodcutter.maxLevel}) et la {B('barracks')} (niveau {BUILDINGS.barracks.maxLevel}). Le coût est multiplié par 1,25 ou 1,26 et la durée par 1,2 à chaque niveau.</li>
           <li>Chaque niveau d'{B('townhall')} au-delà du premier réduit de 5 % la durée de toutes les constructions.</li>
           <li>Certains bâtiments ont des prérequis : {B('market')} ({requiresText(BUILDINGS.market.requires)}), {B('barracks')} ({requiresText(BUILDINGS.barracks.requires)}), {B('wall')} ({requiresText(BUILDINGS.wall.requires)}).</li>
-          <li>Chaque niveau rapporte des points de classement : le niveau N rapporte N points, donc un bâtiment au niveau N vaut N×(N+1)/2 points (210 au niveau 20).</li>
+          <li>Chaque niveau rapporte des points de classement : un point pour {fmt(RESOURCES_PER_POINT)} ressources dépensées. Les points suivent donc le vrai poids du village, et les derniers niveaux, très chers, en rapportent beaucoup.</li>
           <li>L'aspect du bâtiment change aux niveaux 7 et 14.</li>
         </ul>
         <p>Toutes les valeurs par niveau sont dans les <a href="#/wiki/batiments">fiches des bâtiments</a>.</p>
@@ -633,7 +634,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           <li>La page « Statistiques du monde », dans le menu Social, donne les totaux et moyennes de toute la carte.</li>
         </ul>
         <p>
-          Les points d'un joueur sont la somme des points de ses villages, et ceux d'un village la somme des points de ses bâtiments (un bâtiment au niveau N vaut N×(N+1)/2 points). Le
+          Les points d'un joueur sont la somme des points de ses villages, et ceux d'un village les ressources investies dans ses bâtiments : un point pour {fmt(RESOURCES_PER_POINT)} ressources (bois, argile, fer et blé). Le
           classement des tribus additionne les points de leurs membres.
         </p>
         <p>
@@ -777,7 +778,7 @@ function BuildingSheet({ k }: { k: BuildingKey }) {
           <p>{def.description}</p>
           <p><b>Prérequis :</b> {requiresText(def.requires)}</p>
           <p><b>Bonus :</b> {bonusSummary(k, world.speed)}</p>
-          <p><b>Points :</b> le niveau N rapporte N points ; total au niveau 20 : {pointsAt(k, def.maxLevel)} points.</p>
+          <p><b>Points :</b> un point pour {fmt(RESOURCES_PER_POINT)} ressources dépensées ; total au niveau {def.maxLevel} : {fmt(pointsAt(k, def.maxLevel))} points.</p>
         </div>
       </div>
       {k === 'townhall' ? (
@@ -814,7 +815,7 @@ function BuildingSheet({ k }: { k: BuildingKey }) {
                   {RESOURCES.map((r) => <td key={r}>{fmt(cost[r])}</td>)}
                   <td>{fmt(total(cost))}</td>
                   <td>{duration(buildingTime(k, lvl, th, world.speed))}</td>
-                  <td>{pointsAt(k, lvl)} (+{pointsAt(k, lvl) - pointsAt(k, lvl - 1)})</td>
+                  <td>{fmt(pointsAt(k, lvl))} (+{fmt(pointsAt(k, lvl) - pointsAt(k, lvl - 1))})</td>
                   <td>{bonusAt(k, lvl, world.speed)}</td>
                 </tr>
               );

@@ -52,7 +52,7 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
   woodcutter: {
     name: 'Bûcheron',
     description: 'Produit du bois.',
-    maxLevel: 20,
+    maxLevel: 30,
     baseCost: { wood: 50, clay: 60, iron: 40, wheat: 20 },
     costFactor: 1.25,
     baseTime: 300,
@@ -62,7 +62,7 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
   claypit: {
     name: 'Argilière',
     description: "Produit de l'argile.",
-    maxLevel: 20,
+    maxLevel: 30,
     baseCost: { wood: 65, clay: 50, iron: 40, wheat: 20 },
     costFactor: 1.25,
     baseTime: 300,
@@ -72,7 +72,7 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
   ironmine: {
     name: 'Mine de fer',
     description: 'Produit du fer.',
-    maxLevel: 20,
+    maxLevel: 30,
     baseCost: { wood: 75, clay: 65, iron: 70, wheat: 25 },
     costFactor: 1.25,
     baseTime: 360,
@@ -112,8 +112,8 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
   barracks: {
     name: 'Caserne',
     description: 'Recrute les unités. Plus elle est haute, plus le recrutement est rapide.',
-    maxLevel: 20,
-    baseCost: { wood: 200, clay: 170, iron: 90, wheat: 60 },
+    maxLevel: 25,
+    baseCost: { wood: 195, clay: 170, iron: 90, wheat: 60 },
     costFactor: 1.26,
     baseTime: 900,
     timeFactor: 1.2,
@@ -130,6 +130,19 @@ export const BUILDINGS: Record<BuildingKey, BuildingDef> = {
     requires: { barracks: 1 },
   },
 };
+
+/** Production horaire (vitesse x1) d'un bâtiment de ressource : 30 au niveau 1, +20 % par niveau jusqu'au niveau 20, puis une croissance plus douce jusqu'à PRODUCTION_MAX au niveau 30. */
+export const PRODUCTION_BASE = 30;
+export const PRODUCTION_GROWTH = 1.2;
+/** Niveau jusqu'où la production croît de PRODUCTION_GROWTH par niveau. */
+export const PRODUCTION_KNEE = 20;
+/** Production au niveau maximal des mines (bois, argile, fer). */
+export const PRODUCTION_MAX = 3000;
+/** Production sans bâtiment. */
+export const PRODUCTION_EMPTY = 5;
+
+/** Points de classement : un point pour tant de ressources investies dans les bâtiments du village. */
+export const RESOURCES_PER_POINT = 200;
 
 export const STARTING_BUILDINGS: Buildings = {
   townhall: 1,
