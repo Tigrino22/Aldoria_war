@@ -112,6 +112,16 @@ describe('administration', () => {
     expect(detail.troops.away.spearman).toBe(5);
     expect(detail.troops.queued.swordsman).toBe(10);
     expect(detail.rank.all).toBeGreaterThan(0);
+
+    // Messages privés du joueur pour la modération : envoyés et reçus, sans les marquer comme lus.
+    const curieuxId = (await pool.query("SELECT id FROM players WHERE username = 'Curieux'")).rows[0].id as number;
+    await pool.query("INSERT INTO messages (from_id, to_id, subject, body) VALUES ($1, $2, 'Salut', 'Bonjour'), ($2, $1, 'Re', 'Coucou')", [curieuxId, bossId]);
+    expect((await app.inject({ method: 'GET', url: `/api/admin/players/${curieuxId}/messages`, headers: other })).statusCode).toBe(403);
+    const msgs = (await app.inject({ method: 'GET', url: `/api/admin/players/${curieuxId}/messages`, headers: boss })).json();
+    expect(msgs).toHaveLength(2);
+    expect(msgs.find((m: { sent: boolean }) => m.sent).body).toBe('Bonjour');
+    expect(msgs.find((m: { sent: boolean }) => !m.sent).from).toBe('Patron');
+    expect((await pool.query('SELECT count(*)::int AS n FROM messages WHERE read')).rows[0].n).toBe(0);
   });
 
   it('remplit les entrepôts des PNJ jusqu’à un pourcentage, sans jamais réduire', async () => {
