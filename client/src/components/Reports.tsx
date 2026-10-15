@@ -3,7 +3,7 @@ import { BUILDINGS, BUILDING_KEYS, RELIC_DAYS, RESOURCES, UNIT_KEYS, type Attack
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
 import { useGame, useRoute } from '../game';
-import { PlayerLink, ResIcon, UnitIcon, UnitList } from '../ui';
+import { PlayerLink, ResIcon, UnitIcon, UnitList, VillageLink } from '../ui';
 import { PageBanner } from './PageBanner';
 import './reports.css';
 
@@ -67,18 +67,17 @@ function IntelBlock({ intel }: { intel: Intel }) {
   );
 }
 
-const villageLink = (v: { name: string; x: number; y: number }) => <a href={`#/carte/${v.x},${v.y}`}>{v.name} ({v.x}|{v.y})</a>;
 
 function ScoutReport({ d }: { d: ScoutReportData }) {
   return (
     <div className="stack">
       <p className={`verdict ${d.intel ? 'win' : 'loss'}`}>{d.intel ? 'Espionnage réussi' : "Aucun éclaireur n'est revenu"}</p>
       <h3>
-        Éclaireurs de {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · {villageLink(d.attacker.village)}
+        Éclaireurs de {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <VillageLink v={d.attacker.village} />
       </h3>
       <TroopTable units={d.attacker.units} losses={d.attacker.losses} />
       <h3>
-        Cible : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · {villageLink(d.defender.village)}
+        Cible : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · <VillageLink v={d.defender.village} />
       </h3>
       {d.intel && (
         <>
@@ -95,7 +94,7 @@ function TradeReport({ d }: { d: TradeReportData }) {
   return (
     <div className="stack">
       <p>
-        De {villageLink(d.from)} {d.from.playerName && <span className="muted">(<PlayerLink name={d.from.playerName} />)</span>} vers {villageLink(d.to)}{' '}
+        De <VillageLink v={d.from} /> {d.from.playerName && <span className="muted">(<PlayerLink name={d.from.playerName} />)</span>} vers <VillageLink v={d.to} />{' '}
         {d.to.playerName && <span className="muted">(<PlayerLink name={d.to.playerName} />)</span>}
       </p>
       <ResLine label="Cargaison" res={d.resources} />
@@ -167,11 +166,11 @@ function AttackReport({ d }: { d: AttackReportData }) {
         </p>
       )}
       <h3>
-        {d.field ? 'Intercepteur' : 'Attaquant'} : {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <a href={`#/carte/${d.attacker.village.x},${d.attacker.village.y}`}>{d.attacker.village.name} ({d.attacker.village.x}|{d.attacker.village.y})</a>
+        {d.field ? 'Intercepteur' : 'Attaquant'} : {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <VillageLink v={d.attacker.village} />
       </h3>
       <TroopTable units={d.attacker.units} losses={d.attacker.losses} />
       <h3>
-        {d.field ? 'Armée interceptée' : 'Défenseur'} : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · <a href={`#/carte/${d.defender.village.x},${d.defender.village.y}`}>{d.defender.village.name} ({d.defender.village.x}|{d.defender.village.y})</a>
+        {d.field ? 'Armée interceptée' : 'Défenseur'} : {d.defender.playerName ? <PlayerLink name={d.defender.playerName} /> : 'barbares'} · <VillageLink v={d.defender.village} />
       </h3>
       <TroopTable units={d.defender.units} losses={d.defender.losses} />
       {d.wall !== null && <p>Muraille : niveau {d.wall}</p>}

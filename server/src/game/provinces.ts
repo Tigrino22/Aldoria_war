@@ -202,18 +202,29 @@ export async function refreshNeutralBastions(c: Db) {
 
 // ---------- Géographie ----------
 
-let geoCache: { key: string; ids: number[]; neighbours: Map<number, number[]> } | null = null;
+type Geography = { key: string; ids: number[]; neighbours: Map<number, number[]>; grid: Int16Array };
+let geoCache: Geography | null = null;
 
-/** Voisines de chaque province, calculées une fois à partir des points (la carte ne change pas en cours de partie). */
-async function geography(c: Db): Promise<{ ids: number[]; neighbours: Map<number, number[]> }> {
+/** Découpage et voisines de chaque province, calculés une fois à partir des points (la carte ne change pas en cours de partie). */
+async function geography(c: Pick<Db, 'query'>): Promise<Geography> {
   const rows = (await c.query('SELECT id, x, y, weight FROM provinces ORDER BY id')).rows as ProvinceSeed[];
   const key = `${env.mapSize}:${rows.map((r) => `${r.id},${r.x},${r.y},${r.weight}`).join(';')}`;
   if (geoCache?.key === key) return geoCache;
   const grid = provinceGrid(env.mapSize, rows);
   const sets = provinceNeighbours(grid, env.mapSize, rows.length);
   const neighbours = new Map(rows.map((r, i) => [r.id, [...sets[i]].map((j) => rows[j].id).sort((a, b) => a - b)]));
-  geoCache = { key, ids: rows.map((r) => r.id), neighbours };
+  geoCache = { key, ids: rows.map((r) => r.id), neighbours, grid };
   return geoCache;
+}
+
+/** Province d'une case de la carte (null hors carte ou sans provinces). */
+export async function provinceAt(c: Pick<Db, 'query'>, x: number, y: number): Promise<{ id: number; name: string; holy: boolean } | null> {
+  if (x < 0 || y < 0 || x >= env.mapSize || y >= env.mapSize) return null;
+  const geo = await geography(c);
+  const id = geo.ids[geo.grid[y * env.mapSize + x]];
+  if (id === undefined) return null;
+  const p = (await c.query('SELECT id, name, kind FROM provinces WHERE id = $1', [id])).rows[0];
+  return p ? { id: p.id, name: p.name, holy: p.kind === 'holy' } : null;
 }
 
 async function provinceOfBastion(c: Db, villageId: number, forUpdate = false): Promise<ProvinceRow | null> {

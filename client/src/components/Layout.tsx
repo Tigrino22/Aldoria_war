@@ -34,6 +34,7 @@ const PAGES = {
   WorldWars: () => import('./WorldWars'),
   Admin: () => import('./Admin'),
   BugReport: () => import('./BugReport'),
+  VillageSheet: () => import('./VillageSheet'),
   Raid: () => import('./Raid'),
   Crusade: () => import('./Crusade'),
   Provinces: () => import('./Provinces'),
@@ -54,6 +55,7 @@ const WorldStats = lazy(PAGES.WorldStats);
 const WorldWars = lazy(PAGES.WorldWars);
 const Admin = lazy(PAGES.Admin);
 const BugReport = lazy(PAGES.BugReport);
+const VillageSheet = lazy(PAGES.VillageSheet);
 const Raid = lazy(PAGES.Raid);
 const Crusade = lazy(PAGES.Crusade);
 const Provinces = lazy(PAGES.Provinces);
@@ -331,6 +333,7 @@ export default function Layout() {
           {page === 'gestionnaire' && <Manager />}
           {page === 'admin' && me.isAdmin && <Admin />}
           {page === 'bug' && <BugReport from={lastPage.current} />}
+          {page === 'fiche' && route[1] && <VillageSheet coords={route[1]} />}
           {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
           </Suspense>
         </main>
