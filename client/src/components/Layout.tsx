@@ -81,6 +81,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { path: 'marche/offres', label: 'Offres du marché', icon: 'offres' },
       { path: 'apercu', label: 'Mes villages', icon: 'apercu' },
       { path: 'inventaire', label: 'Inventaire', icon: 'tresor' },
+      { path: 'profil', label: 'Mon profil', icon: 'compte' },
       { path: 'succes', label: 'Succès', icon: 'medaille' },
       { path: 'gestionnaire', label: 'Gestionnaire de compte', icon: 'gestionnaire' },
     ],
@@ -274,7 +275,7 @@ export default function Layout() {
           </button>
         </div>
         <TopResources />
-        <a href="#/compte" className="who">
+        <a href="#/profil" className="who" title="Mon profil">
           <span className="avatar">{me.player.username[0]}</span>
           <span className="who-txt">
             <b>
@@ -327,6 +328,7 @@ export default function Layout() {
           {page === 'rapports' && <Reports id={route[1] ? Number(route[1]) : undefined} />}
           {page === 'messages' && <Messages id={route[1] && route[1] !== 'ecrire' ? Number(route[1]) : undefined} to={route[1] === 'ecrire' && route[2] ? decodeURIComponent(route[2]) : undefined} />}
           {page === 'joueur' && route[1] && <Profile name={decodeURIComponent(route[1])} />}
+          {page === 'profil' && <Profile name={me.player.username} />}
           {page === 'tribu' && <Tribe id={route[1] ? Number(route[1]) : undefined} />}
           {page === 'classement' && <Ranking initial={route[1]} />}
           {page === 'monde' && <WorldStats />}
