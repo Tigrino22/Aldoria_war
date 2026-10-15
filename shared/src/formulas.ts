@@ -11,6 +11,7 @@ import {
   MERCHANT_SPEED,
   POPULATION_BASE,
   POPULATION_GROWTH,
+  FARM_WHEAT_MAX,
   PRODUCTION_BASE,
   PRODUCTION_EMPTY,
   PRODUCTION_GROWTH,
@@ -85,6 +86,13 @@ export function resourceProduction(level: number): number {
 }
 
 /** Capacité de l'entrepôt : 1 000 au niveau 1, +23 % par niveau jusqu'au 20, puis +25,6 % environ jusqu'à 500 000 au niveau 30. */
+/** Blé produit par heure par la ferme, à vitesse x1 : 30 au niveau 1, puis une croissance régulière jusqu'à FARM_WHEAT_MAX au niveau 20. */
+export function wheatProduction(level: number): number {
+  if (level <= 0) return PRODUCTION_EMPTY;
+  const last = BUILDINGS.farm.maxLevel;
+  return Math.round(PRODUCTION_BASE * Math.pow(FARM_WHEAT_MAX / PRODUCTION_BASE, (Math.min(level, last) - 1) / (last - 1)));
+}
+
 export function warehouseCapacity(level: number): number {
   const knee = 1000 * Math.pow(1.23, 19);
   if (level <= 20) return Math.round(1000 * Math.pow(1.23, Math.max(0, level - 1)));
@@ -114,7 +122,7 @@ export function productionRates(buildings: Buildings, worldSpeed: number): Resou
     wood: resourceProduction(buildings.woodcutter) * worldSpeed,
     clay: resourceProduction(buildings.claypit) * worldSpeed,
     iron: resourceProduction(buildings.ironmine) * worldSpeed,
-    wheat: resourceProduction(buildings.farm) * worldSpeed,
+    wheat: wheatProduction(buildings.farm) * worldSpeed,
   };
 }
 

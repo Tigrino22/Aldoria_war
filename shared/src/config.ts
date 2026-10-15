@@ -138,6 +138,8 @@ export const PRODUCTION_GROWTH = 1.2;
 export const PRODUCTION_KNEE = 20;
 /** Production au niveau maximal des mines (bois, argile, fer). */
 export const PRODUCTION_MAX = 3000;
+/** Blé produit par la ferme à son niveau maximal (20) : sa courbe est plus raide que celle des mines, pour suivre leurs 3 000 par heure. */
+export const FARM_WHEAT_MAX = 2000;
 /** Production sans bâtiment. */
 export const PRODUCTION_EMPTY = 5;
 

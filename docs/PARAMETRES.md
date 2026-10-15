@@ -4,7 +4,7 @@ Valeurs à vitesse x1 (le monde local tourne en x10 : production x10, durées /1
 
 ## Production et stockage par niveau (vitesse x1, par heure)
 
-| Niveau | Production (bois, argile, fer, blé) | Entrepôt : capacité max | Cachette anti-pillage |
+| Niveau | Production des mines (bois, argile, fer) | Entrepôt : capacité max | Cachette anti-pillage |
 |---|---|---|---|
 | 0 | 5 | – | – |
 | 1 | 30 | 1 000 | 100 |
@@ -32,7 +32,7 @@ Valeurs à vitesse x1 (le monde local tourne en x10 : production x10, durées /1
 | 29 | 2 676 (mines) | 398 009 | 5 000 |
 | 30 | 3 000 (mines) | 500 000 | 5 000 |
 
-Le bûcheron, l'argilière et la mine de fer montent jusqu'au niveau 30 : +20 % par niveau jusqu'au 20, puis +12 % environ jusqu'à 3 000 par heure au niveau 30. L'entrepôt monte aussi au niveau 30 (500 000) ; la cachette vaut 10 % de sa capacité, 5 000 au plus. La ferme et les autres bâtiments s'arrêtent au niveau 20, la caserne au niveau 25.
+La ferme a sa propre courbe de blé : 30 au niveau 1, environ +25 % par niveau, 2 000 par heure au niveau 20 (`FARM_WHEAT_MAX`) ; le tableau ci-dessus donne la production des mines. Le bûcheron, l'argilière et la mine de fer montent jusqu'au niveau 30 : +20 % par niveau jusqu'au 20, puis +12 % environ jusqu'à 3 000 par heure au niveau 30. L'entrepôt monte aussi au niveau 30 (500 000) ; la cachette vaut 10 % de sa capacité, 5 000 au plus. La ferme et les autres bâtiments s'arrêtent au niveau 20, la caserne au niveau 25.
 
 ## Points des villages
 

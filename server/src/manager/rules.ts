@@ -155,56 +155,49 @@ export function parsePlan(raw: any): { plan: Plan } | { error: string } {
 }
 
 /**
- * Modèles fournis à chaque joueur à sa première visite, réglés par simulation (tools/sim) : économie d'abord (mines, ferme
- * et entrepôt au fil des besoins), caserne assez tôt pour les unités, puis caserne 25 pour recruter vite, enfin mines et
- * entrepôt 30. Ferme 20 pleine : environ 19 500 places de population.
+ * Modèles fournis à chaque joueur à sa première visite, trouvés par recherche locale sur le simulateur (tools/sim/optimize.ts) :
+ * les mines montent très tôt et très haut (la production se cumule), la caserne juste assez pour une garde après la protection
+ * débutant, puis caserne 25 pour remplir la ferme 20 au plus vite (environ 19 500 places de population vers le jour 45 à x1).
  */
 export const PRESETS: { name: string; plan: Plan }[] = [
   {
     name: 'Offensif',
     plan: {
       buildings: [
-        { building: 'woodcutter', level: 3 }, { building: 'claypit', level: 3 }, { building: 'ironmine', level: 3 },
-        { building: 'farm', level: 3 }, { building: 'warehouse', level: 3 }, { building: 'townhall', level: 3 },
-        { building: 'barracks', level: 3 }, { building: 'woodcutter', level: 7 }, { building: 'claypit', level: 7 },
-        { building: 'ironmine', level: 7 }, { building: 'farm', level: 6 }, { building: 'warehouse', level: 7 },
-        { building: 'townhall', level: 5 }, { building: 'barracks', level: 5 }, { building: 'woodcutter', level: 10 },
-        { building: 'claypit', level: 10 }, { building: 'ironmine', level: 10 }, { building: 'farm', level: 10 },
-        { building: 'warehouse', level: 11 }, { building: 'townhall', level: 10 }, { building: 'woodcutter', level: 15 },
-        { building: 'claypit', level: 15 }, { building: 'ironmine', level: 15 }, { building: 'farm', level: 14 },
-        { building: 'warehouse', level: 15 }, { building: 'barracks', level: 15 }, { building: 'woodcutter', level: 20 },
-        { building: 'claypit', level: 20 }, { building: 'ironmine', level: 20 }, { building: 'farm', level: 20 },
-        { building: 'townhall', level: 20 }, { building: 'barracks', level: 25 }, { building: 'warehouse', level: 22 },
-        { building: 'wall', level: 10 }, { building: 'woodcutter', level: 25 }, { building: 'claypit', level: 25 },
-        { building: 'ironmine', level: 25 }, { building: 'warehouse', level: 26 }, { building: 'woodcutter', level: 30 },
-        { building: 'claypit', level: 30 }, { building: 'ironmine', level: 30 }, { building: 'warehouse', level: 30 },
+        { building: 'ironmine', level: 3 }, { building: 'claypit', level: 3 }, { building: 'woodcutter', level: 7 },
+        { building: 'claypit', level: 8 }, { building: 'ironmine', level: 10 }, { building: 'woodcutter', level: 10 },
+        { building: 'warehouse', level: 6 }, { building: 'farm', level: 6 }, { building: 'claypit', level: 13 },
+        { building: 'woodcutter', level: 15 }, { building: 'ironmine', level: 15 }, { building: 'claypit', level: 16 },
+        { building: 'barracks', level: 3 }, { building: 'farm', level: 10 }, { building: 'warehouse', level: 14 },
+        { building: 'woodcutter', level: 19 }, { building: 'claypit', level: 21 }, { building: 'ironmine', level: 21 },
+        { building: 'farm', level: 20 }, { building: 'woodcutter', level: 25 }, { building: 'townhall', level: 8 },
+        { building: 'claypit', level: 28 }, { building: 'ironmine', level: 27 }, { building: 'warehouse', level: 19 },
+        { building: 'wall', level: 18 }, { building: 'woodcutter', level: 30 }, { building: 'warehouse', level: 24 },
+        { building: 'ironmine', level: 30 }, { building: 'claypit', level: 30 }, { building: 'barracks', level: 25 },
+        { building: 'market', level: 20 }, { building: 'townhall', level: 20 }, { building: 'warehouse', level: 30 },
       ],
       troops: { swordsman: 11500, cavalry: 1800, ram: 150, scout: 50 },
-      troopsShare: 15,
+      troopsShare: 5,
     },
   },
   {
     name: 'Défensif',
     plan: {
       buildings: [
-        { building: 'woodcutter', level: 3 }, { building: 'claypit', level: 3 }, { building: 'ironmine', level: 3 },
-        { building: 'farm', level: 3 }, { building: 'warehouse', level: 3 }, { building: 'townhall', level: 3 },
-        { building: 'barracks', level: 4 }, { building: 'woodcutter', level: 7 }, { building: 'claypit', level: 7 },
-        { building: 'ironmine', level: 7 }, { building: 'farm', level: 6 }, { building: 'warehouse', level: 7 },
-        { building: 'wall', level: 5 }, { building: 'townhall', level: 5 }, { building: 'woodcutter', level: 10 },
-        { building: 'claypit', level: 10 }, { building: 'ironmine', level: 10 }, { building: 'farm', level: 10 },
-        { building: 'warehouse', level: 11 }, { building: 'wall', level: 10 }, { building: 'townhall', level: 10 },
-        { building: 'woodcutter', level: 15 }, { building: 'claypit', level: 15 }, { building: 'ironmine', level: 15 },
-        { building: 'farm', level: 14 }, { building: 'warehouse', level: 15 }, { building: 'barracks', level: 12 },
-        { building: 'wall', level: 15 }, { building: 'woodcutter', level: 20 }, { building: 'claypit', level: 20 },
-        { building: 'ironmine', level: 20 }, { building: 'farm', level: 20 }, { building: 'wall', level: 20 },
-        { building: 'townhall', level: 20 }, { building: 'barracks', level: 20 }, { building: 'warehouse', level: 22 },
-        { building: 'barracks', level: 25 }, { building: 'woodcutter', level: 25 }, { building: 'claypit', level: 25 },
-        { building: 'ironmine', level: 25 }, { building: 'warehouse', level: 26 }, { building: 'woodcutter', level: 30 },
-        { building: 'claypit', level: 30 }, { building: 'ironmine', level: 30 }, { building: 'warehouse', level: 30 },
+        { building: 'claypit', level: 4 }, { building: 'woodcutter', level: 7 }, { building: 'ironmine', level: 6 },
+        { building: 'claypit', level: 9 }, { building: 'ironmine', level: 10 }, { building: 'woodcutter', level: 10 },
+        { building: 'warehouse', level: 6 }, { building: 'claypit', level: 11 }, { building: 'farm', level: 6 },
+        { building: 'woodcutter', level: 14 }, { building: 'claypit', level: 16 }, { building: 'ironmine', level: 15 },
+        { building: 'warehouse', level: 15 }, { building: 'farm', level: 14 }, { building: 'woodcutter', level: 20 },
+        { building: 'claypit', level: 21 }, { building: 'wall', level: 11 }, { building: 'ironmine', level: 21 },
+        { building: 'woodcutter', level: 27 }, { building: 'market', level: 2 }, { building: 'warehouse', level: 21 },
+        { building: 'barracks', level: 3 }, { building: 'claypit', level: 30 }, { building: 'farm', level: 20 },
+        { building: 'ironmine', level: 25 }, { building: 'townhall', level: 6 }, { building: 'woodcutter', level: 30 },
+        { building: 'market', level: 20 }, { building: 'townhall', level: 20 }, { building: 'ironmine', level: 30 },
+        { building: 'wall', level: 20 }, { building: 'barracks', level: 25 }, { building: 'warehouse', level: 30 },
       ],
       troops: { spearman: 9500, halberdier: 9900, scout: 250 },
-      troopsShare: 25,
+      troopsShare: 10,
     },
   },
 ];
