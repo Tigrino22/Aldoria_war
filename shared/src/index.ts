@@ -10,3 +10,4 @@ export * from './armies';
 export * from './provinces';
 export * from './items';
 export * from './moderation';
+export * from './bugs';

@@ -33,6 +33,7 @@ const PAGES = {
   WorldStats: () => import('./WorldStats'),
   WorldWars: () => import('./WorldWars'),
   Admin: () => import('./Admin'),
+  BugReport: () => import('./BugReport'),
   Raid: () => import('./Raid'),
   Crusade: () => import('./Crusade'),
   Provinces: () => import('./Provinces'),
@@ -52,6 +53,7 @@ const Wiki = lazy(PAGES.Wiki);
 const WorldStats = lazy(PAGES.WorldStats);
 const WorldWars = lazy(PAGES.WorldWars);
 const Admin = lazy(PAGES.Admin);
+const BugReport = lazy(PAGES.BugReport);
 const Raid = lazy(PAGES.Raid);
 const Crusade = lazy(PAGES.Crusade);
 const Provinces = lazy(PAGES.Provinces);
@@ -105,6 +107,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { path: 'wiki', label: 'Wiki', icon: 'wiki' },
       { path: 'compte', label: 'Mon compte', icon: 'compte' },
+      { path: 'bug', label: 'Signaler un bug', icon: 'bug' },
     ],
   },
 ];
@@ -197,6 +200,11 @@ export default function Layout() {
   const [route, go] = useRoute();
   const page = route[0] ?? 'village';
   const [drawer, setDrawer] = useState(false);
+  // Dernière page visitée avant « Signaler un bug », jointe au bug pour le retrouver.
+  const lastPage = useRef('');
+  useEffect(() => {
+    if (page !== 'bug') lastPage.current = route.join('/');
+  });
   const swipe = useSwipeToClose(() => setDrawer(false));
   useEffect(() => setDrawer(false), [route.join('/')]);
   // Le tiroir se ferme aussi avec la touche Échap.
@@ -213,7 +221,7 @@ export default function Layout() {
       for (const load of Object.values(PAGES)) void load();
     });
   }, []);
-  const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : path === 'admin' ? (me.openModerationReports ?? 0) : 0);
+  const badge = (path: string) => (path === 'rapports' ? me.unreadReports : path === 'messages' ? me.unreadMessages : path === 'tribu' ? me.invites.length : path === 'inventaire' ? (me.items ?? 0) : path === 'admin' ? (me.openModerationReports ?? 0) + (me.openBugReports ?? 0) : 0);
 
   if (!me.villages.length) {
     return (
@@ -322,6 +330,7 @@ export default function Layout() {
           {page === 'apercu' && <Overview />}
           {page === 'gestionnaire' && <Manager />}
           {page === 'admin' && me.isAdmin && <Admin />}
+          {page === 'bug' && <BugReport from={lastPage.current} />}
           {page === 'wiki' && <Wiki section={route[1]} item={route[2]} />}
           </Suspense>
         </main>

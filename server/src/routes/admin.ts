@@ -15,6 +15,7 @@ import { GameError } from '../errors';
 import { act } from '../act';
 import { announceCrusade, endCrusade } from '../game/crusades';
 import { refreshNeutralBastions } from '../game/provinces';
+import { listBugReports, resolveBugReport } from '../game/bugs';
 import { listModerationReports, resolveModerationReport } from '../game/moderation';
 import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
@@ -220,6 +221,23 @@ export default async function adminRoutes(app: FastifyInstance) {
       .object({ status: z.enum(['open', 'done', 'rejected']), note: z.string().max(MODERATION_COMMENT_MAX).nullable().optional() })
       .parse(req.body);
     await tx((c) => resolveModerationReport(c, id, admin.name, body.status, body.note ?? null, new Date()));
+    return { ok: true };
+  });
+
+  /** Bugs remontés par les joueurs : `?status=open` (à traiter) ou `closed` (corrigés ou non retenus). */
+  app.get('/api/admin/bugs', async (req) => {
+    await requireAdmin(req);
+    const { status } = z.object({ status: z.enum(['open', 'closed']).default('open') }).parse(req.query);
+    return listBugReports(pool, status);
+  });
+
+  app.put('/api/admin/bugs/:id', async (req) => {
+    const admin = await requireAdminNamed(req);
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
+    const body = z
+      .object({ status: z.enum(['open', 'fixed', 'rejected']), note: z.string().max(MODERATION_COMMENT_MAX).nullable().optional() })
+      .parse(req.body);
+    await tx((c) => resolveBugReport(c, id, admin.name, body.status, body.note ?? null, new Date()));
     return { ok: true };
   });
 

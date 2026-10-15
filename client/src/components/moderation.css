@@ -26,3 +26,11 @@
 .mod-tag.alert { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .mod-tag.done { border-color: var(--ok); color: var(--ok); }
 @media (max-width: 640px) { .mod-actions input { flex-basis: 100%; } }
+
+/* Bugs (page des joueurs et onglet de l'administration) */
+.mod-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mod-card.fixed { border-left-color: var(--ok); }
+.mod-tag.fixed { border-color: var(--ok); color: var(--ok); }
+.mod-tag.open { border-color: var(--gold); }
+.mod-device { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.bugs .mod-card.open { border-left-color: var(--gold); }

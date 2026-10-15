@@ -8,9 +8,10 @@ import { PageBanner } from './PageBanner';
 import AdminWars from './AdminWars';
 import AdminPlayers from './AdminPlayers';
 import AdminModeration from './AdminModeration';
+import AdminBugs from './AdminBugs';
 import './admin.css';
 
-type Tab = 'moderation' | 'npc' | 'wars' | 'players' | 'stats' | 'world';
+type Tab = 'moderation' | 'bugs' | 'npc' | 'wars' | 'players' | 'stats' | 'world';
 type Kind = 'all' | 'attack' | 'scout' | 'market' | 'quiet';
 
 interface NpcEvent {
@@ -84,9 +85,9 @@ const SETTING_LABEL: Record<string, string> = {
 /** Page d'administration (lecture seule), réservée aux pseudos de ADMIN_USERNAMES. */
 export default function Admin() {
   const { me, run, toast } = useGame();
-  const pending = me.openModerationReports ?? 0;
-  // Des signalements attendent : on arrive directement dessus.
-  const [tab, setTab] = useState<Tab>(pending > 0 ? 'moderation' : 'npc');
+  const pending: Partial<Record<Tab, number>> = { moderation: me.openModerationReports ?? 0, bugs: me.openBugReports ?? 0 };
+  // Des signalements ou des bugs attendent : on arrive directement dessus.
+  const [tab, setTab] = useState<Tab>(pending.moderation ? 'moderation' : pending.bugs ? 'bugs' : 'npc');
   const [hours, setHours] = useState(24);
   const [kind, setKind] = useState<Kind>('all');
   const [log, setLog] = useState<NpcLog | null>(null);
@@ -143,6 +144,7 @@ export default function Admin() {
 
   const tabs: [Tab, string][] = [
     ['moderation', 'Signalements'],
+    ['bugs', 'Bugs'],
     ['npc', 'PNJ'],
     ['wars', 'Guerres'],
     ['players', 'Joueurs'],
@@ -160,13 +162,13 @@ export default function Admin() {
 
   return (
     <div className="pg admin">
-      <PageBanner icon="admin" kicker="Administration" title="Tableau de bord du monde" lead="Signalements, PNJ, guerres, joueurs et réglages du monde · actualisé toutes les 20 s" />
+      <PageBanner icon="admin" kicker="Administration" title="Tableau de bord du monde" lead="Signalements, bugs, PNJ, guerres, joueurs et réglages du monde · actualisé toutes les 20 s" />
       <div className="admin-toolbar">
         <div className="tabs" role="tablist">
           {tabs.map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
               {label}
-              {k === 'moderation' && pending > 0 && <span className="badge-pill">{pending}</span>}
+              {(pending[k] ?? 0) > 0 && <span className="badge-pill">{pending[k]}</span>}
             </button>
           ))}
         </div>
@@ -253,6 +255,8 @@ export default function Admin() {
       {tab === 'wars' && <AdminWars hours={hours} />}
 
       {tab === 'moderation' && <AdminModeration />}
+
+      {tab === 'bugs' && <AdminBugs />}
 
       {tab === 'players' && <AdminPlayers />}
 
