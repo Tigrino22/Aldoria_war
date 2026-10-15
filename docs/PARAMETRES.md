@@ -20,7 +20,23 @@ Valeurs à vitesse x1 (le monde local tourne en x10 : production x10, durées /1
 | 12 | 223 | 9 749 | 975 |
 | 15 | 385 | 18 141 | 1 814 |
 | 18 | 666 | 33 759 | 3 376 |
-| 20 | 958 | 51 074 | 5 107 |
+| 20 | 958 | 51 074 | 5 000 |
+| 21 | 1 074 (mines) | 64 161 | 5 000 |
+| 22 | 1 204 (mines) | 80 603 | 5 000 |
+| 23 | 1 350 (mines) | 101 258 | 5 000 |
+| 24 | 1 513 (mines) | 127 206 | 5 000 |
+| 25 | 1 696 (mines) | 159 802 | 5 000 |
+| 26 | 1 901 (mines) | 200 752 | 5 000 |
+| 27 | 2 130 (mines) | 252 196 | 5 000 |
+| 28 | 2 388 (mines) | 316 822 | 5 000 |
+| 29 | 2 676 (mines) | 398 009 | 5 000 |
+| 30 | 3 000 (mines) | 500 000 | 5 000 |
+
+Le bûcheron, l'argilière et la mine de fer montent jusqu'au niveau 30 : +20 % par niveau jusqu'au 20, puis +12 % environ jusqu'à 3 000 par heure au niveau 30. L'entrepôt monte aussi au niveau 30 (500 000) ; la cachette vaut 10 % de sa capacité, 5 000 au plus. La ferme et les autres bâtiments s'arrêtent au niveau 20, la caserne au niveau 25.
+
+## Points des villages
+
+Un point pour 200 ressources (bois + argile + fer + blé) dépensées dans les bâtiments du village (`RESOURCES_PER_POINT`). Village de départ : 6 points ; tout au niveau 13 : 793 ; tout au niveau 20 : 4 113 ; village maximal (mines et entrepôt 30, caserne 25) : 17 051. Les points sont recalculés au démarrage du serveur.
 
 ## Bâtiments : coût (bois / argile / fer / blé) et durée, vitesse x1, hôtel de ville niveau 1
 

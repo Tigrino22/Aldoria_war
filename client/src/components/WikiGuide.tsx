@@ -4,6 +4,7 @@ import {
   BUILDINGS,
   BUILDING_KEYS,
   BUILD_QUEUE_LIMIT,
+  HIDDEN_MAX,
   HIDDEN_SHARE,
   MERCHANT_CAPACITY,
   NOBLE_LOYALTY_MAX,
@@ -208,7 +209,7 @@ export default function WikiGuide() {
             {fmt(populationCapacity(10))} au niveau 10. Un lancier prend 1 place, un cavalier {UNITS.cavalry.population}, un noble {noble.population}. Si la caserne refuse de recruter, c'est souvent la ferme. Gardez aussi du blé pour vos attaques : chacune emporte {ATTACK_WHEAT_PER_POPULATION} blé par place de population envoyée.
           </li>
           <li>
-            <b>La cachette protège une réserve.</b> {fmt(HIDDEN_SHARE * 100)} % de la capacité de l'entrepôt est invisible pour les pillards ({fmt(hiddenResources(5))} par ressource au niveau 5). Tout le reste
+            <b>La cachette protège une réserve.</b> {fmt(HIDDEN_SHARE * 100)} % de la capacité de l'entrepôt, {fmt(HIDDEN_MAX)} au plus, est invisible pour les pillards ({fmt(hiddenResources(5))} par ressource au niveau 5). Tout le reste
             peut être volé : mieux vaut dépenser que stocker.
           </li>
           <li>

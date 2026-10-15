@@ -7,6 +7,7 @@ import {
   BUILD_QUEUE_LIMIT,
   normalizeUnits,
   populationCapacity,
+  productionRates,
   warehouseCapacity,
   type BuildingKey,
   type Buildings,
@@ -88,12 +89,19 @@ export async function runVillage(c: Db, villageId: number, plan: Plan, now: Date
       for (const k of UNIT_KEYS) owned[k] += u[k];
     }
     const cap = warehouseCapacity(v.buildings.warehouse);
-    const budget = troopBudget(resourcesOf(v), reserveFor(costOf(next), plan.troopsShare, cap));
+    const stock = resourcesOf(v);
+    // Les troupes ont tout ce qui dépasse le coût du prochain bâtiment, plus `troopsShare` % de la production prise sur sa réserve.
+    const budget = troopBudget(stock, reserveFor(costOf(next), 0, cap));
+    const until = (await c.query('SELECT troops_until FROM manager_villages WHERE village_id = $1', [villageId])).rows[0]?.troops_until ?? null;
+    const dip = !until || new Date(until) <= now ? { stock, rates: productionRates(v.buildings, env.worldSpeed), share: plan.troopsShare } : undefined;
     const free = populationCapacity(v.buildings.farm) - (await computePopulation(c, villageId));
-    const lot = nextTroopLot(plan.troops, owned, v.buildings, budget, free, env.worldSpeed);
+    const lot = nextTroopLot(plan.troops, owned, v.buildings, budget, free, env.worldSpeed, dip);
     if (lot) {
       try {
         await enqueueRecruit(c, villageId, lot.unit, lot.count, now);
+        if (lot.dipSeconds > 0) {
+          await c.query('UPDATE manager_villages SET troops_until = $2 WHERE village_id = $1', [villageId, new Date(now.getTime() + lot.dipSeconds * 1000)]);
+        }
         done.push(`${lot.count} ${UNITS[lot.unit].name.toLowerCase()} en recrutement`);
       } catch (err) {
         if (!(err instanceof GameError)) throw err;

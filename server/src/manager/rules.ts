@@ -7,6 +7,7 @@ import {
   buildingCost,
   meetsRequirements,
   recruitTime,
+  warehouseCapacity,
   type BuildingKey,
   type Buildings,
   type Resources,
@@ -32,10 +33,13 @@ export interface Plan {
   troopsShare: number;
 }
 
-/** Durée maximale (en secondes de jeu) d'un lot de recrutement, pour que la file reste réactive. */
+/** Nombre maximum de lignes de bâtiments dans un plan. */
+export const MAX_PLAN_LINES = 60;
+
+/** Durée maximale (en secondes réelles) d'un lot de recrutement, pour que la file reste réactive. */
 export const MAX_LOT_SECONDS = 2 * 3600;
 
-/** Prochain bâtiment à monter : le premier objectif non atteint, en passant par un prérequis manquant s'il le faut. */
+/** Prochain bâtiment à monter : le premier objectif non atteint, en passant par un prérequis manquant ou un entrepôt trop petit s'il le faut. */
 export function nextBuilding(targets: BuildTarget[], levels: Buildings): { building: BuildingKey; level: number } | null {
   const want = (key: BuildingKey, depth = 0): BuildingKey | null => {
     if (depth > 4) return null;
@@ -43,7 +47,11 @@ export function nextBuilding(targets: BuildTarget[], levels: Buildings): { build
     for (const [req, lvl] of Object.entries(def.requires) as [BuildingKey, number][]) {
       if (levels[req] < lvl) return want(req, depth + 1);
     }
-    return levels[key] < def.maxLevel ? key : null;
+    if (levels[key] >= def.maxLevel) return null;
+    // Un niveau plus cher que ce que l'entrepôt peut contenir ne serait jamais payé : l'entrepôt passe d'abord.
+    const cost = buildingCost(key, levels[key] + 1);
+    if (key !== 'warehouse' && Math.max(cost.wood, cost.clay, cost.iron, cost.wheat) > warehouseCapacity(levels.warehouse)) return want('warehouse', depth + 1);
+    return key;
   };
   for (const t of targets) {
     if (levels[t.building] >= Math.min(t.level, BUILDINGS[t.building].maxLevel)) continue;
@@ -70,7 +78,22 @@ export const troopBudget = (stock: Resources, reserve: Resources): Resources => 
   wheat: Math.max(0, stock.wheat - reserve.wheat),
 });
 
-/** Prochain lot de troupes : l'unité la plus en retard sur son objectif, dans la limite du budget, de la ferme et de la durée. */
+/**
+ * Part de la production que les troupes peuvent prendre sur la réserve du prochain bâtiment (`troopsShare`).
+ * `stock` : ressources du village ; `rates` : production horaire réelle.
+ */
+export interface Dip {
+  stock: Resources;
+  rates: Resources;
+  share: number;
+}
+
+/**
+ * Prochain lot de troupes : l'unité la plus en retard sur son objectif, dans la limite du budget, de la ferme et de la durée.
+ * `budget` est ce qui dépasse le coût du prochain bâtiment. Avec `dip`, un lot peut aussi entamer la réserve du bâtiment,
+ * d'au plus `share` % de deux heures de production ; `dipSeconds` dit pendant combien de temps les troupes ne doivent plus
+ * y toucher, pour qu'elles n'en prennent jamais plus que `share` % de la production et que le bâtiment avance toujours.
+ */
 export function nextTroopLot(
   targets: Partial<Record<UnitKey, number>>,
   owned: UnitCounts,
@@ -78,20 +101,32 @@ export function nextTroopLot(
   budget: Resources,
   freePopulation: number,
   worldSpeed: number,
-): { unit: UnitKey; count: number } | null {
-  const lots: { unit: UnitKey; count: number; late: number }[] = [];
+  dip?: Dip,
+): { unit: UnitKey; count: number; dipSeconds: number } | null {
+  const share = dip ? Math.min(100, Math.max(0, dip.share)) / 100 : 0;
+  const allow = (r: (typeof RESOURCES)[number]) =>
+    !dip || share <= 0 ? 0 : Math.max(0, Math.min(dip.stock[r] - budget[r], share * dip.rates[r] * (MAX_LOT_SECONDS / 3600)));
+  const lots: { unit: UnitKey; count: number; late: number; dipSeconds: number }[] = [];
   for (const unit of UNIT_KEYS) {
     const goal = targets[unit] ?? 0;
     const missing = goal - owned[unit];
     const def = UNITS[unit];
     if (missing <= 0 || !meetsRequirements(buildings, def.requires)) continue;
     let count = missing;
-    for (const r of RESOURCES) if (def.cost[r] > 0) count = Math.min(count, Math.floor(budget[r] / def.cost[r]));
+    for (const r of RESOURCES) if (def.cost[r] > 0) count = Math.min(count, Math.floor((budget[r] + allow(r)) / def.cost[r]));
     count = Math.min(count, Math.floor(freePopulation / def.population), Math.floor(MAX_LOT_SECONDS / recruitTime(unit, buildings.barracks, worldSpeed)));
-    if (count >= 1) lots.push({ unit, count, late: missing / goal });
+    if (count < 1) continue;
+    let dipSeconds = 0;
+    if (dip && share > 0) {
+      for (const r of RESOURCES) {
+        const taken = def.cost[r] * count - budget[r];
+        if (taken > 0 && dip.rates[r] > 0) dipSeconds = Math.max(dipSeconds, Math.ceil((taken / (share * dip.rates[r])) * 3600));
+      }
+    }
+    lots.push({ unit, count, late: missing / goal, dipSeconds });
   }
   lots.sort((a, b) => b.late - a.late);
-  return lots[0] ? { unit: lots[0].unit, count: lots[0].count } : null;
+  return lots[0] ? { unit: lots[0].unit, count: lots[0].count, dipSeconds: lots[0].dipSeconds } : null;
 }
 
 export const costOf = (next: { building: BuildingKey; level: number } | null) => (next ? buildingCost(next.building, next.level) : null);
@@ -100,7 +135,7 @@ export const costOf = (next: { building: BuildingKey; level: number } | null) =>
 export function parsePlan(raw: any): { plan: Plan } | { error: string } {
   if (!raw || typeof raw !== 'object') return { error: 'Réglage invalide' };
   const buildings: BuildTarget[] = [];
-  if (!Array.isArray(raw.buildings) || raw.buildings.length > 40) return { error: 'Liste de bâtiments invalide (40 lignes au plus)' };
+  if (!Array.isArray(raw.buildings) || raw.buildings.length > MAX_PLAN_LINES) return { error: `Liste de bâtiments invalide (${MAX_PLAN_LINES} lignes au plus)` };
   for (const b of raw.buildings) {
     if (!BUILDING_KEYS.includes(b?.building)) return { error: 'Bâtiment inconnu' };
     const level = Number(b.level);
@@ -119,32 +154,57 @@ export function parsePlan(raw: any): { plan: Plan } | { error: string } {
   return { plan: { buildings, troops, troopsShare: share } };
 }
 
-/** Modèles fournis à chaque joueur à sa première visite. */
+/**
+ * Modèles fournis à chaque joueur à sa première visite, réglés par simulation (tools/sim) : économie d'abord (mines, ferme
+ * et entrepôt au fil des besoins), caserne assez tôt pour les unités, puis caserne 25 pour recruter vite, enfin mines et
+ * entrepôt 30. Ferme 20 pleine : environ 19 500 places de population.
+ */
 export const PRESETS: { name: string; plan: Plan }[] = [
   {
     name: 'Offensif',
     plan: {
       buildings: [
-        { building: 'farm', level: 8 }, { building: 'warehouse', level: 8 }, { building: 'barracks', level: 10 },
-        { building: 'woodcutter', level: 10 }, { building: 'claypit', level: 10 }, { building: 'ironmine', level: 10 },
-        { building: 'farm', level: 15 }, { building: 'barracks', level: 15 }, { building: 'warehouse', level: 14 },
-        { building: 'farm', level: 20 }, { building: 'barracks', level: 20 },
+        { building: 'woodcutter', level: 3 }, { building: 'claypit', level: 3 }, { building: 'ironmine', level: 3 },
+        { building: 'farm', level: 3 }, { building: 'warehouse', level: 3 }, { building: 'townhall', level: 3 },
+        { building: 'barracks', level: 3 }, { building: 'woodcutter', level: 7 }, { building: 'claypit', level: 7 },
+        { building: 'ironmine', level: 7 }, { building: 'farm', level: 6 }, { building: 'warehouse', level: 7 },
+        { building: 'townhall', level: 5 }, { building: 'barracks', level: 5 }, { building: 'woodcutter', level: 10 },
+        { building: 'claypit', level: 10 }, { building: 'ironmine', level: 10 }, { building: 'farm', level: 10 },
+        { building: 'warehouse', level: 11 }, { building: 'townhall', level: 10 }, { building: 'woodcutter', level: 15 },
+        { building: 'claypit', level: 15 }, { building: 'ironmine', level: 15 }, { building: 'farm', level: 14 },
+        { building: 'warehouse', level: 15 }, { building: 'barracks', level: 15 }, { building: 'woodcutter', level: 20 },
+        { building: 'claypit', level: 20 }, { building: 'ironmine', level: 20 }, { building: 'farm', level: 20 },
+        { building: 'townhall', level: 20 }, { building: 'barracks', level: 25 }, { building: 'warehouse', level: 22 },
+        { building: 'wall', level: 10 }, { building: 'woodcutter', level: 25 }, { building: 'claypit', level: 25 },
+        { building: 'ironmine', level: 25 }, { building: 'warehouse', level: 26 }, { building: 'woodcutter', level: 30 },
+        { building: 'claypit', level: 30 }, { building: 'ironmine', level: 30 }, { building: 'warehouse', level: 30 },
       ],
-      troops: { swordsman: 2000, cavalry: 800, ram: 100, scout: 40 },
-      troopsShare: 30,
+      troops: { swordsman: 11500, cavalry: 1800, ram: 150, scout: 50 },
+      troopsShare: 15,
     },
   },
   {
     name: 'Défensif',
     plan: {
       buildings: [
-        { building: 'farm', level: 10 }, { building: 'warehouse', level: 10 }, { building: 'barracks', level: 8 },
-        { building: 'wall', level: 10 }, { building: 'woodcutter', level: 10 }, { building: 'claypit', level: 10 },
-        { building: 'ironmine', level: 10 }, { building: 'farm', level: 20 }, { building: 'wall', level: 20 },
-        { building: 'warehouse', level: 16 },
+        { building: 'woodcutter', level: 3 }, { building: 'claypit', level: 3 }, { building: 'ironmine', level: 3 },
+        { building: 'farm', level: 3 }, { building: 'warehouse', level: 3 }, { building: 'townhall', level: 3 },
+        { building: 'barracks', level: 4 }, { building: 'woodcutter', level: 7 }, { building: 'claypit', level: 7 },
+        { building: 'ironmine', level: 7 }, { building: 'farm', level: 6 }, { building: 'warehouse', level: 7 },
+        { building: 'wall', level: 5 }, { building: 'townhall', level: 5 }, { building: 'woodcutter', level: 10 },
+        { building: 'claypit', level: 10 }, { building: 'ironmine', level: 10 }, { building: 'farm', level: 10 },
+        { building: 'warehouse', level: 11 }, { building: 'wall', level: 10 }, { building: 'townhall', level: 10 },
+        { building: 'woodcutter', level: 15 }, { building: 'claypit', level: 15 }, { building: 'ironmine', level: 15 },
+        { building: 'farm', level: 14 }, { building: 'warehouse', level: 15 }, { building: 'barracks', level: 12 },
+        { building: 'wall', level: 15 }, { building: 'woodcutter', level: 20 }, { building: 'claypit', level: 20 },
+        { building: 'ironmine', level: 20 }, { building: 'farm', level: 20 }, { building: 'wall', level: 20 },
+        { building: 'townhall', level: 20 }, { building: 'barracks', level: 20 }, { building: 'warehouse', level: 22 },
+        { building: 'barracks', level: 25 }, { building: 'woodcutter', level: 25 }, { building: 'claypit', level: 25 },
+        { building: 'ironmine', level: 25 }, { building: 'warehouse', level: 26 }, { building: 'woodcutter', level: 30 },
+        { building: 'claypit', level: 30 }, { building: 'ironmine', level: 30 }, { building: 'warehouse', level: 30 },
       ],
-      troops: { spearman: 3000, halberdier: 2000, swordsman: 300, scout: 30 },
-      troopsShare: 30,
+      troops: { spearman: 9500, halberdier: 9900, scout: 250 },
+      troopsShare: 25,
     },
   },
 ];

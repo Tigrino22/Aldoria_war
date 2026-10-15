@@ -8,6 +8,7 @@ import {
   BUILDINGS,
   BUILDING_KEYS,
   BUILD_QUEUE_LIMIT,
+  HIDDEN_MAX,
   HIDDEN_SHARE,
   LOYALTY_AFTER_CONQUEST,
   LOYALTY_REGEN_PER_HOUR,
@@ -137,7 +138,7 @@ function bonusSummary(key: BuildingKey, speed: number): string {
   }
   switch (key) {
     case 'townhall': return 'Chaque niveau au-delà du premier réduit de 5 % la durée de toutes les constructions du village. Il débloque le marché, la caserne et, au niveau 10, le noble.';
-    case 'warehouse': return `Fixe la quantité maximale de chaque ressource. Au-delà, la production est perdue. ${pct(HIDDEN_SHARE)} de la capacité est cachée : les pillards ne peuvent pas la prendre.`;
+    case 'warehouse': return `Fixe la quantité maximale de chaque ressource. Au-delà, la production est perdue. ${pct(HIDDEN_SHARE)} de la capacité est cachée, ${fmt(HIDDEN_MAX)} au plus : les pillards ne peuvent pas la prendre.`;
     case 'market': return `Donne des marchands qui portent chacun ${fmt(MERCHANT_CAPACITY)} ressources vers d'autres villages de joueurs.`;
     case 'barracks': return "Permet de recruter les troupes. Chaque niveau au-delà du premier réduit de 6 % la durée de recrutement et débloque de nouvelles unités.";
     case 'wall': return `Chaque niveau ajoute ${pct(WALL_BONUS_PER_LEVEL)} à la défense de toutes les troupes présentes dans le village, renforts compris.`;
@@ -267,8 +268,8 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           <b>Le blé</b> sert à construire et à recruter. Il ne nourrit pas l'armée : la taille de vos troupes est limitée par la population que loge votre {B('farm')}.
         </p>
         <p>
-          <b>Stockage :</b> l'{B('warehouse')} fixe le maximum de chaque ressource ({fmt(warehouseCapacity(1))} au niveau 1, {fmt(warehouseCapacity(20))} au niveau 20). Une ressource pleine ne produit plus, tout ce qui
-          dépasse (production, butin, livraison) est perdu. {pct(HIDDEN_SHARE)} de cette capacité est cachée et ne peut pas être pillée.
+          <b>Stockage :</b> l'{B('warehouse')} fixe le maximum de chaque ressource ({fmt(warehouseCapacity(1))} au niveau 1, {fmt(warehouseCapacity(20))} au niveau 20, {fmt(warehouseCapacity(BUILDINGS.warehouse.maxLevel))} au niveau {BUILDINGS.warehouse.maxLevel}). Une ressource pleine ne produit plus, tout ce qui
+          dépasse (production, butin, livraison) est perdu. {pct(HIDDEN_SHARE)} de cette capacité, {fmt(HIDDEN_MAX)} au plus, est cachée et ne peut pas être pillée.
         </p>
       </>
     ),
@@ -277,7 +278,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         <p>Touchez un emplacement de la vue du village pour construire ou améliorer un bâtiment. Le coût est payé tout de suite.</p>
         <ul>
           <li>La file de construction accepte {BUILD_QUEUE_LIMIT} chantiers à la fois ; le second commence quand le premier est terminé.</li>
-          <li>Les bâtiments montent jusqu'au niveau 20, sauf les trois mines (niveau {BUILDINGS.woodcutter.maxLevel}) et la {B('barracks')} (niveau {BUILDINGS.barracks.maxLevel}). Le coût est multiplié par 1,25 ou 1,26 et la durée par 1,2 à chaque niveau.</li>
+          <li>Les bâtiments montent jusqu'au niveau 20, sauf les trois mines et l'{B('warehouse')} (niveau {BUILDINGS.woodcutter.maxLevel}) et la {B('barracks')} (niveau {BUILDINGS.barracks.maxLevel}). Le coût est multiplié par 1,25 ou 1,26 et la durée par 1,2 à chaque niveau.</li>
           <li>Chaque niveau d'{B('townhall')} au-delà du premier réduit de 5 % la durée de toutes les constructions.</li>
           <li>Certains bâtiments ont des prérequis : {B('market')} ({requiresText(BUILDINGS.market.requires)}), {B('barracks')} ({requiresText(BUILDINGS.barracks.requires)}), {B('wall')} ({requiresText(BUILDINGS.wall.requires)}).</li>
           <li>Chaque niveau rapporte des points de classement : un point pour {fmt(RESOURCES_PER_POINT)} ressources dépensées. Les points suivent donc le vrai poids du village, et les derniers niveaux, très chers, en rapportent beaucoup.</li>
@@ -685,36 +686,36 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
         </ul>
         <p><b>Les modèles</b></p>
         <p>
-          Un modèle est un réglage que vous pouvez appliquer à plusieurs villages. Deux modèles vous sont donnés au départ, « Offensif » (épéistes, cavaliers, béliers, éclaireurs) et « Défensif »
-          (lanciers, hallebardiers, muraille haute). Vous pouvez les modifier, en créer d'autres (10 au maximum) ou les supprimer. Un modèle contient :
+          Un modèle est un réglage que vous pouvez appliquer à plusieurs villages. Deux modèles vous sont donnés au départ, réglés pour faire grandir le village le plus vite possible puis remplir toute la
+          ferme : « Offensif » (épéistes, cavaliers, béliers, éclaireurs) et « Défensif » (lanciers, hallebardiers, muraille 20). Vous pouvez les modifier, en créer d'autres (10 au maximum) ou les supprimer. Un modèle contient :
         </p>
         <ul>
           <li>
             <b>Une liste de bâtiments, par ordre de priorité,</b> chacun avec son niveau cible. Le gestionnaire monte le premier bâtiment de la liste qui n'a pas atteint son niveau. Un même bâtiment peut
             revenir plusieurs fois (par exemple ferme 8, caserne 10, puis ferme 20). Si un prérequis manque (une {B('barracks')} pour la {B('wall')}, un {B('townhall')} assez haut…), il construit d'abord
-            le prérequis.
+            le prérequis, et l'{B('warehouse')} si le niveau coûte plus que ce qu'il peut contenir.
           </li>
           <li>
             <b>Un effectif voulu par unité.</b> Les troupes déjà au village, en déplacement et en cours de recrutement comptent dans l'effectif. Le gestionnaire recrute celles qui sont le plus en retard
             sur leur objectif, par lots d'au plus deux heures de recrutement, pour que la file reste réactive. Il demande une {B('barracks')} et les prérequis de chaque unité, comme à la main.
           </li>
           <li>
-            <b>Le curseur « part du prochain bâtiment utilisable par les troupes »</b> (voir plus bas).
+            <b>Le curseur « part de la production pour les troupes »</b> (voir plus bas).
           </li>
         </ul>
         <p><b>Bâtiments ou troupes : qui passe d'abord ?</b></p>
         <p>
           Un bâtiment coûte presque toujours bien plus cher que quelques soldats. Sans précaution, les troupes dépenseraient tout dès qu'elles le peuvent et le bâtiment n'aurait jamais ses ressources. Le
-          gestionnaire met donc de côté le coût du prochain bâtiment, et les troupes n'utilisent que le reste. Le curseur règle la part de ce coût qui reste accessible aux troupes :
+          gestionnaire met donc de côté le coût du prochain bâtiment, et les troupes utilisent le reste. Le curseur règle la part de la production que les troupes peuvent quand même prendre sur cette réserve :
         </p>
         <ul>
           <li><b>0 %</b> : bâtiments d'abord. Les troupes n'utilisent que l'excédent, donc rien ne part tant que le bâtiment n'est pas payé.</li>
-          <li><b>30 %</b> (réglage des deux modèles de départ) : un compromis, les troupes avancent déjà pendant que le bâtiment se prépare.</li>
+          <li><b>15 à 25 %</b> (Offensif 15 %, Défensif 25 %) : les troupes avancent déjà pendant que le bâtiment se prépare, et le bâtiment arrive toujours, avec seulement un peu de retard.</li>
           <li><b>100 %</b> : troupes d'abord, rien n'est réservé pour les bâtiments.</li>
         </ul>
         <p>
           Quand un bâtiment attend ses ressources, le gestionnaire ne passe jamais au suivant : sinon les petits bâtiments mangeraient tout et les gros ne seraient jamais construits. Le message « en
-          attente » de « Mes villages » vous dit ce qui manque. Si le coût d'un bâtiment dépasse la capacité de l'{B('warehouse')}, rien n'est réservé pour lui : montez l'entrepôt plus haut dans la liste.
+          attente » de « Mes villages » vous dit ce qui manque. Si le coût d'un bâtiment dépasse la capacité de l'{B('warehouse')}, l'entrepôt est monté d'abord.
         </p>
         <p><b>Types de village</b></p>
         <p>
