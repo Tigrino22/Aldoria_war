@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { emptyUnits, STARTING_BUILDINGS } from '@aldoria/shared';
+import { emptyUnits, STARTING_BUILDINGS, totalUnits } from '@aldoria/shared';
 import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
@@ -139,6 +139,12 @@ describe('jeu', () => {
     expect(owner.loyalty).toBe(25);
     const defenderReport = (await pool.query("SELECT title FROM reports WHERE player_id = $1 ORDER BY id DESC LIMIT 1", [defender])).rows[0];
     expect(defenderReport.title).toMatch(/conquis/);
+
+    // L'escorte du noble reste en renfort dans le village conquis : elle appartient toujours au village attaquant.
+    expect(totalUnits(await tx((c) => getTroops(c, target, target)))).toBe(0);
+    const escort = await tx((c) => getTroops(c, target, home));
+    expect(escort.swordsman).toBeGreaterThan(0);
+    expect(escort.noble).toBe(0);
 
     // Classement de guerre : une conquête, des victoires pour l'attaquant, une défaite pour le défenseur, et une ligne au journal public.
     const war = (await pool.query('SELECT id, conquests, villages_lost, attack_wins, defense_wins FROM players WHERE id = ANY($1)', [[attacker, defender]])).rows;
