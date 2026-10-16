@@ -492,7 +492,7 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
   }
 
   if (conquered) {
-    await conquer(c, outbox, target, attackerId, survivors);
+    await conquer(c, outbox, target, origin, attackerId, survivors);
     loyalty = { before: loyalty!.before, after: LOYALTY_AFTER_CONQUEST };
   } else if (totalUnits(survivors) > 0) {
     const arriveAt = new Date(at.getTime() + travelTime(survivors, target, origin, env.worldSpeed, await speedBonus(c, attackerId, at)) * 1000);
@@ -562,7 +562,7 @@ async function handleAttack(c: Db, outbox: Outbox, cmd: any) {
   if (attackerId && !conquered) outbox.push(attackerId, { type: 'village', villageId: origin.id });
 }
 
-async function conquer(c: Db, outbox: Outbox, target: VillageRow, newOwner: number | null, survivors: UnitCounts) {
+async function conquer(c: Db, outbox: Outbox, target: VillageRow, origin: VillageRow, newOwner: number | null, survivors: UnitCounts) {
   target.owner_id = newOwner;
   target.loyalty = LOYALTY_AFTER_CONQUEST;
   await c.query('DELETE FROM build_queue WHERE village_id = $1', [target.id]);
@@ -571,9 +571,10 @@ async function conquer(c: Db, outbox: Outbox, target: VillageRow, newOwner: numb
   await c.query('DELETE FROM troops WHERE home_village_id = $1 OR village_id = $1', [target.id]);
   await c.query('UPDATE commands SET processed = true WHERE home_village_id = $1 AND NOT processed', [target.id]);
   await c.query('DELETE FROM planned_commands WHERE origin_village_id = $1', [target.id]);
-  // Un noble s'installe pour gouverner ; le reste de l'armée devient la garnison du village.
-  const garrison = { ...survivors, noble: Math.max(0, survivors.noble - 1) };
-  await setTroops(c, target.id, target.id, garrison);
+  // Un noble s'installe pour gouverner ; le reste de l'armée reste en renfort dans le village conquis
+  // et appartient toujours au village d'où est partie l'attaque (rappelable, compté dans sa population).
+  const escort = { ...survivors, noble: Math.max(0, survivors.noble - 1) };
+  await addTroops(c, target.id, origin.id, escort);
   outbox.push(newOwner, { type: 'me' });
 }
 

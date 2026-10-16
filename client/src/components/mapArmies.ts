@@ -43,6 +43,16 @@ interface ArmyScene {
 
 const INK = 0x1c140d;
 
+/**
+ * Taille des colonnes sur la carte, à régler ici. De près, une colonne garde au moins `ARMY_MIN_SCALE` (environ la moitié d'une case,
+ * plus petite qu'un village) ; en s'éloignant, elle garde à peu près `ARMY_SCREEN_SCALE` à l'écran, plafonnée à `ARMY_MAX_SCALE`,
+ * pour rester lisible sans recouvrir les pastilles des villages.
+ */
+const ARMY_MIN_SCALE = 0.85;
+const ARMY_SCREEN_SCALE = 0.55;
+const ARMY_MAX_SCALE = 2.6;
+const armyScale = (zoom: number) => Math.min(ARMY_MAX_SCALE, Math.max(ARMY_MIN_SCALE, ARMY_SCREEN_SCALE / zoom));
+
 /** Genre d'unité → image de marche (bande de foulées rendue en 3D, voir tools/render) et taille sur la carte. */
 const SHEETS: Record<ArmyKind, { key: string; height: number; fps: number; gap: number; hop: number }> = {
   foot: { key: 'marchFoot', height: 21, fps: 6, gap: 9, hop: 0.9 },
@@ -231,7 +241,7 @@ export function drawArmies(s: ArmyScene, armies: MapArmy[]): () => void {
     const now = serverNow();
     const w = s.world;
     const sc = w.scale.x;
-    const k = Math.min(4, Math.max(1.6, 1.2 / sc));
+    const k = armyScale(sc);
     const vx0 = -w.x / sc - TILE;
     const vy0 = -w.y / sc - TILE;
     const vx1 = (s.app.screen.width - w.x) / sc + TILE;
@@ -268,7 +278,7 @@ export function drawArmies(s: ArmyScene, armies: MapArmy[]): () => void {
 /** Armée sous le doigt ou la souris (position en cases, échelle de la carte), la plus proche de la colonne dessinée. */
 export function pickArmy(armies: MapArmy[], fx: number, fy: number, scale: number): MapArmy | null {
   const now = serverNow();
-  const k = Math.min(4, Math.max(1.6, 1.2 / scale));
+  const k = armyScale(scale);
   const reach = (16 * k) / TILE;
   let best: MapArmy | null = null;
   let bestD = Infinity;
