@@ -1,14 +1,22 @@
 import {
+  BUILD_QUEUE_LIMIT,
   MERCHANT_CAPACITY,
+  RESOURCES,
+  UNITS,
   emptyResources,
+  meetsRequirements,
+  populationCapacity,
+  productionRates,
   merchantCount,
   merchantsNeeded,
   STARTING_BUILDINGS,
   STARTING_RESOURCES,
   type BuildingKey,
   type Buildings,
+  type Resources,
   type ScoutReportData,
   type UnitCounts,
+  UNIT_KEYS,
   emptyUnits,
   normalizeUnits,
   travelTime,
@@ -24,17 +32,13 @@ import { unlocked, type Locker } from '../lock';
 import { processDueEvents, sendCommand } from './commands';
 import { pickNpcName } from './npc-names';
 import {
-  NOBLES_PER_CONQUEST,
   attackBeats,
   pointRatioOk,
-  NPC_PROFILES,
   npcTribeNameCandidates,
   SOLO_PROFILES,
-  chooseBuilding,
   consecutiveScoutFailures,
   isQuiet,
-  nextRecruit,
-  npcCap,
+  npcType,
   pickRaidUnits,
   pickWinningUnits,
   MIN_LOOT,
@@ -49,7 +53,8 @@ import {
   type NpcProfile,
 } from './npc-rules';
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
-import { villageRoles, type VillageRole } from './npc-roles';
+import { npcPlan, villageRoles, type VillageRole } from './npc-roles';
+import { costOf, nextBuilding, nextTroopLot, reserveFor, troopBudget } from '../manager/rules';
 import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, recentlyHit } from './npc-offensive';
 import { interceptStep } from './npc-intercept';
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
@@ -63,7 +68,7 @@ import { acceptOffer, cancelOffer, createOffer, expireOffers, freeMerchants } fr
 const MARKET_ROUNDS = 10;
 import { npcAccepts, planOffer } from './market-rules';
 import { ensureLetters } from './nobility';
-import { createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, resourcesOf, syncVillage, transitMerchants } from './village';
+import { computePopulation, createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, ownedUnits, resourcesOf, syncVillage, transitMerchants } from './village';
 
 let rng: () => number = Math.random;
 /** Permet aux tests de rendre les décisions des PNJ déterministes. */
@@ -78,12 +83,15 @@ const delayMs = () => Math.max(30_000, ((0.5 + rng()) * env.npcThinkMinutes * 60
 const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 /** Rayon (en cases) dans lequel un PNJ cherche des cibles. */
 const RAID_RADIUS = 20;
-/** Épéistes qui accompagnent chaque noble d'un train. */
+/** Fantassins qui accompagnent chaque noble d'un train : des épéistes depuis un village offensif, des lanciers depuis un village défensif. */
 const NOBLE_ESCORT = 2;
+const ESCORT_UNIT: Record<VillageRole, keyof UnitCounts> = { offense: 'swordsman', defense: 'spearman' };
 /** Nombre maximal de nobles dans un train. */
 const MAX_TRAIN = 6;
-/** Rayon (en cases) dans lequel un PNJ conquérant choisit le village à prendre. */
+/** Rayon (en cases) dans lequel un PNJ choisit le village à conquérir. */
 const CONQUEST_RADIUS = 12;
+/** Villages à conquérir écartés (trop bien défendus pour l'armée du PNJ), retenus pour ne pas y revenir aussitôt. */
+const CONQUEST_AVOID = 5;
 const DAY_MS = 86_400_000;
 /** Délai minimal (en heures de jeu) entre deux missions d'espionnage d'un même PNJ chez un joueur ou un PNJ (les barbares ne comptent pas). */
 const SCOUT_COOLDOWN_GAME_HOURS = 4;
@@ -121,11 +129,6 @@ async function knownScoutsAt(c: Db, npcId: number, villageId: number): Promise<n
 }
 
 const isQuietAt = (d: Date) => isQuiet(d, env.npcTimezone, env.npcQuietStart, env.npcQuietEnd);
-
-async function worldDays(c: Db, now: Date): Promise<number> {
-  const started = (await c.query("SELECT value FROM world_meta WHERE key = 'started_at'")).rows[0]?.value;
-  return started ? ((now.getTime() - Date.parse(started)) / DAY_MS) * env.worldSpeed : 0;
-}
 
 // ---------- Création ----------
 
@@ -371,14 +374,22 @@ async function candidates(c: Db, npcId: number, from: { id: number; x: number; y
 }
 
 /**
- * Un PNJ de type pillard ou conquérant vise aussi les joueurs, mais jamais pendant les heures calmes ni au-delà de ses plafonds.
+ * Attaques d'un village de PNJ : barbares, PNJ hostiles et joueurs (jamais pendant les heures calmes), avec ses épéistes, cavaliers et béliers.
+ * Un village défensif n'en a guère : il ne sort sa garnison (lanciers et hallebardiers) que pour escorter ses nobles.
+ * Dès qu'un village a un noble chez lui, il part avec chaque attaque, et la conquête d'un barbare ou d'un PNJ hostile passe avant tout (sauf la riposte).
  * Dans une tribu, seul le chef lance une opération contre un joueur ; les autres s'y joignent si leur troupe peut arriver dans la fenêtre.
  */
-async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, villageId: number, cap: number, tribe: TribeInfo | null, now: Date) {
+async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, tribe: TribeInfo | null, now: Date) {
   const village = await loadVillage(c, villageId);
   const home = await getTroops(c, villageId, villageId);
   const attackers: UnitCounts = { ...emptyUnits(), swordsman: home.swordsman, cavalry: home.cavalry, ram: home.ram };
-  if (attackers.swordsman + attackers.cavalry < 5) return;
+  if (role === 'defense' && home.noble > 0) {
+    attackers.spearman = home.spearman;
+    attackers.halberdier = home.halberdier;
+  }
+  if (attackers.spearman + attackers.halberdier + attackers.swordsman + attackers.cavalry < 5) return;
+  // L'escorte des nobles : l'unité du rôle (lanciers ou épéistes), ou l'autre si le village en a davantage.
+  const escortUnit: keyof UnitCounts = attackers[ESCORT_UNIT[role]] >= Math.max(attackers.spearman, attackers.swordsman) ? ESCORT_UNIT[role] : role === 'offense' ? 'spearman' : 'swordsman';
   const grudges = await grudgesOf(c, npcId, tribe, now);
   const quiet = isQuietAt(now);
   const arrivalOf = (units: UnitCounts, to: { x: number; y: number }) => new Date(now.getTime() + travelTime(units, village, to, env.worldSpeed) * 1000);
@@ -386,10 +397,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
    * « Train de nobles » : un PNJ qui a au moins 4 nobles les envoie un par un, arrivant à une seconde d'écart juste après l'assaut qui nettoie la défense.
    * Renvoie le nombre de nobles du train (0 si aucun).
    */
-  const trainSize = (): number => {
-    if (home.noble < NOBLES_PER_CONQUEST) return 0;
-    return Math.min(home.noble, MAX_TRAIN);
-  };
+  const trainSize = (): number => Math.min(home.noble, MAX_TRAIN);
 
   // 1. Une opération de la tribu est en cours : on tente de s'y joindre.
   const op = tribe?.state.op;
@@ -427,7 +435,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const rivalVillages = all.filter((t) => t.rival);
   // Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef ou le conquérant) : leur type ne règle que leur évolution.
   // Celui qui a été attaqué riposte en plus, sans attendre.
-  const isLeader = !tribe || tribe.leaderId === npcId || profile === 'conqueror';
+  const isLeader = !tribe || tribe.leaderId === npcId;
   const opCooldownOk = !tribe || !tribe.state.lastOpAt || now.getTime() - Date.parse(tribe.state.lastOpAt) >= (12 * 3_600_000) / env.worldSpeed;
   const humans = all.filter((t) => t.ownerId !== null && !t.rival);
   const revenge = quiet ? [] : humans.filter((t) => grudges.includes(t.ownerId!));
@@ -438,14 +446,14 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const sameSize = humans.filter((t) => pointRatioOk(myPoints, t.ownerPoints));
   const aggressive = !quiet && isLeader && opCooldownOk ? sameSize : [];
   const players = [...new Set([...revenge, ...aggressive, ...warPlayers])];
-  // Un Bâtisseur se développe surtout en pillant les barbares et ne s'en prend que de temps en temps à un joueur.
+  // Un PNJ défensif se développe surtout en pillant les barbares et ne s'en prend que de temps en temps à un joueur.
   // Les ennemis déclarés (guerre de tribu, PNJ qui nous a attaqués) passent avant tout ; viennent ensuite les rivaux, puis les barbares.
   // Un village de joueur ne se vise jamais pendant les heures calmes, même en guerre.
   const enemyVillages = all.filter((t) => t.enemy && (t.rival || !quiet));
   const prey = enemyVillages.length && rng() < 0.9 ? enemyVillages : rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
   const revengePool = players.filter((t) => revenge.includes(t));
   // Quand une guerre ou une vengeance contre un autre PNJ occupe la tribu, les joueurs passent au second plan.
-  const playerChance = enemyVillages.length ? 0.1 : profile === 'builder' ? 0.15 : 0.4;
+  const playerChance = enemyVillages.length ? 0.1 : profile === 'defense' ? 0.15 : 0.4;
   const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < playerChance) ? players : prey;
   // Offensive occasionnelle : à l'heure programmée, le PNJ vise un ennemi de guerre, un rival ou un joueur de sa taille (jamais celui qu'un PNJ a déjà frappé
   // pendant la période), garde la même cible d'un tour à l'autre le temps de l'espionner, puis frappe avec une part de son armée.
@@ -455,25 +463,30 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     nextOff = nextOffensiveAt(now, rng()).getTime();
     await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text)) WHERE id = $1", [npcId, new Date(nextOff).toISOString()]);
   }
+  // Conquête : dès qu'un noble est au village, le PNJ choisit un village à prendre (barbare ou PNJ hostile, jamais un joueur),
+  // le plus gros au plus près de chez lui, et s'y tient d'une réflexion à l'autre au lieu de frapper au hasard.
+  let conquest: Candidate | undefined;
+  const avoid: number[] = Array.isArray(npcState.conquest?.avoid) ? npcState.conquest.avoid : [];
+  if (!revengePool.length && trainSize() > 0) {
+    const options = all.filter((t) => (t.ownerId === null || t.rival) && t.dist <= CONQUEST_RADIUS && !avoid.includes(t.id));
+    const kept = npcState.conquest?.targetId as number | undefined;
+    conquest = options.find((t) => t.id === kept) ?? options.sort((a, b) => b.points / (1 + b.dist) - a.points / (1 + a.dist))[0];
+    if (conquest && conquest.id !== kept) {
+      await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('conquest', jsonb_build_object('targetId', $2::int, 'avoid', $3::jsonb)) WHERE id = $1", [
+        npcId,
+        conquest.id,
+        JSON.stringify(avoid),
+      ]);
+    }
+  }
   let offensive = false;
   let offensivePool: Candidate[] = [];
-  if (!revengePool.length && offensiveDue(nextOff, now)) {
+  if (!conquest && !revengePool.length && offensiveDue(nextOff, now)) {
     const fresh = sameSize.filter((t) => !quiet);
     const hitSafe: Candidate[] = [];
     for (const t of fresh) if (!(await recentlyHit(c, t.ownerId!, now))) hitSafe.push(t);
     offensivePool = [...warPlayers, ...enemyVillages, ...hitSafe, ...rivalVillages.filter((t) => !t.enemy)];
     offensive = offensivePool.length > 0;
-  }
-  // Conquête réfléchie : un PNJ qui a de quoi former un train de nobles choisit un village à prendre (barbare ou PNJ rival, jamais un joueur),
-  // le plus gros au plus près de chez lui, et s'y tient d'une réflexion à l'autre au lieu de frapper au hasard.
-  let conquest: Candidate | undefined;
-  if (!offensive && !revengePool.length && trainSize() > 0) {
-    const options = all.filter((t) => (t.ownerId === null || t.rival) && t.dist <= CONQUEST_RADIUS);
-    const kept = npcState.conquest?.targetId as number | undefined;
-    conquest = options.find((t) => t.id === kept) ?? options.sort((a, b) => b.points / (1 + b.dist) - a.points / (1 + a.dist))[0];
-    if (conquest && conquest.id !== kept) {
-      await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('conquest', jsonb_build_object('targetId', $2::int)) WHERE id = $1", [npcId, conquest.id]);
-    }
   }
   if (!offensive && !conquest && pool.length === 0) return;
   const keptId = offensive ? (npcState.offensive?.targetId as number | undefined) : undefined;
@@ -551,17 +564,28 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       return;
     }
     const avenging = (hostileToPlayer && grudges.includes(target.ownerId!)) || target.enemy;
-    // Chaque noble du train part avec une petite escorte d'épéistes (un noble seul ne survit pas à la défense de base) : on la met de côté avant de choisir l'assaut.
+    // Chaque noble du train part avec une petite escorte (un noble seul ne survit pas à la défense de base) : on la met de côté avant de choisir l'assaut.
+    // Un seul noble suffit : il revient à la charge jusqu'à faire tomber la loyauté.
     let nobles = trainSize();
-    if (nobles > 0) nobles = Math.min(nobles, Math.floor(Math.max(0, attackers.swordsman - 5) / NOBLE_ESCORT));
-    if (nobles < 2) nobles = 0;
-    const raid = pickRaidUnits({ ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
-    if (!raid) return;
+    if (nobles > 0) nobles = Math.min(nobles, Math.floor(Math.max(0, attackers[escortUnit] - 5) / NOBLE_ESCORT));
+    // Un barbare ou un PNJ vu sans défense est laissé au pillage intensif, par groupes de 50 épéistes ou lanciers (voir npc-raids.ts).
+    if (!hostileToPlayer && !avenging && nobles === 0 && UNIT_KEYS.every((k) => intel.troops[k] === 0)) return;
+    const raid = pickRaidUnits({ ...attackers, [escortUnit]: attackers[escortUnit] - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
+    if (!raid) {
+      // Village trop bien défendu pour l'armée du PNJ : il en choisit un autre à la prochaine réflexion.
+      if (conquest) {
+        await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('conquest', jsonb_build_object('avoid', $2::jsonb)) WHERE id = $1", [
+          npcId,
+          JSON.stringify([...avoid, conquest.id].slice(-CONQUEST_AVOID)),
+        ]);
+      }
+      return;
+    }
     const units = raid.units;
     // Hors riposte et conquête, un pillage ne vaut le déplacement que s'il y a de quoi remplir les sacs.
     if (!avenging && nobles === 0 && raid.loot < MIN_LOOT) return;
     // Tous les envois arrivent à la suite : l'assaut d'abord, puis un noble par seconde.
-    const single = { ...emptyUnits(), noble: 1, swordsman: NOBLE_ESCORT };
+    const single = { ...emptyUnits(), noble: 1, [escortUnit]: NOBLE_ESCORT };
     const naturals = [arrivalOf(units, target), ...(nobles ? [arrivalOf(single, target)] : [])];
     const landTime = Math.max(...naturals.map((d) => d.getTime()));
     if (hostileToPlayer && isQuietAt(new Date(landTime + nobles * 1000))) return;
@@ -590,67 +614,94 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   }
 }
 
-/** Construit le prochain bâtiment du plan du PNJ (le modèle Offensif ou Défensif de son rôle). */
-async function buildStep(c: Db, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
-  const v = await syncVillage(c, villageId, now);
-  const queued = (await c.query('SELECT building, level FROM build_queue WHERE village_id = $1', [villageId])).rows;
-  const levels: Buildings = { ...v.buildings };
-  for (const q of queued) levels[q.building as BuildingKey] = Math.max(levels[q.building as BuildingKey], q.level);
-  const next = chooseBuilding(profile, levels, cap, role);
-  if (!next) return;
-  try {
-    await enqueueBuild(c, villageId, next, now);
-  } catch (err) {
-    if (!(err instanceof GameError)) throw err;
-  }
+/** Niveaux d'un village une fois sa file de construction terminée, et nombre de chantiers en file. */
+async function queuedLevels(c: Db, villageId: number, buildings: Buildings) {
+  const queue = (await c.query('SELECT building, level FROM build_queue WHERE village_id = $1', [villageId])).rows;
+  const levels: Buildings = { ...buildings };
+  for (const q of queue) levels[q.building as BuildingKey] = Math.max(levels[q.building as BuildingKey], q.level);
+  return { levels, queued: queue.length };
 }
 
 /**
- * Recrutement : la file se remplit dès qu'il lui reste moins de deux réflexions de travail (elle ne reste donc jamais vide entre deux réflexions),
- * avec jusqu'à `npcRecruitBatches` lots de types différents, chacun d'au plus `npcRecruitBatch` unités.
+ * Développement d'un village de PNJ, comme le gestionnaire de compte avec le modèle de son rôle (voir `npcPlan`) : la file de construction
+ * se remplit dans l'ordre du modèle, puis les troupes prennent ce qui dépasse le coût du prochain bâtiment, plus 30 % de la production
+ * mise de côté pour lui. Le noble passe avant tout : dès que ses bâtiments sont prêts, le village frappe sa lettre et le recrute ; tant qu'il
+ * ne peut pas le payer, bâtiments et autres troupes laissent son prix de côté.
+ * `troopsUntil` (date ISO par village) dit jusqu'à quand les troupes ne doivent plus entamer la réserve du bâtiment ; il est mis à jour ici.
  */
-async function recruitStep(c: Db, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
-  const v = await syncVillage(c, villageId, now);
+async function economyStep(c: Db, npcId: number, role: VillageRole, villageId: number, now: Date, troopsUntil: Record<string, string>) {
+  const plan = npcPlan(role);
+  let v = await syncVillage(c, villageId, now);
+  // Troupes comptées où qu'elles soient (au village, en renfort, en route, planifiées) et en formation.
+  const owned = await ownedUnits(c, villageId);
+  for (const r of (await c.query('SELECT unit, count - delivered AS n FROM recruit_queue WHERE village_id = $1', [villageId])).rows) owned[r.unit as keyof UnitCounts] += Number(r.n);
+
+  // 1. Le noble : comme un joueur, le PNJ frappe d'abord la lettre de noblesse qui manque (en versant à la cagnotte ce qu'il faut).
+  let nobleWaits = false;
+  if (owned.noble < (plan.troops.noble ?? 0) && meetsRequirements(v.buildings, UNITS.noble.requires)) {
+    nobleWaits = true;
+    if (await ensureLetters(c, npcId, villageId, 1, now)) {
+      try {
+        await enqueueRecruit(c, villageId, 'noble', 1, now);
+        owned.noble++;
+        nobleWaits = false;
+      } catch (err) {
+        if (!(err instanceof GameError)) throw err;
+      }
+    }
+    v = await syncVillage(c, villageId, now);
+  }
+  /** Ce qui reste d'un stock une fois mis de côté le prix du noble qui attend. */
+  const afterNoble = (stock: Resources): Resources =>
+    nobleWaits ? (Object.fromEntries(RESOURCES.map((r) => [r, Math.max(0, stock[r] - UNITS.noble.cost[r])])) as unknown as Resources) : stock;
+
+  // 2. Bâtiments : on remplit la file avec les prochains objectifs du modèle, sans jamais en sauter un faute de ressources.
+  for (let i = 0; i < BUILD_QUEUE_LIMIT; i++) {
+    const { levels, queued } = await queuedLevels(c, villageId, v.buildings);
+    const next = queued < BUILD_QUEUE_LIMIT ? nextBuilding(plan.buildings, levels) : null;
+    if (!next) break;
+    const cost = costOf(next)!;
+    if (nobleWaits && RESOURCES.some((r) => afterNoble(resourcesOf(v))[r] < cost[r])) break;
+    try {
+      await enqueueBuild(c, villageId, next.building, now);
+    } catch (err) {
+      if (!(err instanceof GameError)) throw err;
+      break;
+    }
+    v = await syncVillage(c, villageId, now);
+  }
+
+  // 3. Autres troupes : la file se remplit dès qu'il lui reste moins de deux réflexions de travail.
   if (v.buildings.barracks < 1) return;
   const { rows: q } = await c.query(
     `SELECT coalesce(extract(epoch FROM max(start_at + make_interval(secs => count * unit_seconds)) - $2::timestamptz), 0)::float AS left FROM recruit_queue WHERE village_id = $1`,
     [villageId, now],
   );
   if (q[0].left > (2 * env.npcThinkMinutes * 60) / Math.sqrt(env.worldSpeed)) return;
-  const owned = await getTroops(c, villageId, villageId);
-  const away = (await c.query("SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed AND type IN ('attack', 'support', 'return')", [villageId])).rows;
-  for (const r of away) {
-    const u = normalizeUnits(r.units);
-    for (const k of Object.keys(owned) as (keyof UnitCounts)[]) owned[k] += u[k];
-  }
-  const queuedUnits = (await c.query('SELECT unit, count - delivered AS n FROM recruit_queue WHERE village_id = $1', [villageId])).rows;
-  for (const r of queuedUnits) owned[r.unit as keyof UnitCounts] += r.n;
-  let batches = 0;
-  for (const choice of nextRecruit(profile, role, v.buildings, owned, cap, env.npcDifficulty, env.npcRecruitBatch)) {
-    if (batches >= env.npcRecruitBatches) break;
-    // Trop cher ou trop de monde pour la ferme : on réduit le lot de moitié jusqu'à ce qu'il passe.
-    for (let count = choice.count; count >= 1; count = Math.floor(count / 2)) {
-      try {
-        // Comme un joueur, un PNJ frappe d'abord les lettres de noblesse qui manquent à ses nobles (s'il peut les payer).
-        if (choice.unit === 'noble' && !(await ensureLetters(c, v.owner_id!, villageId, count, now))) continue;
-        await enqueueRecruit(c, villageId, choice.unit, count, now);
-        batches++;
-        break;
-      } catch (err) {
-        if (!(err instanceof GameError)) throw err;
-      }
+  const { levels } = await queuedLevels(c, villageId, v.buildings);
+  const stock = resourcesOf(v);
+  const budget = troopBudget(afterNoble(stock), reserveFor(costOf(nextBuilding(plan.buildings, levels)), 0, warehouseCapacity(v.buildings.warehouse)));
+  const goals = { ...plan.troops, noble: 0 };
+  let free = populationCapacity(v.buildings.farm) - (await computePopulation(c, villageId));
+  const until = troopsUntil[villageId];
+  let dip = !nobleWaits && (!until || Date.parse(until) <= now.getTime()) ? { stock, rates: productionRates(v.buildings, env.worldSpeed), share: plan.troopsShare } : undefined;
+  for (let lots = 0; lots < env.npcRecruitBatches; lots++) {
+    const lot = nextTroopLot(goals, owned, v.buildings, budget, free, env.worldSpeed, dip);
+    if (!lot) break;
+    try {
+      await enqueueRecruit(c, villageId, lot.unit, lot.count, now);
+    } catch (err) {
+      if (!(err instanceof GameError)) throw err;
+      break;
     }
-  }
-}
-
-async function economyStep(c: Db, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, cap: number, now: Date) {
-  // Le premier servi prend les ressources : par défaut l'armée, sauf si l'administration remet la construction en tête.
-  if (env.npcArmyFirst) {
-    await recruitStep(c, profile, role, villageId, cap, now);
-    await buildStep(c, profile, role, villageId, cap, now);
-  } else {
-    await buildStep(c, profile, role, villageId, cap, now);
-    await recruitStep(c, profile, role, villageId, cap, now);
+    const def = UNITS[lot.unit];
+    owned[lot.unit] += lot.count;
+    free -= def.population * lot.count;
+    for (const r of RESOURCES) budget[r] = Math.max(0, budget[r] - def.cost[r] * lot.count);
+    if (dip && lot.dipSeconds > 0) {
+      troopsUntil[villageId] = new Date(now.getTime() + lot.dipSeconds * 1000).toISOString();
+      dip = undefined;
+    }
   }
 }
 
@@ -724,7 +775,7 @@ async function marketStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
 export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date): Promise<boolean> {
   const npc = (await c.query('SELECT id, username, npc_profile, npc_state FROM players WHERE id = $1 AND is_npc FOR UPDATE', [npcId])).rows[0];
   if (!npc) return false;
-  const profile = (NPC_PROFILES.includes(npc.npc_profile) ? npc.npc_profile : 'builder') as NpcProfile;
+  const profile = npcType(npc.npc_profile);
   const villages = (await c.query('SELECT id FROM villages WHERE owner_id = $1 ORDER BY id', [npcId])).rows;
 
   if (villages.length === 0) {
@@ -738,15 +789,20 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
     return false;
   }
 
-  const cap = npcCap(await worldDays(c, now), env.npcDifficulty);
   const tribe = await npcTribeOf(c, npcId, now);
   let angry = false;
-  // Les villages se partagent entre offensifs et défensifs selon le profil du PNJ (voir npc-roles.ts).
+  // Un seul village : il suit le type du PNJ. Dès le deuxième, la gestion devient mixte, moitié offensive, moitié défensive (voir npc-roles.ts).
   const roles = villageRoles(profile, villages.length);
+  const troopsUntil: Record<string, string> = { ...(npc.npc_state?.troopsUntil ?? {}) };
+  // Chaque village se développe, même au-delà des trois premiers.
+  for (const [i, v] of villages.entries()) await economyStep(c, npcId, roles[i], v.id, now, troopsUntil);
+  await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('troopsUntil', $2::jsonb) WHERE id = $1", [
+    npcId,
+    JSON.stringify(Object.fromEntries(Object.entries(troopsUntil).filter(([id]) => villages.some((v) => String(v.id) === id)))),
+  ]);
   // Croisade en vue : les villages offensifs d'une tribu engagée gardent leurs troupes pour l'assaut (ni attaque ni pillage).
   const holdForCrusade = await crusadeHold(c, tribe, now);
-  for (const [i, v] of villages.slice(0, 3).entries()) {
-    await economyStep(c, npcId, profile, roles[i], v.id, cap, now);
+  for (const [i, v] of villages.entries()) {
     await marketStep(c, outbox, npcId, profile, v.id, now);
     if (tribe) await defendStep(c, outbox, npcId, v.id, tribe, now);
     // Un PNJ en colère enchaîne jusqu'à trois attaques par réflexion, sur des villages différents de l'agresseur.
@@ -758,13 +814,13 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
       const openAttacks = async () =>
         (await c.query("SELECT count(*)::int AS n FROM commands WHERE player_id = $1 AND type = 'attack' AND NOT processed", [npcId])).rows[0].n as number;
       const before = await openAttacks();
-      await attackStep(c, outbox, npcId, profile, v.id, cap, tribe, now);
+      await attackStep(c, outbox, npcId, profile, roles[i], v.id, tribe, now);
       if ((await openAttacks()) === before) break;
     }
   }
   // Pillage intensif : chaque village (pas seulement les trois premiers) envoie ses pillages vers les villages sans défense qu'il connaît.
   const hostiles = { tribes: [...(tribe?.state.rivals ?? []), ...warEnemiesOf(tribe, now)], npcs: await npcGrudgesOf(c, npcId, tribe, now) };
-  for (const [i, v] of villages.entries()) if (!(holdForCrusade && roles[i] === 'offense')) await raidStep(c, outbox, npcId, v.id, hostiles, now);
+  for (const [i, v] of villages.entries()) if (!(holdForCrusade && roles[i] === 'offense')) await raidStep(c, outbox, npcId, v.id, roles[i], hostiles, now);
   // Interceptions : chaque village (sauf les offensifs réservés pour une croisade) peut attaquer en chemin une armée hostile repérée.
   if (env.npcIntercept) {
     const friends = tribe ? [tribe.id, ...(tribe.state.allies ?? [])] : [];

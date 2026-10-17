@@ -9,7 +9,7 @@ import { fillNpcWarehouses } from '../game/npc-fill';
 import { worldStats } from '../game/world-stats';
 import { adminPlayerDetail } from '../game/admin-player';
 import { WAR_SCORE_SQL } from '../game/war-stats';
-import { isQuiet } from '../game/npc-rules';
+import { isQuiet, npcType, PROFILE_LABEL } from '../game/npc-rules';
 import { warOverview } from '../game/npc-war-report';
 import { GameError } from '../errors';
 import { act } from '../act';
@@ -128,7 +128,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       id: r.id,
       username: r.username,
       isNpc: r.is_npc,
-      profile: r.npc_profile,
+      profile: r.is_npc ? PROFILE_LABEL[npcType(r.npc_profile)] : null,
       tribe: r.tribe_tag,
       tribeName: r.tribe_name,
       villages: r.villages,
@@ -278,10 +278,8 @@ export default async function adminRoutes(app: FastifyInstance) {
         npcRaids: env.npcRaids ? `activé (${env.npcRaidsPerThink} par réflexion, ${env.npcRaidRadius} cases)` : 'désactivé',
         npcAttackMargin: `${env.npcAttackMargin} %`,
         npcThinkMinutes: `${env.npcThinkMinutes} min`,
-        npcRecruitBatch: `${env.npcRecruitBatch} unités, ${env.npcRecruitBatches} lots par réflexion`,
-        npcArmyFirst: env.npcArmyFirst ? 'recrutement avant construction' : 'construction avant recrutement',
+        npcRecruitBatches: `${env.npcRecruitBatches} lots par réflexion`,
         npcWars: env.npcWars ? 'activées' : 'désactivées',
-        npcDifficulty: env.npcDifficulty,
         npcTimezone: env.npcTimezone,
         quietHours: `${env.npcQuietStart} h → ${env.npcQuietEnd} h`,
         crusades: env.crusades ? `activées (jours ${env.crusadeDays}, ${env.crusadeTime}, ${env.crusadeMinutes} min)` : 'désactivées',

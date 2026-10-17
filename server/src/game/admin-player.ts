@@ -15,6 +15,7 @@ import { pool, type Db } from '../db';
 import { notFound } from '../errors';
 import { boostedRates, computePopulation, estimateResources, productionBonus, type VillageRow } from './village';
 import { warScore } from './war-stats';
+import { npcType, PROFILE_LABEL } from './npc-rules';
 
 /**
  * Fiche d'un joueur pour l'administration, en lecture seule : compte, tribu, classements, villages (ressources estimées,
@@ -175,7 +176,7 @@ async function detail(c: Db, id: number) {
     id: p.id as number,
     username: p.username as string,
     isNpc: p.is_npc as boolean,
-    profile: p.npc_profile as string | null,
+    profile: p.is_npc ? PROFILE_LABEL[npcType(p.npc_profile)] : null,
     createdAt: p.created_at,
     lastSeen: p.last_seen_at,
     protectionUntil: p.protection_until && new Date(p.protection_until) > now ? p.protection_until : null,

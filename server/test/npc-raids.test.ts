@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyUnits } from '@aldoria/shared';
-import { farmPlan, farmPool, pickFarmUnits } from '../src/game/npc-raids';
-import { carryOf } from '../src/game/npc-rules';
+import { farmPlan, raidGroup } from '../src/game/npc-raids';
 
 const NOW = new Date('2030-01-15T12:00:00Z');
 const full = { wood: 500, clay: 500, iron: 500, wheat: 500 };
@@ -13,24 +12,12 @@ const scoutRow = (minutesAgo: number, troops = emptyUnits()) => ({
 });
 
 describe('pillage intensif des PNJ', () => {
-  it('tous les porteurs peuvent piller, hallebardiers compris', () => {
-    const home = { ...emptyUnits(), spearman: 100, halberdier: 50, swordsman: 20, cavalry: 10, scout: 5, ram: 3 };
-    expect(farmPool(home)).toEqual({ ...emptyUnits(), spearman: 100, halberdier: 50, swordsman: 20, cavalry: 10 });
-  });
-
-  it('complète avec les hallebardiers quand il n’y a rien d’autre', () => {
-    const units = pickFarmUnits({ ...emptyUnits(), halberdier: 100 }, 300, 0)!;
-    expect(units.halberdier).toBeGreaterThanOrEqual(30);
-  });
-
-  it('envoie juste de quoi porter le butin', () => {
-    const units = pickFarmUnits({ ...emptyUnits(), cavalry: 50 }, 800, 0)!;
-    expect(units.cavalry).toBe(10);
-    expect(carryOf(units)).toBeGreaterThanOrEqual(800);
-  });
-
-  it('n’envoie rien si le groupe ne passe pas la muraille', () => {
-    expect(pickFarmUnits({ ...emptyUnits(), spearman: 2 }, 50, 20)).toBeNull();
+  it('un pillage compte 50 épéistes depuis un village offensif, 50 lanciers depuis un village défensif', () => {
+    const home = { ...emptyUnits(), spearman: 120, halberdier: 50, swordsman: 80, cavalry: 10, scout: 5 };
+    expect(raidGroup(home, 'offense', 0)).toEqual({ ...emptyUnits(), swordsman: 50 });
+    expect(raidGroup(home, 'defense', 0)).toEqual({ ...emptyUnits(), spearman: 50 });
+    // Moins de 50 de l'unité du rôle : pas de pillage, même avec d'autres troupes au village.
+    expect(raidGroup({ ...home, swordsman: 49 }, 'offense', 0)).toBeNull();
   });
 
   it('espionne un barbare inconnu, pille un barbare vu vide, laisse un village défendu', () => {

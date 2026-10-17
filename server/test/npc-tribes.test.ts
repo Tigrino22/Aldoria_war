@@ -57,8 +57,8 @@ describe('règles des tribus de PNJ', () => {
 
   it('chaque tribu a un chef pillard et un conquérant', () => {
     const p = tribeMemberProfiles(5);
-    expect(p[0]).toBe('raider');
-    expect(p).toContain('conqueror');
+    expect(p[0]).toBe('offense');
+    expect(p).toContain('defense');
     expect(p).toHaveLength(5);
   });
 });
@@ -206,7 +206,8 @@ describe('tribus de PNJ', () => {
     await pool.query('UPDATE villages SET x = $2, y = $3 WHERE id = $1', [vb.id, va.x + 4, va.y]);
     await pool.query('UPDATE villages SET x = 0, y = 0 WHERE owner_id IS NULL');
     await tx(async (c) => {
-      await setTroops(c, va.id, va.id, { ...emptyUnits(), swordsman: 200, cavalry: 100, scout: 5 });
+      await setTroops(c, va.id, va.id, { ...emptyUnits(), swordsman: 200, cavalry: 100, spearman: 60, scout: 5 });
+      // Vu vide, le village rival est pillé par 50 lanciers (le PNJ est défensif).
       await c.query(
         `INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`,
         [a, JSON.stringify({ attacker: {}, defender: { village: { id: vb.id } }, intel: { resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, buildings: { wall: 0 }, troops: emptyUnits() } }), NIGHT],
@@ -227,6 +228,8 @@ describe('tribus de PNJ', () => {
     const [va] = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [a])).rows;
     const [vb] = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [b])).rows;
     await pool.query('UPDATE villages SET x = $2, y = $3 WHERE id = $1', [vb.id, va.x + 30, va.y]);
+    // Les autres villages de la tribu ennemie restent eux aussi hors de portée du pillage ordinaire.
+    await pool.query('UPDATE villages SET x = $2 + id % 5, y = $3 WHERE id <> $1 AND owner_id IN (SELECT id FROM players WHERE tribe_id = $4)', [vb.id, va.x + 31, va.y, t3.id]);
     await pool.query('UPDATE villages SET x = 0, y = 0 WHERE owner_id IS NULL');
     await tx(async (c) => {
       await setTroops(c, va.id, va.id, { ...emptyUnits(), swordsman: 200, cavalry: 100, scout: 5 });

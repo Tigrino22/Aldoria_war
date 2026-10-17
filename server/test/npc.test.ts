@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { STARTING_BUILDINGS, emptyUnits, populationCapacity, populationOf } from '@aldoria/shared';
+import { STARTING_BUILDINGS, UNITS, emptyUnits, meetsRequirements } from '@aldoria/shared';
 import { pool, tx } from '../src/db';
 import { env } from '../src/env';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents } from '../src/game/commands';
 import { createNpc, ensureNpcs, npcThink, processNpcs, setNpcRandom } from '../src/game/npc';
-import { FARM_LEAD, armyTarget, villageRoles } from '../src/game/npc-roles';
-import { chooseBuilding, isQuiet, nextRecruit, npcCap, pickWinningUnits } from '../src/game/npc-rules';
+import { NOBLE_AFTER, NOBLE_BUILDINGS, ROLE_PRESET, npcPlan, villageRoles } from '../src/game/npc-roles';
+import { isQuiet, npcType, pickWinningUnits } from '../src/game/npc-rules';
+import { PRESETS, nextBuilding } from '../src/manager/rules';
 import { createVillage, getTroops, setTroops } from '../src/game/village';
 
 const MIN = 60_000;
@@ -41,50 +42,38 @@ describe('règles des PNJ', () => {
     expect(quiet('2030-07-15T20:30:00Z')).toBe(true); // 22 h 30 en heure d'été
   });
 
-  it('le plafond de niveau monte avec l’âge du monde et plus vite en difficulté élevée', () => {
-    expect(npcCap(0, 1)).toBe(2);
-    expect(npcCap(10, 1)).toBe(12);
-    expect(npcCap(10, 1.5)).toBeGreaterThan(npcCap(10, 1));
-    expect(npcCap(1000, 1)).toBe(30);
-  });
-
-  it('un bâtiment dont les conditions manquent n’est pas choisi avant l’hôtel de ville niveau 3', () => {
-    const levels = { ...STARTING_BUILDINGS, townhall: 1 };
-    for (let i = 0; i < 40; i++) {
-      const next = chooseBuilding('raider', levels, 5);
-      if (!next) break;
-      if (levels.townhall < 3) expect(['barracks', 'wall', 'market']).not.toContain(next);
-      levels[next] += 1;
+  it('un village de PNJ suit à la lettre le modèle du gestionnaire de son rôle, avec la caserne de pillage et les bâtiments du noble en plus', () => {
+    for (const role of ['offense', 'defense'] as const) {
+      const preset = PRESETS.find((p) => p.name === ROLE_PRESET[role])!.plan;
+      const plan = npcPlan(role);
+      const extra = plan.buildings.length - preset.buildings.length;
+      expect(extra).toBe(NOBLE_BUILDINGS.length + 1);
+      // Hors lignes ajoutées, l'ordre est celui du modèle.
+      const added = [2, ...NOBLE_BUILDINGS.map((_, i) => NOBLE_AFTER[role] + 1 + i)];
+      expect(plan.buildings.filter((_, i) => !added.includes(i))).toEqual(preset.buildings);
+      expect(plan.troopsShare).toBe(30);
+      for (const [unit, n] of Object.entries(preset.troops)) expect(plan.troops[unit as keyof typeof plan.troops]).toBeGreaterThanOrEqual(n);
     }
-    expect(levels.townhall).toBeGreaterThanOrEqual(3);
+    expect(npcPlan('offense').buildings[2]).toEqual({ building: 'barracks', level: 3 });
+    expect(npcPlan('defense').buildings[2]).toEqual({ building: 'barracks', level: 1 });
+    expect(npcPlan('offense').troops.noble).toBe(2);
+    expect(npcPlan('defense').troops.noble).toBe(1);
+    expect(nextBuilding(npcPlan('defense').buildings, { ...STARTING_BUILDINGS })?.building).toBe('claypit');
   });
 
-  it('un village de PNJ suit le modèle de son rôle, borné par son plafond', () => {
-    const levels = { ...STARTING_BUILDINGS };
-    // Le modèle Offensif commence par la mine de fer et l'argilière.
-    expect(chooseBuilding('raider', levels, 5, 'offense')).toBe('ironmine');
-    // Plan atteint au plafond : le PNJ ne dépasse jamais son plafond du jour.
-    for (let n = 0; n < 200; n++) {
-      const next = chooseBuilding('raider', levels, 5, 'offense');
-      if (!next) break;
-      levels[next] += 1;
+  it('un PNJ suivant son plan construit hôtel de ville et caserne 10 (le noble) bien avant la fin du modèle', () => {
+    for (const role of ['offense', 'defense'] as const) {
+      const levels = { ...STARTING_BUILDINGS };
+      let steps = 0;
+      while (!meetsRequirements(levels, UNITS.noble.requires)) {
+        const next = nextBuilding(npcPlan(role).buildings, levels)!;
+        levels[next.building] = next.level;
+        steps++;
+      }
+      // Mines encore loin du niveau 20 : le noble arrive tôt.
+      expect(Math.max(levels.woodcutter, levels.claypit, levels.ironmine)).toBeLessThan(20);
+      expect(steps).toBeLessThan(150);
     }
-    for (const k of Object.keys(levels) as (keyof typeof levels)[]) expect(levels[k]).toBeLessThanOrEqual(k === 'farm' ? 8 : 5);
-    expect(levels.woodcutter).toBe(5);
-  });
-
-  it('recrute d’abord ce qui manque le plus, parmi les unités disponibles', () => {
-    const wanted = nextRecruit('raider', 'offense', { ...STARTING_BUILDINGS, barracks: 1 }, emptyUnits(), 4, 1);
-    expect(wanted.map((w) => w.unit)).toEqual(['spearman']);
-    const later = nextRecruit('raider', 'offense', { ...STARTING_BUILDINGS, barracks: 5 }, { ...emptyUnits(), spearman: 100 }, 4, 1);
-    expect(later.map((w) => w.unit)).not.toContain('spearman');
-  });
-
-  it('recrute des hallebardiers dès que la caserne le permet (niveau 4)', () => {
-    const avant = nextRecruit('builder', 'defense', { ...STARTING_BUILDINGS, barracks: 3 }, emptyUnits(), 4, 1);
-    expect(avant.map((w) => w.unit)).not.toContain('halberdier');
-    const apres = nextRecruit('builder', 'defense', { ...STARTING_BUILDINGS, barracks: 4 }, emptyUnits(), 4, 1);
-    expect(apres.map((w) => w.unit)).toContain('halberdier');
   });
 
   it('attaque dès que son armée bat celle d’en face (sans marge par défaut), avec toute l’armée face à des défenseurs et le minimum face à un village vide', () => {
@@ -102,62 +91,22 @@ describe('règles des PNJ', () => {
     expect(vide!.swordsman).toBeLessThan(400);
   });
 
-  it('les Bâtisseurs ne recrutent pas de nobles', () => {
-    expect(armyTarget('builder', 'offense', 20, 1).noble).toBe(0);
-    expect(armyTarget('raider', 'offense', 20, 1).noble).toBeGreaterThan(0);
-    expect(armyTarget('raider', 'defense', 20, 1).noble).toBe(0);
-  });
-
-  it('un village offensif recrute de quoi frapper, un village défensif de quoi tenir : jamais d’unités hors rôle', () => {
-    const off = armyTarget('conqueror', 'offense', 20, 1);
-    const def = armyTarget('conqueror', 'defense', 20, 1);
-    expect(off.swordsman).toBeGreaterThan(off.spearman);
-    expect(off.cavalry).toBeGreaterThan(0);
-    expect(off.halberdier).toBe(0);
-    expect(def.spearman + def.halberdier).toBeGreaterThan(5 * def.swordsman);
-    expect([def.cavalry, def.ram, def.noble]).toEqual([0, 0, 0]);
-  });
-
-  it('l\'armée visée remplit la ferme visée, à tous les niveaux et dans tous les rôles', () => {
-    for (const cap of [2, 5, 10, 17, 20]) {
-      const room = populationCapacity(Math.min(20, cap + FARM_LEAD));
-      for (const profile of ['builder', 'raider', 'conqueror'] as const) {
-        for (const role of ['offense', 'defense'] as const) {
-          const pop = populationOf(armyTarget(profile, role, cap, 1));
-          expect(pop).toBeLessThanOrEqual(room);
-          expect(pop).toBeGreaterThan(room - 20);
-        }
-      }
-    }
-    // Une difficulté de 0,5 ne remplit que la moitié.
-    expect(populationOf(armyTarget('raider', 'defense', 10, 0.5))).toBeLessThan(populationCapacity(13) * 0.55);
-  });
-
-  it('le recrutement suit le rôle du village', () => {
-    const buildings = { ...STARTING_BUILDINGS, barracks: 10, townhall: 10, wall: 3 };
-    const defense = nextRecruit('conqueror', 'defense', buildings, emptyUnits(), 12, 1).map((w) => w.unit);
-    const offense = nextRecruit('conqueror', 'offense', buildings, emptyUnits(), 12, 1).map((w) => w.unit);
-    expect(defense).toEqual(expect.arrayContaining(['spearman', 'halberdier']));
-    for (const u of ['cavalry', 'ram', 'noble']) expect(defense).not.toContain(u);
-    expect(offense).toEqual(expect.arrayContaining(['swordsman', 'cavalry', 'ram', 'noble']));
-    expect(offense).not.toContain('halberdier');
-  });
-
-  it('les villages d’un PNJ se répartissent entre offensifs et défensifs', () => {
-    expect(villageRoles('builder', 1)).toEqual(['defense']);
-    expect(villageRoles('raider', 1)).toEqual(['offense']);
-    expect(villageRoles('conqueror', 1)).toEqual(['offense']);
-    for (const profile of ['builder', 'raider', 'conqueror'] as const) {
+  it('un seul village suit le type du PNJ ; dès le deuxième, moitié offensifs, moitié défensifs', () => {
+    expect(villageRoles('defense', 1)).toEqual(['defense']);
+    expect(villageRoles('offense', 1)).toEqual(['offense']);
+    expect(villageRoles('defense', 2)).toEqual(['defense', 'offense']);
+    expect(villageRoles('offense', 2)).toEqual(['offense', 'defense']);
+    for (const type of ['offense', 'defense'] as const) {
       for (let n = 2; n <= 8; n++) {
-        const roles = villageRoles(profile, n);
+        const roles = villageRoles(type, n);
         expect(roles).toHaveLength(n);
-        expect(roles).toContain('offense');
-        expect(roles).toContain('defense');
+        expect(roles.filter((r) => r === 'offense').length).toBe(type === 'offense' ? Math.ceil(n / 2) : Math.floor(n / 2));
       }
     }
-    expect(villageRoles('builder', 2)).toEqual(['defense', 'offense']);
-    expect(villageRoles('raider', 4).filter((r) => r === 'offense')).toHaveLength(3);
-    expect(villageRoles('builder', 4).filter((r) => r === 'offense')).toHaveLength(1);
+  });
+
+  it('les anciens types deviennent défensifs ou offensifs', () => {
+    expect(['builder', 'raider', 'conqueror', 'defense', 'offense', null].map(npcType)).toEqual(['defense', 'offense', 'offense', 'defense', 'offense', 'defense']);
   });
 });
 
@@ -183,18 +132,15 @@ describe('PNJ en jeu', () => {
   });
 
   it('un PNJ construit et recrute tout seul avec le temps', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const npc = await tx((c) => createNpc(c, NOON, 'defense'));
     const village = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [npc])).rows[0].id as number;
     await pool.query("UPDATE villages SET buildings = buildings || '{\"townhall\": 3, \"barracks\": 1, \"farm\": 3}'::jsonb, wood = 900, clay = 900, iron = 900, wheat = 900 WHERE id = $1", [village]);
     let t = NOON;
-    // Ce test vérifie la construction : on lui donne la priorité sur les ressources (le recrutement passe sinon en premier).
-    env.npcArmyFirst = 0;
     for (let i = 0; i < 12; i++) {
       await tx((c) => npcThink(c, new Outbox(), npc, t));
       t = new Date(t.getTime() + 20 * MIN);
       await processDueEvents(t);
     }
-    env.npcArmyFirst = 1;
     const queue = (await pool.query('SELECT count(*)::int AS n FROM build_queue WHERE village_id = $1', [village])).rows[0].n;
     const v = (await pool.query('SELECT buildings, points FROM villages WHERE id = $1', [village])).rows[0];
     expect(queue + v.points).toBeGreaterThan(0);
@@ -205,9 +151,9 @@ describe('PNJ en jeu', () => {
   });
 
   it('un PNJ met plusieurs lots en file d’un coup, gros lots compris, et recrute avant de construire', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const village = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [npc])).rows[0].id as number;
-    await pool.query("UPDATE villages SET buildings = buildings || '{\"townhall\": 10, \"barracks\": 10, \"farm\": 12, \"wall\": 3, \"warehouse\": 12}'::jsonb, wood = 90000, clay = 90000, iron = 90000, wheat = 90000 WHERE id = $1", [village]);
+    await pool.query("UPDATE villages SET buildings = buildings || '{\"townhall\": 9, \"barracks\": 9, \"farm\": 12, \"wall\": 3, \"warehouse\": 12}'::jsonb, wood = 90000, clay = 90000, iron = 90000, wheat = 90000 WHERE id = $1", [village]);
     await tx((c) => npcThink(c, new Outbox(), npc, NOON));
     const rows = (await pool.query('SELECT unit, count FROM recruit_queue WHERE village_id = $1', [village])).rows;
     expect(rows.length).toBeGreaterThanOrEqual(2);
@@ -220,7 +166,7 @@ describe('PNJ en jeu', () => {
 
   it('un pillard espionne puis attaque un joueur le jour, une seule fois par jour, jamais pendant les heures calmes', async () => {
     await pool.query("DELETE FROM villages WHERE owner_id IS NULL");
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await setNpcTroops(home.id, { swordsman: 150, scout: 5 });
     const player = (await pool.query("INSERT INTO players (username, password_hash) VALUES ('Cible', 'x') RETURNING id")).rows[0].id as number;
@@ -291,7 +237,7 @@ describe('PNJ en jeu', () => {
   });
 
   it('un PNJ sans village repart ailleurs après un délai', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const npc = await tx((c) => createNpc(c, NOON, 'defense'));
     await pool.query('DELETE FROM villages WHERE owner_id = $1', [npc]);
     await tx((c) => npcThink(c, new Outbox(), npc, NOON));
     expect((await pool.query('SELECT 1 FROM villages WHERE owner_id = $1', [npc])).rowCount).toBe(0);

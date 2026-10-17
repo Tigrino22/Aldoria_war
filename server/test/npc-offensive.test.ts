@@ -49,7 +49,7 @@ describe('Offensives des PNJ', () => {
   });
 
   it('à l’heure programmée, le PNJ frappe un joueur de sa taille avec 50 % de son armée, puis reprogramme', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 100, scout: 3 })));
     const player = await makePlayer('Voisin');
@@ -67,7 +67,7 @@ describe('Offensives des PNJ', () => {
   });
 
   it('garde-fous : joueur sous protection, heures calmes, interrupteur coupé', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 100, scout: 3 })));
     const player = await makePlayer('Debutant');

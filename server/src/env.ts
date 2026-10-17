@@ -44,12 +44,10 @@ const baseEnv = {
   /** Marge de sécurité des attaques des PNJ, en % de la défense estimée (0 = ils attaquent dès que leur armée bat celle d'en face) ; modifiable à chaud. */
   npcAttackMargin: count('NPC_ATTACK_MARGIN', 0),
   npcRaids: count('NPC_RAIDS', 1) > 0 ? 1 : 0,
-  npcRaidsPerThink: count('NPC_RAIDS_PER_THINK', 6),
+  npcRaidsPerThink: count('NPC_RAIDS_PER_THINK', 20),
   npcRaidRadius: count('NPC_RAID_RADIUS', 25),
   /** Recrutement des PNJ : lot maximal par unité, nombre de lots par réflexion, et recrutement avant construction (1 = oui) ; modifiables à chaud. */
-  npcRecruitBatch: count('NPC_RECRUIT_BATCH', 150),
   npcRecruitBatches: count('NPC_RECRUIT_BATCHES', 3),
-  npcArmyFirst: count('NPC_ARMY_FIRST', 1) > 0 ? 1 : 0,
   /** Délai moyen (minutes réelles à vitesse x1) entre deux réflexions d'un PNJ, divisé par la racine de la vitesse du monde. */
   npcThinkMinutes: count('NPC_THINK_MINUTES', 10),
   /** Gestionnaire de compte (1 = activé sur le monde), modifiable à chaud depuis l'administration. */
@@ -97,7 +95,6 @@ const baseEnv = {
   /** Ménage : rapports des joueurs gardés (jours, hors archives ; 0 = tous) et mouvements terminés gardés (jours). */
   reportsKeepDays: count('REPORTS_KEEP_DAYS', 30),
   commandsKeepDays: count('COMMANDS_KEEP_DAYS', 4),
-  npcDifficulty: num('NPC_DIFFICULTY', 1),
   npcTimezone: process.env.NPC_TIMEZONE || 'Europe/Paris',
   npcQuietStart: count('NPC_QUIET_START', 22),
   npcQuietEnd: count('NPC_QUIET_END', 8),

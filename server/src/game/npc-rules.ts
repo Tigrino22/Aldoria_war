@@ -1,36 +1,28 @@
 import {
-  BUILDINGS,
-  BUILDING_KEYS,
-  type BuildingKey,
-  type Buildings,
   type Resources,
   type UnitCounts,
   UNIT_KEYS,
   UNITS,
   emptyUnits,
-  meetsRequirements,
   resolveCombat,
   wallDuringCombat,
 } from '@aldoria/shared';
 
 import { env } from '../env';
-import { armyTarget, FARM_LEAD, type VillageRole } from './npc-roles';
-import { PRESETS, nextBuilding } from '../manager/rules';
-
-export { FARM_LEAD, NOBLES_PER_CONQUEST } from './npc-roles';
+import { ROLE_LABEL, type VillageRole } from './npc-roles';
 
 // Règles pures des PNJ : pas de base de données ni d'horloge ici, pour pouvoir les tester facilement.
 
-export type NpcProfile = 'builder' | 'raider' | 'conqueror';
-export const NPC_PROFILES: NpcProfile[] = ['builder', 'raider', 'conqueror'];
-/** Profils tirés au sort pour un PNJ solitaire : 2 bâtisseurs, 2 pillards et 1 conquérant sur 5 en moyenne. */
-export const SOLO_PROFILES: NpcProfile[] = ['builder', 'builder', 'raider', 'raider', 'conqueror'];
+/** Type d'un PNJ : défensif ou offensif (le rôle de son premier village, voir npc-roles.ts). */
+export type NpcProfile = VillageRole;
+export const NPC_PROFILES: NpcProfile[] = ['defense', 'offense'];
+/** Types tirés au sort pour un PNJ solitaire : autant de défensifs que d'offensifs. */
+export const SOLO_PROFILES: NpcProfile[] = ['defense', 'offense'];
 
-export const PROFILE_LABEL: Record<NpcProfile, string> = {
-  builder: 'Bâtisseur',
-  raider: 'Pillard',
-  conqueror: 'Conquérant',
-};
+export const PROFILE_LABEL: Record<NpcProfile, string> = ROLE_LABEL;
+
+/** Type d'un PNJ enregistré en base : les anciens bâtisseurs deviennent défensifs, les pillards et conquérants offensifs. */
+export const npcType = (raw: unknown): NpcProfile => (raw === 'offense' || raw === 'raider' || raw === 'conqueror' ? 'offense' : 'defense');
 
 /** Heure (0-23) dans un fuseau donné. */
 export function hourIn(date: Date, timeZone: string): number {
@@ -42,73 +34,6 @@ export function hourIn(date: Date, timeZone: string): number {
 export function isQuiet(date: Date, timeZone: string, start: number, end: number): boolean {
   const h = hourIn(date, timeZone);
   return start <= end ? h >= start && h < end : h >= start || h < end;
-}
-
-/** Niveaux gagnés par jour de monde : le plafond atteint 20 au bout de 18 jours et 30 au bout de 28 (difficulté ×1). */
-export const NPC_LEVELS_PER_DAY = 1;
-/** Plafond le plus haut des PNJ : celui des mines et de l'entrepôt. Les autres bâtiments s'arrêtent à leur propre maximum (20, caserne 25). */
-export const NPC_MAX_CAP = 30;
-/** Niveau maximal que les PNJ visent selon l'âge du monde : ils suivent un rythme régulier, sans dépasser NPC_MAX_CAP. */
-export function npcCap(worldDays: number, difficulty: number): number {
-  return Math.max(2, Math.min(NPC_MAX_CAP, 2 + Math.floor(Math.max(0, worldDays) * NPC_LEVELS_PER_DAY * difficulty)));
-}
-
-/** Importance donnée à chaque bâtiment : plus le poids est fort, plus le PNJ le monte haut. */
-const BUILD_WEIGHTS: Record<NpcProfile, Record<BuildingKey, number>> = {
-  builder: { townhall: 1, woodcutter: 1.2, claypit: 1.2, ironmine: 1.1, farm: 1.7, warehouse: 1, market: 0.4, barracks: 0.8, wall: 1.1 },
-  raider: { townhall: 0.9, woodcutter: 0.9, claypit: 0.9, ironmine: 1.3, farm: 1.6, warehouse: 0.7, market: 0.1, barracks: 1.4, wall: 0.4 },
-  // Les nobles demandent hôtel de ville et caserne au niveau 10 : le conquérant les monte en priorité.
-  conqueror: { townhall: 1.5, woodcutter: 1, claypit: 1, ironmine: 1.2, farm: 1.7, warehouse: 0.9, market: 0.1, barracks: 1.5, wall: 0.5 },
-};
-
-/** Modèle du gestionnaire suivi par un village de PNJ selon son rôle (le même que celui des joueurs). */
-export const ROLE_PRESET: Record<VillageRole, string> = { offense: 'Offensif', defense: 'Défensif' };
-
-/**
- * Le prochain bâtiment à monter. Avec un rôle, le PNJ suit l'ordre du modèle Offensif ou Défensif des joueurs, chaque ligne
- * bornée par son plafond du jour (la ferme garde son avance). Une fois ce plan atteint, ou sans rôle : le bâtiment le plus en
- * retard par rapport à son poids, sous le plafond, conditions remplies.
- */
-export function chooseBuilding(profile: NpcProfile, levels: Buildings, cap: number, role?: VillageRole): BuildingKey | null {
-  if (role) {
-    const plan = PRESETS.find((p) => p.name === ROLE_PRESET[role])?.plan;
-    const limit = (key: BuildingKey) => Math.min(key === 'farm' ? cap + FARM_LEAD : cap, BUILDINGS[key].maxLevel);
-    const targets = (plan?.buildings ?? []).map((t) => ({ building: t.building, level: Math.min(t.level, limit(t.building)) }));
-    const next = nextBuilding(targets, levels);
-    if (next) return next.building;
-  }
-  let best: BuildingKey | null = null;
-  let bestScore = Infinity;
-  for (const key of BUILDING_KEYS) {
-    const level = levels[key];
-    if (level >= Math.min(key === 'farm' ? cap + FARM_LEAD : cap, BUILDINGS[key].maxLevel)) continue;
-    if (!meetsRequirements(levels, BUILDINGS[key].requires)) continue;
-    // Le marché ne sert à rien à un PNJ avant que le reste ne soit bien avancé.
-    if (key === 'market' && cap < 6) continue;
-    const score = level / BUILD_WEIGHTS[profile][key];
-    if (score < bestScore) {
-      bestScore = score;
-      best = key;
-    }
-  }
-  return best;
-}
-
-/** Unité à recruter en priorité : celle qui manque le plus par rapport à la cible, parmi celles qu'il peut recruter. */
-export function nextRecruit(
-  profile: NpcProfile,
-  role: VillageRole,
-  buildings: Buildings,
-  owned: UnitCounts,
-  cap: number,
-  difficulty: number,
-  maxBatch = 40,
-): { unit: (typeof UNIT_KEYS)[number]; count: number }[] {
-  const target = armyTarget(profile, role, cap, difficulty);
-  return UNIT_KEYS.filter((k) => target[k] > owned[k] && meetsRequirements(buildings, UNITS[k].requires))
-    .map((k) => ({ unit: k, deficit: target[k] - owned[k], ratio: (target[k] - owned[k]) / target[k] }))
-    .sort((a, b) => b.ratio - a.ratio)
-    .map(({ unit, deficit }) => ({ unit, count: Math.max(1, Math.min(maxBatch, Math.ceil(deficit / 2))) }));
 }
 
 /** Éclaireurs envoyés selon le nombre d'échecs de suite : 50 d'emblée, pour passer les éclaireurs d'un joueur, puis 100 et 200. */
@@ -254,10 +179,9 @@ export function npcTribeNameCandidates(): { name: string; tag: string }[] {
   return out;
 }
 
-/** Profils des membres d'une tribu : un chef pillard, un conquérant, puis bâtisseurs et pillards en alternance. */
+/** Types des membres d'une tribu : un chef offensif, puis défensifs et offensifs en alternance. */
 export function tribeMemberProfiles(size: number): NpcProfile[] {
-  const rest: NpcProfile[] = ['conqueror', 'builder', 'raider', 'builder'];
-  return Array.from({ length: size }, (_, i) => (i === 0 ? 'raider' : rest[(i - 1) % rest.length]));
+  return Array.from({ length: size }, (_, i) => (i % 2 === 0 ? 'offense' : 'defense'));
 }
 
 export interface TribeRelations {

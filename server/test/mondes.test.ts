@@ -103,15 +103,15 @@ describe('plusieurs mondes', () => {
     env.adminUsernames.push('chef');
     const h = auth((await post('/api/auth/register', { username: 'Chef', password: 'secret123', world: null })).json().token);
     const put = (world: number, payload: object) => app.inject({ method: 'PUT', url: '/api/admin/settings', headers: { ...h, 'x-world': String(world) }, payload });
-    expect((await put(elnor.id, { npcDifficulty: 1.5 })).statusCode).toBe(200);
-    expect(inWorld(elnor, () => env.npcDifficulty)).toBe(1.5);
-    expect(env.npcDifficulty).toBe(1);
-    expect(await inWorld(elnor, async () => (await pool.query('SELECT value FROM world_settings')).rows)).toEqual([{ value: '1.5' }]);
+    expect((await put(elnor.id, { npcOffensiveShare: 75 })).statusCode).toBe(200);
+    expect(inWorld(elnor, () => env.npcOffensiveShare)).toBe(75);
+    expect(env.npcOffensiveShare).toBe(50);
+    expect(await inWorld(elnor, async () => (await pool.query('SELECT value FROM world_settings')).rows)).toEqual([{ value: '75' }]);
     expect((await pool.query('SELECT count(*)::int AS n FROM world_settings')).rows[0].n).toBe(0);
     // Un joueur ordinaire ne choisit pas son monde par l'en-tête.
     const other = auth((await post('/api/auth/register', { username: 'Curieux', password: 'secret123' })).json().token);
     expect((await app.inject({ method: 'GET', url: '/api/world', headers: { ...other, 'x-world': String(elnor.id) } })).json().id).toBe(1);
-    expect((await put(999, { npcDifficulty: 1 })).statusCode).toBe(404);
+    expect((await put(999, { npcOffensiveShare: 50 })).statusCode).toBe(404);
   });
 
   it('supprimer son compte le retire de tous ses mondes', async () => {
