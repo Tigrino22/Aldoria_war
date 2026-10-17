@@ -28,6 +28,33 @@ export interface WorldChoice {
   member: { villages: number; points: number; lastPlayed: string } | null;
 }
 
+/** Administration : un monde et ses chiffres clés. */
+export interface AdminWorldSummary {
+  id: number;
+  name: string;
+  open: boolean;
+  createdAt: string;
+  /** Réglages fixés à la création (vitesse, taille de la carte…). */
+  config: Record<string, number>;
+  totals: { players: number; npcs: number; villages: number; barbarians: number; tribes: number; active: number };
+}
+
+/** Administration : formulaire d'un nouveau monde. */
+export interface WorldTemplate {
+  config: { key: string; label: string; help: string; min: number; max: number; integer: boolean; default: number }[];
+  settings: { key: string; label: string; help: string; type: 'number' | 'integer' | 'text' | 'boolean'; min: number | null; max: number | null; default: number | string }[];
+}
+
+/** Administration : un compte et les mondes où il joue. */
+export interface AdminAccount {
+  id: number;
+  username: string;
+  createdAt: string;
+  lastSeen: string | null;
+  admin: boolean;
+  worlds: { worldId: number; worldName: string; playerId: number; villages: number; points: number; tribe: string | null; lastPlayed: string }[];
+}
+
 export interface PlayerSummary {
   id: number;
   username: string;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WorldChoice } from '@aldoria/shared';
 import { api, ApiError } from '../api';
+import { API_BASE } from '../config';
 import { logo, villageBg } from '../assets';
 import { ago, fmt } from '../format';
 import './auth.css';
@@ -11,8 +12,10 @@ export interface SessionWorld {
 }
 
 /** Choix du monde après la connexion : ceux où le joueur est inscrit d'abord, puis les mondes qu'il peut rejoindre. */
-export default function WorldPicker({ username, current, onEnter, onLogout, onBack }: {
+export default function WorldPicker({ username, isAdmin, current, onEnter, onLogout, onBack }: {
   username: string;
+  /** Le lien vers le tableau de bord n'apparaît qu'aux administrateurs. */
+  isAdmin?: boolean;
   current: SessionWorld | null;
   onEnter: (w: SessionWorld) => void;
   onLogout: () => void;
@@ -86,6 +89,11 @@ export default function WorldPicker({ username, current, onEnter, onLogout, onBa
             <button type="button" className="btn" onClick={onBack}>
               Revenir à {current.name}
             </button>
+          )}
+          {isAdmin && (
+            <a className="btn" href={`${API_BASE}/admin`}>
+              Administration
+            </a>
           )}
           <button type="button" className="btn ghost" onClick={onLogout}>
             Se déconnecter

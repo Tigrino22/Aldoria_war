@@ -32,7 +32,8 @@ const PAGES = {
   Wiki: () => import('./Wiki'),
   WorldStats: () => import('./WorldStats'),
   WorldWars: () => import('./WorldWars'),
-  Admin: () => import('./Admin'),
+  // L'administration est un tableau de bord séparé (/admin) : dans le jeu, l'entrée n'y mène que par un lien.
+  Admin: () => import('./AdminLink'),
   BugReport: () => import('./BugReport'),
   VillageSheet: () => import('./VillageSheet'),
   Raid: () => import('./Raid'),

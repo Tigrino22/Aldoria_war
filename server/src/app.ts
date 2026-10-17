@@ -24,6 +24,7 @@ import statsRoutes from './routes/stats';
 import villageRoutes from './routes/village';
 import itemRoutes from './routes/items';
 import worldRoutes from './routes/worlds';
+import adminWorldRoutes from './routes/admin-worlds';
 
 export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] } = {}) {
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: env.trustProxy });
@@ -100,6 +101,7 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
   await app.register(crusadeRoutes);
   await app.register(itemRoutes);
   await app.register(worldRoutes);
+  await app.register(adminWorldRoutes);
 
   // En production, le même serveur distribue aussi le site (le client utilise des routes en #, donc
   // tout chemin inconnu hors /api renvoie la page d'accueil).
@@ -115,6 +117,8 @@ export async function buildApp(opts: { logger?: boolean; corsOrigins?: string[] 
         res.setHeader('cache-control', filePath.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache');
       },
     });
+    // Le tableau de bord d'administration, séparé du jeu : sa propre page.
+    app.get('/admin', (_req, reply) => reply.header('cache-control', 'no-cache').sendFile('admin.html'));
     app.setNotFoundHandler((req, reply) => {
       if (req.method === 'GET' && !req.url.startsWith('/api')) return reply.header('cache-control', 'no-cache').sendFile('index.html');
       return reply.status(404).send({ error: 'Introuvable' });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { BUILDINGS, RESOURCE_NAMES, UNITS, type BuildingKey, type Resource, type UnitKey } from '@aldoria/shared';
 import { api } from '../api';
 import { clockTime, fmt } from '../format';
@@ -83,7 +83,7 @@ const SETTING_LABEL: Record<string, string> = {
 };
 
 /** Page d'administration (lecture seule), réservée aux pseudos de ADMIN_USERNAMES. */
-export default function Admin() {
+export default function Admin({ header }: { header?: ReactNode } = {}) {
   const { me, run, toast } = useGame();
   const pending: Partial<Record<Tab, number>> = { moderation: me.openModerationReports ?? 0, bugs: me.openBugReports ?? 0 };
   // Des signalements ou des bugs attendent : on arrive directement dessus.
@@ -162,7 +162,9 @@ export default function Admin() {
 
   return (
     <div className="pg admin">
-      <PageBanner icon="admin" kicker="Administration" title="Tableau de bord du monde" lead="Signalements, bugs, PNJ, guerres, joueurs et réglages du monde · actualisé toutes les 20 s" />
+{header ?? (
+        <PageBanner icon="admin" kicker="Administration" title="Tableau de bord du monde" lead="Signalements, bugs, PNJ, guerres, joueurs et réglages du monde · actualisé toutes les 20 s" />
+      )}
       <div className="admin-toolbar">
         <div className="tabs" role="tablist">
           {tabs.map(([k, label]) => (
@@ -450,7 +452,7 @@ export default function Admin() {
                     </label>
                   );
                 })}
-                <p className="muted small">Les changements s'appliquent tout de suite. La vitesse du monde et la taille de la carte se règlent sur Render : les modifier en cours de partie fausserait les constructions et les trajets en cours.</p>
+                <p className="muted small">Les changements s'appliquent tout de suite. La vitesse du monde et la taille de la carte sont fixées à la création du monde : les modifier en cours de partie fausserait les constructions et les trajets en cours.</p>
               </div>
             )}
           </Panel>
