@@ -83,8 +83,8 @@ const delayMs = () => Math.max(30_000, ((0.5 + rng()) * env.npcThinkMinutes * 60
 const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 /** Rayon (en cases) dans lequel un PNJ cherche des cibles. */
 const RAID_RADIUS = 20;
-/** Fantassins qui accompagnent chaque noble d'un train : des épéistes depuis un village offensif, des lanciers depuis un village défensif. */
-const NOBLE_ESCORT = 2;
+/** Fantassins qui accompagnent chaque noble d'un train (épéistes depuis un village offensif, lanciers depuis un village défensif) : assez pour passer la défense de base et la muraille d'un village vidé par l'assaut. Sans eux, le noble ne part pas. */
+const NOBLE_ESCORT = 20;
 const ESCORT_UNIT: Record<VillageRole, keyof UnitCounts> = { offense: 'swordsman', defense: 'spearman' };
 /** Nombre maximal de nobles dans un train. */
 const MAX_TRAIN = 6;

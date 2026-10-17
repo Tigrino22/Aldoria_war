@@ -108,6 +108,8 @@ describe('PNJ : nobles, conquêtes et pillage', () => {
       if (back.noble === 0 && nobleAttacks === 0) await tx((c) => setTroops(c, home.id, home.id, army));
     }
     expect(nobleAttacks).toBeGreaterThan(0);
+    // Chaque noble part avec 20 épéistes d'escorte, de quoi passer la défense de base et la muraille.
+    for (const r of (await sentFrom(home.id)).filter((r) => r.units.noble > 0)) expect(r.units).toEqual(expect.objectContaining({ noble: 1, swordsman: 20 }));
     expect((await pool.query('SELECT owner_id FROM villages WHERE id = $1', [target])).rows[0].owner_id).toBe(npc);
     // Deux villages : la gestion devient mixte, le second village suit le modèle défensif.
     const villages = (await pool.query('SELECT id FROM villages WHERE owner_id = $1 ORDER BY id', [npc])).rows;

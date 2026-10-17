@@ -44,7 +44,7 @@ Le code est dans `npc-tribes.ts` (défense, alertes, opérations) et `npc.ts`, l
 
 ### Train de nobles, PNJ forts et ratio de points
 
-- **Train de nobles** : un PNJ qui a des nobles au village (6 au plus par train, un seul suffit) lance un assaut qui nettoie la défense, puis ses nobles un par un, à une seconde d'écart, juste derrière, chacun avec 2 fantassins d'escorte. Le train est annulé si le dernier noble arriverait pendant les heures calmes.
+- **Train de nobles** : un PNJ qui a des nobles au village (6 au plus par train, un seul suffit) lance un assaut qui nettoie la défense, puis ses nobles un par un, à une seconde d'écart, juste derrière, chacun avec 20 fantassins d'escorte (sans eux, le noble ne part pas). Le train est annulé si le dernier noble arriverait pendant les heures calmes.
 - **Force de frappe** : plus de notion de « PNJ fort » ni de délai : seule compte la taille de l'armée disponible face au butin.
 - **Ratio de points** : sans provocation, un PNJ ne s'en prend qu'à un joueur dont les points valent de 70 % à 150 % des siens. La riposte contre un joueur qui l'a attaqué (lui, sa tribu ou une alliée) ignore ce ratio.
 
