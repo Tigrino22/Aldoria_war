@@ -22,6 +22,8 @@ export interface WarSide {
 }
 
 export interface WarBattle {
+  /** Rapport d'où vient la bataille, que l'administration peut ouvrir. */
+  reportId: number;
   at: string;
   attacker: { player: string; tribeId: number; tag: string; village: string };
   defender: { player: string; tribeId: number; tag: string; village: string };
@@ -113,7 +115,7 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
   // Batailles entre PNJ de tribus différentes : le rapport de défense du PNJ attaqué contient les pertes des deux camps.
   const battleRows = (
     await pool.query(
-      `SELECT r.created_at, r.data, d.username AS defender, d.tribe_id AS dt, a.username AS attacker, a.tribe_id AS at_
+      `SELECT r.id, r.created_at, r.data, d.username AS defender, d.tribe_id AS dt, a.username AS attacker, a.tribe_id AS at_
        FROM reports r
        JOIN players d ON d.id = r.player_id AND d.is_npc
        JOIN players a ON a.username = r.data->'attacker'->>'playerName' AND a.is_npc
@@ -125,13 +127,13 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
   // Batailles qui opposent un PNJ et un joueur dans une guerre de tribu : le rapport de l'attaquant PNJ (ou celui du PNJ attaqué par un joueur).
   const mixedRows = (
     await pool.query(
-      `SELECT r.created_at, r.data, a.username AS attacker, a.tribe_id AS at_, d.username AS defender, d.tribe_id AS dt
+      `SELECT r.id, r.created_at, r.data, a.username AS attacker, a.tribe_id AS at_, d.username AS defender, d.tribe_id AS dt
        FROM reports r
        JOIN players a ON a.id = r.player_id AND a.is_npc
        JOIN players d ON d.username = r.data->'defender'->>'playerName' AND NOT d.is_npc
        WHERE r.type = 'attack' AND r.created_at >= $1 AND a.tribe_id IS NOT NULL AND d.tribe_id IS NOT NULL AND a.tribe_id <> d.tribe_id
        UNION ALL
-       SELECT r.created_at, r.data, a.username, a.tribe_id, d.username, d.tribe_id
+       SELECT r.id, r.created_at, r.data, a.username, a.tribe_id, d.username, d.tribe_id
        FROM reports r
        JOIN players d ON d.id = r.player_id AND d.is_npc
        JOIN players a ON a.username = r.data->'attacker'->>'playerName' AND NOT a.is_npc
@@ -141,6 +143,7 @@ export async function warOverview(hours: number, now = new Date()): Promise<WarO
     )
   ).rows.filter((r) => playerPairs.has(pairKey(r.at_, r.dt)));
   const battles: WarBattle[] = [...battleRows, ...mixedRows].sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime()).map((r) => ({
+    reportId: r.id,
     at: new Date(r.created_at).toISOString(),
     attacker: { player: r.attacker, tribeId: r.at_, tag: side.get(r.at_)?.tag ?? '?', village: r.data.attacker.village.name },
     defender: { player: r.defender, tribeId: r.dt, tag: side.get(r.dt)?.tag ?? '?', village: r.data.defender.village.name },

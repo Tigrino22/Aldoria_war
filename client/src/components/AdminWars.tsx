@@ -3,6 +3,8 @@ import { api } from '../api';
 import { fmt } from '../format';
 import { useGame } from '../game';
 import { Countdown, Panel } from '../ui';
+import { ReportBody } from './Reports';
+import './reports.css';
 
 interface Side {
   id: number;
@@ -25,6 +27,8 @@ interface Front {
   inFlight: number;
 }
 interface Battle {
+  /** Absent de la vue publique : seule l'administration ouvre les rapports. */
+  reportId?: number;
   at: string;
   attacker: { player: string; tag: string; village: string };
   defender: { player: string; tag: string; village: string };
@@ -54,7 +58,16 @@ interface Overview {
   log: { at: string; kind: 'declared' | 'ended'; a: string; b: string }[];
 }
 
-type Line = { at: string; node: React.ReactNode };
+type Line = { at: string; node: React.ReactNode; reportId?: number };
+
+interface AdminReport {
+  id: number;
+  type: string;
+  title: string;
+  data: any;
+  createdAt: string;
+  player: string;
+}
 
 /** Heure courte (« 12:48 »), précédée du jour quand ce n'est pas aujourd'hui. */
 const shortTime = (iso: string) => {
@@ -77,6 +90,8 @@ export default function AdminWars({ hours, publicView = false }: { hours: number
   const { run } = useGame();
   const [data, setData] = useState<Overview | null>(null);
   const [all, setAll] = useState(false);
+  const [report, setReport] = useState<AdminReport | null>(null);
+  const openReport = (id: number) => run(async () => setReport(await api<AdminReport>(`/api/admin/reports/${id}`)));
   const load = useCallback(() => run(async () => setData(await api<Overview>(`/api/${publicView ? 'world' : 'admin'}/wars?hours=${hours}`))), [run, hours, publicView]);
   useEffect(() => {
     load();
@@ -92,6 +107,7 @@ export default function AdminWars({ hours, publicView = false }: { hours: number
   const timeline: Line[] = [
     ...data.battles.map((b) => ({
       at: b.at,
+      reportId: publicView ? undefined : b.reportId,
       node: (
         <>
           <b>[{b.attacker.tag}] {b.attacker.player}</b> {b.conquered ? 'conquiert' : 'attaque'} {b.defender.village} de <b>[{b.defender.tag}] {b.defender.player}</b> :{' '}
@@ -223,12 +239,37 @@ export default function AdminWars({ hours, publicView = false }: { hours: number
           <div className="admin-scroll">
             <table className="admin-table">
               <tbody>
-                {(all ? timeline : timeline.slice(0, 30)).map((l, i) => (
-                  <tr key={i}>
-                    <td className="t">{shortTime(l.at)}</td>
-                    <td>{l.node}</td>
-                  </tr>
-                ))}
+                {(all ? timeline : timeline.slice(0, 30)).map((l, i) =>
+                  l.reportId ? (
+                    <tr
+                      key={i}
+                      className="war-line-link"
+                      role="button"
+                      tabIndex={0}
+                      title="Ouvrir le rapport de la bataille"
+                      onClick={() => openReport(l.reportId!)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          openReport(l.reportId!);
+                        }
+                      }}
+                    >
+                      <td className="t">{shortTime(l.at)}</td>
+                      <td>
+                        {l.node}
+                        <span className="war-line-more" aria-hidden="true">
+                          Rapport ›
+                        </span>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={i}>
+                      <td className="t">{shortTime(l.at)}</td>
+                      <td>{l.node}</td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
             {timeline.length > 30 && (
@@ -239,6 +280,8 @@ export default function AdminWars({ hours, publicView = false }: { hours: number
           </div>
         )}
       </Panel>
+
+      {report && <ReportDialog report={report} onClose={() => setReport(null)} />}
 
       <Panel title="Tribus en trêve">
         {data.truce.length === 0 ? (
@@ -255,5 +298,34 @@ export default function AdminWars({ hours, publicView = false }: { hours: number
         )}
       </Panel>
     </>
+  );
+}
+
+/** Rapport d'une bataille du journal, tel que son joueur le voit (lecture seule : il reste non lu pour lui). */
+function ReportDialog({ report, onClose }: { report: AdminReport; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="pg reports war-report-dialog" role="dialog" aria-modal="true" aria-label={report.title} onClick={(e) => e.stopPropagation()}>
+        <div className="row between">
+          <div>
+            <p className="muted small">
+              Rapport de {report.player} · {shortTime(report.createdAt)}
+            </p>
+            <h2>{report.title}</h2>
+          </div>
+          <button className="btn small" onClick={onClose} autoFocus>
+            Fermer
+          </button>
+        </div>
+        <div className="rp-body">
+          <ReportBody report={report} />
+        </div>
+      </div>
+    </div>
   );
 }
