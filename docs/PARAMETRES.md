@@ -301,7 +301,7 @@ Valeurs dans `server/src/game/market-rules.ts`, à ajuster librement.
 | Minimum par côté | 50 ressources |
 | Offres ouvertes par joueur | 5 (aucune limite pour un PNJ) |
 | PNJ : excédent / manque | plus de 70 % / moins de 25 % de l'entrepôt |
-| PNJ : montant offert | 30 % du stock en excédent (au plus ce que portent ses marchands libres), taux 0,9 (bâtisseur) ou 1 |
+| PNJ : montant offert | 30 % du stock en excédent (au plus ce que portent ses marchands libres), taux 0,9 (défensif) ou 1 (offensif) |
 | PNJ : rayon pour accepter | aucun (tout le monde) |
 | PNJ : échanges par réflexion | jusqu'à 10 par village, tant qu'il reste des marchands libres |
 
@@ -396,46 +396,34 @@ Avant, un PNJ lançait au plus une attaque par réflexion (toutes les 10 à 20 m
 | Règle | Valeur |
 |---|---|
 | Cibles | Barbares et villages des PNJ rivaux, en guerre ou rancuniers, dans 25 cases ; jamais un joueur (les attaques habituelles s'en chargent) |
-| Renseignement | Barbare inconnu ou rapport de plus de 24 h de jeu : 1 éclaireur (2 par réflexion au plus, sur la moitié des éclaireurs du village). Village de PNJ : seulement s'il a été vu vide il y a moins de 6 h de jeu |
+| Renseignement | Barbare inconnu ou rapport de plus de 24 h de jeu : 1 éclaireur (4 par réflexion au plus, sur la moitié des éclaireurs du village). Village de PNJ : seulement s'il a été vu vide il y a moins de 6 h de jeu |
 | Butin | Estimé comme l'assistant des joueurs (`estimateLoot`) ; pas de pillage sous 100 |
-| Troupes | Le plus petit groupe qui porte le butin (cavaliers, lanciers, épéistes, hallebardiers : toutes les unités qui portent du butin, dans tout village offensif ou défensif) et bat la défense de base (sans marge, comme toutes les attaques de PNJ) |
+| Troupes | Exactement 50 épéistes (village offensif) ou 50 lanciers (village défensif), s'ils battent la défense de base (sans marge, comme toutes les attaques de PNJ) ; moins de 50 au village : pas de pillage |
 | Cible en cours | Un village déjà visé par une attaque en route est sauté |
 | Rythme | Réflexion toutes les 5 à 15 minutes (`NPC_THINK_MINUTES`, 10 par défaut ; avant : 10 à 20) |
 
 Réglages à chaud (Administration > Monde) : « Pillage intensif des PNJ » (`NPC_RAIDS`), « Pillages par village et par réflexion » (`NPC_RAIDS_PER_THINK`), « Rayon du pillage intensif » (`NPC_RAID_RADIUS`), « Rythme de réflexion des PNJ » (`NPC_THINK_MINUTES`).
 
-## Recrutement des PNJ : villages offensifs et défensifs
+## Moteur des PNJ : défensifs et offensifs (octobre 2026)
 
-Rythme : le niveau visé par les PNJ gagne 1 par jour de monde (`NPC_LEVELS_PER_DAY`, 20 au bout de 18 jours à difficulté ×1). La ferme, qui loge l'armée, monte `FARM_LEAD` = 3 niveaux plus haut que le reste et pèse davantage (poids 1,6 à 1,7). L'armée visée de chaque village remplit toute la ferme visée (niveau de ferme = plafond + 3, 20 au plus, soit jusqu'à 19 968 habitants), éclaireurs et nobles compris (`armyTarget` dans `npc-roles.ts`) ; les proportions ci-dessous se répartissent le reste. Une difficulté inférieure à 1 ne remplit qu'une part de la ferme. Un lot de recrutement peut aller jusqu'à 40 unités, réduit de moitié tant qu'il est trop cher ou trop lourd pour la ferme.
+Il n'y a plus que deux types de PNJ, défensif et offensif (code : `server/src/game/npc-roles.ts`). Les anciens bâtisseurs sont devenus défensifs, les pillards et conquérants offensifs (migration 039). Dans une tribu, les membres alternent : chef offensif, puis défensif, offensif, etc.
 
-Chaque village d'un PNJ a un rôle (code : `server/src/game/npc-roles.ts`), qui fixe les seules unités qu'on y recrute.
-
-| Rôle | Unités recrutées (par niveau visé) |
+| Règle | Valeur |
 |---|---|
-| Offensif | (proportions) épéistes ×7, cavaliers ×2, jusqu'à 60 éclaireurs (min(60, (6 + niveau × 2,5) × max(1, difficulté)), voir « Espionnage »), garde de lanciers ×1 ; béliers ×1 (conquérant) ; 4 nobles dès le niveau 10 (pillard et conquérant) |
-| Défensif | (proportions) lanciers ×5, hallebardiers ×5, épéistes ×1 (petite troupe de pillage et de riposte), un tiers des éclaireurs d'un village offensif (5 au moins, `defenseScouts`) |
+| Rôle des villages | Un seul village : celui du type du PNJ. Dès le deuxième village, gestion mixte : les rôles alternent (moitié offensifs, moitié défensifs), en commençant par le type du PNJ (`villageRoles`) |
+| Constructions | Le modèle « Offensif » ou « Défensif » du gestionnaire de compte (`PRESETS` dans `server/src/manager/rules.ts`), à la lettre et sans plafond de niveau, avec deux ajouts (`npcPlan`) : la caserne de l'unité de pillage après les deux premières lignes (caserne 3 pour les épéistes, caserne 1 pour les lanciers), et les bâtiments du noble après la onzième ligne (entrepôt 14, hôtel de ville 10, caserne 10). Toute la file de construction (2 chantiers) se remplit à chaque réflexion |
+| Troupes | Effectifs du modèle (offensif : 11 500 épéistes, 1 800 cavaliers, 150 béliers, 50 éclaireurs ; défensif : 9 500 lanciers, 9 900 hallebardiers, 250 éclaireurs), recrutés avec les règles du gestionnaire (`nextTroopLot`) : les troupes prennent ce qui dépasse le coût du prochain bâtiment, plus 30 % de la production mise de côté pour lui (`NPC_TROOPS_SHARE`). Lots de 2 heures de recrutement au plus, jusqu'à `NPC_RECRUIT_BATCHES` lots par réflexion |
+| Nobles | 2 par village offensif, 1 par village défensif (`NOBLE_GOAL`). Dès que l'hôtel de ville et la caserne sont au niveau 10, le village frappe la lettre qui manque (cagnotte remplie depuis son stock) puis recrute le noble. Tant que le noble n'est pas payé, bâtiments et autres troupes laissent son prix de côté. Sur le simulateur (vitesse x1, sans pillage), les bâtiments du noble sont prêts vers le jour 10 à 11 |
+| Conquête | Dès qu'un noble est au village, le PNJ choisit un barbare ou un village de PNJ hostile à 12 cases au plus (le plus gros au plus près), l'espionne, envoie l'assaut qui nettoie puis ses nobles un par seconde, chacun escorté de 2 fantassins (épéistes depuis un village offensif, lanciers depuis un village défensif). Un seul noble suffit : il revient à la charge jusqu'à faire tomber la loyauté. La conquête passe avant les offensives et les pillages (pas avant la riposte). Un village trop bien défendu pour son armée est écarté (les 5 derniers sont retenus). Les attaques ordinaires contre un joueur emmènent aussi les nobles présents |
+| Pillage | 50 lanciers par pillage depuis un village défensif, 50 épéistes depuis un village offensif (`RAID_SIZE`, `RAID_UNIT`), vers chaque village sans défense connu ; autant de pillages que les troupes le permettent, jusqu'à « Pillages par village et par réflexion » (20 par défaut). Un barbare ou un PNJ vu sans défense n'est plus pillé par l'attaque habituelle (toute l'armée), seulement par ces groupes de 50 |
 
-Espionnage des PNJ : avant de piller, un PNJ envoie d'emblée 50 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), il réagit selon un tirage (`afterScoutFailure`) : 35 % il attend, 25 % il réespionne avec la vague suivante, 100 puis 200 (dans la limite de ceux du village), 25 % il envoie une petite troupe d'intimidation (un dixième de ses épéistes et cavaliers, entre 10 et 40, `harassUnits`), 15 % il frappe à l'aveugle avec une vraie attaque (la part d'offensive) ; un joueur déjà frappé par un PNJ pendant la période ne reçoit que l'intimidation. Une seule réaction par délai d'espionnage ; l'échec est retenu pour tout le joueur, pas seulement pour le village visé. S'il a déjà vu des éclaireurs chez la cible (espionnage ou attaque), il en envoie au moins le double plus 5. En guerre (guerre de tribu, riposte, offensive), la vague est doublée et engage au moins les trois quarts des éclaireurs du village (`WAR_SCOUT_SHARE`). Jamais de mission à moins de 5 éclaireurs (`MIN_SCOUT_WAVE`) : le village attend d'en avoir assez. Délai entre deux espionnages d'un même PNJ chez un joueur ou un PNJ : 4 heures de jeu, 1 heure en guerre ; les éclaireurs envoyés aux barbares ne comptent pas. Le pillage intensif n'utilise que la moitié des éclaireurs d'un village. Après trois échecs de suite sur la même cible, il la laisse tranquille 12 heures de jeu après le dernier échec (`SCOUT_PAUSE_GAME_HOURS`), puis reprend directement avec 200 éclaireurs tant que le dernier échec date de moins de 36 heures de jeu (`SCOUT_MEMORY_GAME_HOURS`) ; au-delà, retour à 50. Un espionnage réussi efface les échecs. Constantes : `SCOUT_WAVES`, `scoutWave`, `scoutPaused`, `SCOUT_MAX_FAILURES` dans `npc-rules.ts`, `offenseScouts` et `defenseScouts` dans `npc-roles.ts`.
+Réglages retirés de l'administration (sans objet désormais) : « Difficulté des PNJ », « Taille maximale d'un lot de recrutement » et « Les PNJ recrutent avant de construire ». Les interrupteurs des guerres, de la riposte, des offensives, des interceptions et du pillage restent.
 
-Un village dont le rôle va à l'encontre du tempérament du PNJ (un bâtisseur qui attaque, un pillard qui défend) recrute ses unités principales à 60 %.
-
-| Profil | Part de villages offensifs | Avec un seul village |
-|---|---|---|
-| Bâtisseur | 30 % | défensif |
-| Pillard | 70 % | offensif |
-| Conquérant | 60 % | offensif |
-
-Dès qu'un PNJ a plusieurs villages, il y a toujours au moins un village de chaque rôle ; les offensifs sont répartis régulièrement (ex. 2 villages : le premier défensif, le second offensif). Dans une tribu, les profils sont déjà mélangés (chef pillard, un conquérant, des bâtisseurs et des pillards), donc certains membres sont offensifs et d'autres défensifs. Les renforts qu'un PNJ envoie à sa tribu menacée comptent aussi les hallebardiers.
+Espionnage des PNJ : avant de piller, un PNJ envoie d'emblée 50 éclaireurs. Si tous sont tués (la défense en avait autant ou plus), il réagit selon un tirage (`afterScoutFailure`) : 35 % il attend, 25 % il réespionne avec la vague suivante, 100 puis 200 (dans la limite de ceux du village), 25 % il envoie une petite troupe d'intimidation (un dixième de ses épéistes et cavaliers, entre 10 et 40, `harassUnits`), 15 % il frappe à l'aveugle avec une vraie attaque (la part d'offensive) ; un joueur déjà frappé par un PNJ pendant la période ne reçoit que l'intimidation. Une seule réaction par délai d'espionnage ; l'échec est retenu pour tout le joueur, pas seulement pour le village visé. S'il a déjà vu des éclaireurs chez la cible (espionnage ou attaque), il en envoie au moins le double plus 5. En guerre (guerre de tribu, riposte, offensive), la vague est doublée et engage au moins les trois quarts des éclaireurs du village (`WAR_SCOUT_SHARE`). Jamais de mission à moins de 5 éclaireurs (`MIN_SCOUT_WAVE`) : le village attend d'en avoir assez. Délai entre deux espionnages d'un même PNJ chez un joueur ou un PNJ : 4 heures de jeu, 1 heure en guerre ; les éclaireurs envoyés aux barbares ne comptent pas. Le pillage intensif n'utilise que la moitié des éclaireurs d'un village. Après trois échecs de suite sur la même cible, il la laisse tranquille 12 heures de jeu après le dernier échec (`SCOUT_PAUSE_GAME_HOURS`), puis reprend directement avec 200 éclaireurs tant que le dernier échec date de moins de 36 heures de jeu (`SCOUT_MEMORY_GAME_HOURS`) ; au-delà, retour à 50. Un espionnage réussi efface les échecs. Constantes : `SCOUT_WAVES`, `scoutWave`, `scoutPaused`, `SCOUT_MAX_FAILURES` dans `npc-rules.ts`, éclaireurs visés par les modèles du gestionnaire (50 en offensif, 250 en défensif).
 
 ### Marge de sécurité des attaques des PNJ
 
 Un PNJ attaque dès que son armée bat l'armée qu'il a espionnée (force d'attaque strictement supérieure à la défense estimée, muraille comprise). Avant, il exigeait 30 % de plus. Réglage à chaud « Marge de sécurité des attaques des PNJ (%) » (`NPC_ATTACK_MARGIN`, 0 par défaut) dans Administration > Monde. Elle s'applique aux pillages, aux guerres, aux ripostes et aux opérations de tribu. Les offensives occasionnelles partent avec leur part d'armée (« Part de l'armée engagée dans une offensive ») si cette part bat la défense espionnée ; sinon avec toute l'armée offensive si elle suffit ; sinon le PNJ renonce et retente plus tard. Une attaque perdue d'avance ne faisait que remplir les rapports.
-
-### Recrutement accéléré des PNJ
-
-Avant : un village de PNJ ne recrutait que lorsque sa file était vide, un seul lot d'au plus 40 unités par réflexion, après avoir dépensé ses ressources en construction. À x10, la caserne restait donc inactive entre deux réflexions et l'armée montait lentement.
-
-Désormais (`recruitStep` dans `npc.ts`) : la file se remplit dès qu'il lui reste moins de deux réflexions de travail ; jusqu'à 3 lots de types d'unités différents par réflexion (`NPC_RECRUIT_BATCHES`), chacun d'au plus 150 unités (`NPC_RECRUIT_BATCH`, réduit de moitié tant que c'est trop cher ou trop lourd pour la ferme) ; les unités déjà en file comptent dans les effectifs, donc pas de doublon ; le recrutement passe avant la construction pour l'usage des ressources (`NPC_ARMY_FIRST`, 1 par défaut ; 0 remet la construction en premier). Les trois réglages sont modifiables à chaud dans Administration > Monde. Contrepartie : plus de ressources vont à l'armée, donc les bâtiments montent un peu moins vite.
 
 ## Point de ralliement : ordres planifiés et train de nobles
 

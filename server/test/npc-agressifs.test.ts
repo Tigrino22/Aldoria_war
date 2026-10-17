@@ -54,7 +54,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('un bâtisseur riposte contre un joueur qui l’a attaqué, sans attendre le délai entre deux attaques', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const npc = await tx((c) => createNpc(c, NOON, 'defense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 10 })));
     const player = await makePlayer('Agresseur');
@@ -74,7 +74,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('la riposte se désactive à chaud : le PNJ attaqué n’en veut plus à personne et n’est plus réveillé', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const npc = await tx((c) => createNpc(c, NOON, 'defense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
     const player = await makePlayer('Vindicatif');
@@ -96,7 +96,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('un PNJ attaqué ne riposte pas pendant les heures calmes', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
     const player = await makePlayer('Nocturne');
@@ -109,7 +109,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('un pillard attaque un joueur sans provocation le jour', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
     const player = await makePlayer('Paisible');
@@ -122,7 +122,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('tout PNJ avec des nobles tente de conquérir un joueur, même son dernier village', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const npc = await tx((c) => createNpc(c, NOON, 'defense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     const army = { swordsman: 120, ram: 5, noble: 6 };
     await tx((c) => setTroops(c, home.id, home.id, troops(army)));
@@ -163,7 +163,7 @@ describe('PNJ agressifs', () => {
     expect(pointRatioOk(100, 151)).toBe(false);
     expect(pointRatioOk(0, 50)).toBe(false);
 
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 10 })));
     const giant = await makePlayer('Géant');
@@ -186,7 +186,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('aucune limite journalière : un PNJ attaqué frappe le même joueur autant de fois que nécessaire', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 100000, scout: 3 })));
     const foe = await makePlayer('Adversaire');
@@ -204,7 +204,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('un PNJ attaqué enchaîne les ripostes sur plusieurs villages de l’agresseur dès sa première réflexion', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'builder'));
+    const npc = await tx((c) => createNpc(c, NOON, 'defense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 20000, scout: 3 })));
     const foe = await makePlayer('Rancunier');
@@ -232,7 +232,7 @@ describe('PNJ agressifs', () => {
     const modest = pickRaidUnits(army, emptyUnits(), 0, { wood: 100, clay: 100, iron: 100, wheat: 100 })!;
     expect(modest.units.swordsman).toBeLessThan(100);
 
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 3 })));
     const other = await makePlayer('Voisin');
@@ -284,7 +284,7 @@ describe('PNJ agressifs', () => {
     // Du plus récent au plus ancien : un renseignement obtenu remet le compte à zéro pour les échecs plus anciens.
     expect([...consecutiveScoutFailures(ordered)]).toEqual([[1, { count: 2, lastAt: 60 }]]);
 
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 600 })));
     const other = await makePlayer('Defenseur');
@@ -365,7 +365,7 @@ describe('PNJ agressifs', () => {
   });
 
   it('espionnage crédible : les éclaireurs envoyés aux barbares ne retardent rien, la vague se souvient du joueur, et la guerre engage le gros des éclaireurs', async () => {
-    const npc = await tx((c) => createNpc(c, NOON, 'raider'));
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 40 })));
     const other = await makePlayer('Espionne');

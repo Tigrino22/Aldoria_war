@@ -75,9 +75,7 @@ const SETTING_LABEL: Record<string, string> = {
   npcAttackMargin: 'Marge de sécurité des attaques',
   npcRaids: 'Pillage intensif',
   npcThinkMinutes: 'Rythme de réflexion des PNJ',
-  npcRecruitBatch: 'Lot de recrutement des PNJ',
-  npcArmyFirst: 'Priorité des PNJ',
-  npcDifficulty: 'Difficulté des PNJ',
+  npcRecruitBatches: 'Recrutement des PNJ',
   npcTimezone: 'Fuseau des heures calmes',
   quietHours: 'Heures calmes',
 };

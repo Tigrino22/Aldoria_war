@@ -21,13 +21,13 @@ describe('administration', () => {
     const autre = await register('Badaud');
     const put = (headers: Record<string, string>, payload: object) => app.inject({ method: 'PUT', url: '/api/admin/settings', headers, payload });
 
-    expect((await put(autre, { npcDifficulty: 2 })).statusCode).toBe(403);
-    const before = env.npcDifficulty;
-    const ok = await put(chef, { npcDifficulty: '1,5', npcQuietStart: 23 });
+    expect((await put(autre, { npcOffensiveShare: 80 })).statusCode).toBe(403);
+    const before = env.npcOffensiveShare;
+    const ok = await put(chef, { npcOffensiveShare: '75', npcQuietStart: 23 });
     expect(ok.statusCode).toBe(200);
-    expect(env.npcDifficulty).toBe(1.5);
+    expect(env.npcOffensiveShare).toBe(75);
     expect(env.npcQuietStart).toBe(23);
-    expect((await pool.query('SELECT value FROM world_settings WHERE key = $1', ['npcDifficulty'])).rows[0].value).toBe('1.5');
+    expect((await pool.query('SELECT value FROM world_settings WHERE key = $1', ['npcOffensiveShare'])).rows[0].value).toBe('75');
 
     const off = await put(chef, { npcRevenge: false });
     expect(off.statusCode).toBe(200);
@@ -36,14 +36,14 @@ describe('administration', () => {
     expect((await put(chef, { npcRevenge: 'oui' })).statusCode).toBe(200);
     expect(env.npcRevenge).toBe(1);
 
-    for (const bad of [{ npcDifficulty: 10 }, { npcQuietStart: 1.5 }, { npcTimezone: 'Mars/Olympus' }, { vitesse: 5 }]) {
+    for (const bad of [{ npcOffensiveShare: 500 }, { npcQuietStart: 1.5 }, { npcTimezone: 'Mars/Olympus' }, { vitesse: 5 }]) {
       expect((await put(chef, bad)).statusCode, JSON.stringify(bad)).toBe(400);
     }
-    expect(env.npcDifficulty).toBe(1.5);
+    expect(env.npcOffensiveShare).toBe(75);
 
-    const reset = await put(chef, { npcDifficulty: null, npcQuietStart: null, npcRevenge: null });
+    const reset = await put(chef, { npcOffensiveShare: null, npcQuietStart: null, npcRevenge: null });
     expect(reset.statusCode).toBe(200);
-    expect(env.npcDifficulty).toBe(before);
+    expect(env.npcOffensiveShare).toBe(before);
     expect((await pool.query('SELECT count(*)::int AS n FROM world_settings')).rows[0].n).toBe(0);
     env.adminUsernames.length = 0;
   });
@@ -67,7 +67,7 @@ describe('administration', () => {
     expect((await app.inject({ method: 'GET', url: '/api/me', headers: other })).json().isAdmin).toBe(false);
     expect((await app.inject({ method: 'GET', url: '/api/me', headers: boss })).json().isAdmin).toBe(true);
 
-    await tx((c) => createNpc(c, new Date(), 'raider'));
+    await tx((c) => createNpc(c, new Date(), 'offense'));
     for (const url of ['/api/admin/npc?hours=24', '/api/admin/players', '/api/admin/stats', '/api/admin/world']) {
       const res = await app.inject({ method: 'GET', url, headers: boss });
       expect(res.statusCode, url).toBe(200);
@@ -121,7 +121,7 @@ describe('administration', () => {
     env.adminUsernames.push('patron2');
     const boss = await register('Patron2');
     const other = await register('Curieux2');
-    const npcId = await tx((c) => createNpc(c, new Date(), 'raider'));
+    const npcId = await tx((c) => createNpc(c, new Date(), 'offense'));
     const post = (headers: Record<string, string>, payload: object) => app.inject({ method: 'POST', url: '/api/admin/npc/fill', headers, payload });
     expect((await post(other, { percent: 50 })).statusCode).toBe(403);
     expect((await post(boss, { percent: 150 })).statusCode).toBe(400);

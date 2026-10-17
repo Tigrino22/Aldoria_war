@@ -24,7 +24,7 @@ const interceptionsOf = async (npc: number) => (await pool.query("SELECT target_
 
 let n = 0;
 async function npcAt(units: Partial<UnitCounts>) {
-  const npc = await tx((c) => createNpc(c, new Date(), 'raider'));
+  const npc = await tx((c) => createNpc(c, new Date(), 'offense'));
   const home = (await pool.query('SELECT id FROM villages WHERE owner_id = $1', [npc])).rows[0].id as number;
   n++;
   const x = 400 + n * 60;

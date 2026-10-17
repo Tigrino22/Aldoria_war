@@ -36,15 +36,15 @@ export function marketNeeds({ stock, capacity }: NpcStock): { surplus: Resource[
 }
 
 /** Offre qu'un PNJ publie : il donne 30 % d'une ressource en excédent (au plus `maxGive`, ce que portent ses marchands libres) contre celle qui lui manque le plus. */
-export function planOffer(npc: NpcStock, profile: 'builder' | 'raider' | 'conqueror', maxGive = MERCHANT_CAPACITY): { give: Resource; giveAmount: number; want: Resource; wantAmount: number } | null {
+export function planOffer(npc: NpcStock, profile: 'defense' | 'offense', maxGive = MERCHANT_CAPACITY): { give: Resource; giveAmount: number; want: Resource; wantAmount: number } | null {
   const { surplus, shortage } = marketNeeds(npc);
   if (!surplus.length || !shortage.length) return null;
   const give = surplus.reduce((a, b) => (npc.stock[b] > npc.stock[a] ? b : a));
   const want = shortage.reduce((a, b) => (npc.stock[b] < npc.stock[a] ? b : a));
   const giveAmount = Math.min(maxGive, Math.floor((npc.stock[give] * 0.3) / 10) * 10);
   if (giveAmount < 100) return null;
-  // Un bâtisseur négocie un peu mieux (0,9 contre 1), les autres échangent à parité.
-  const wantAmount = Math.round((giveAmount * (profile === 'builder' ? 0.9 : 1)) / 10) * 10;
+  // Un défensif négocie un peu mieux (0,9 contre 1), un offensif échange à parité.
+  const wantAmount = Math.round((giveAmount * (profile === 'defense' ? 0.9 : 1)) / 10) * 10;
   return rateOk(giveAmount, wantAmount) ? { give, giveAmount, want, wantAmount } : null;
 }
 

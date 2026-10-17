@@ -1,16 +1,18 @@
-import { type UnitCounts, UNITS, emptyUnits, resolveCombat, wallDuringCombat, type TargetIntel } from '@aldoria/shared';
+import { type UnitCounts, emptyUnits, resolveCombat, wallDuringCombat, type TargetIntel } from '@aldoria/shared';
 import type { Db } from '../db';
 import { env } from '../env';
 import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { sendCommand } from './commands';
 import { estimateLoot, pickIntel } from './intel';
-import { attackBeats, carryOf } from './npc-rules';
+import { attackBeats } from './npc-rules';
+import { RAID_SIZE, RAID_UNIT, type VillageRole } from './npc-roles';
 import { getTroops, loadVillage } from './village';
 
 /**
- * Pillage intensif des PNJ : à chaque réflexion, chaque village envoie plusieurs petits pillages vers les villages sans défense
- * qu'il connaît (barbares, et villages vides des PNJ hostiles), comme un joueur avec l'assistant de pillage. Le PNJ ne triche pas :
+ * Pillage intensif des PNJ : à chaque réflexion, chaque village envoie autant de pillages qu'il le peut vers les villages sans défense
+ * qu'il connaît (barbares, et villages vides des PNJ hostiles), comme un joueur avec l'assistant de pillage. Chaque pillage compte
+ * 50 épéistes depuis un village offensif, 50 lanciers depuis un village défensif. Le PNJ ne triche pas :
  * il se fie à ses propres rapports (dernier espionnage ou dernière attaque) et estime le butin comme l'assistant des joueurs
  * (`estimateLoot`). Un barbare jamais vu reçoit d'abord un éclaireur. Les joueurs n'en font jamais partie : ils restent visés
  * par les attaques habituelles (`attackStep`), avec leurs heures calmes et leur protection.
@@ -20,46 +22,19 @@ import { getTroops, loadVillage } from './village';
 /** Butin estimé en dessous duquel un pillage ne vaut pas le déplacement. */
 export const FARM_MIN_LOOT = 100;
 /** Éclaireurs envoyés au plus par village et par réflexion vers des barbares inconnus (ou à revoir). */
-const SCOUTS_PER_THINK = 2;
+const SCOUTS_PER_THINK = 4;
 /** Au-delà de cet âge (heures de jeu), le dernier renseignement sur un barbare est trop vieux pour estimer son butin : on y retourne (un pillage récent compte aussi). */
 const RESCOUT_GAME_HOURS = 48;
 /** Un village de PNJ hostile n'est pillé sans espionnage récent que si on l'a vu vide il y a moins de 6 heures de jeu. */
 const HOSTILE_INTEL_GAME_HOURS = 6;
-/** Ordre de remplissage d'un pillage : les cavaliers (rapides, gros sacs), puis lanciers, épéistes et hallebardiers. */
-const FARM_ORDER = ['cavalry', 'spearman', 'swordsman', 'halberdier'] as const;
-
 const noTroops = (u: UnitCounts) => Object.values(u).every((n) => n === 0);
 
-/** Troupes qu'un village peut envoyer piller : tous ses porteurs, offensifs ou défensifs (ni éclaireurs, ni béliers, ni nobles). */
-export function farmPool(home: UnitCounts): UnitCounts {
-  const pool = emptyUnits();
-  for (const k of FARM_ORDER) pool[k] = home[k];
-  return pool;
-}
-
-/**
- * Le plus petit groupe qui emporte `goal` ressources et bat la défense d'un village vide à muraille `wall`.
- * S'il n'y a pas de quoi tout porter, part ce qui suffit à gagner (tout le butin possible). Null si le groupe ne gagne pas.
- */
-export function pickFarmUnits(pool: UnitCounts, goal: number, wall: number): UnitCounts | null {
-  const units = emptyUnits();
-  for (const k of FARM_ORDER) {
-    const missing = goal - carryOf(units);
-    if (missing <= 0) break;
-    units[k] = Math.min(pool[k], Math.ceil(missing / UNITS[k].carry));
-  }
-  const wins = () => {
-    if (noTroops(units)) return false;
-    const r = resolveCombat({ attackers: units, defenders: [emptyUnits()], wallLevel: wallDuringCombat(wall, 0) });
-    return attackBeats(r);
-  };
-  // Pas assez fort pour passer sans pertes : on ajoute un à un les attaquants les plus solides.
-  while (!wins()) {
-    const k = (['cavalry', 'swordsman', 'spearman', 'halberdier'] as const).find((u) => units[u] < pool[u]);
-    if (!k) return null;
-    units[k]++;
-  }
-  return units;
+/** Un pillage de PNJ : exactement `RAID_SIZE` unités de l'unité de son rôle, si elles battent un village vide à muraille `wall`. Null sinon. */
+export function raidGroup(home: UnitCounts, role: VillageRole, wall: number): UnitCounts | null {
+  const unit = RAID_UNIT[role];
+  if (home[unit] < RAID_SIZE) return null;
+  const units = { ...emptyUnits(), [unit]: RAID_SIZE };
+  return attackBeats(resolveCombat({ attackers: units, defenders: [emptyUnits()], wallLevel: wallDuringCombat(wall, 0) })) ? units : null;
 }
 
 interface FarmTarget {
@@ -95,11 +70,11 @@ export interface FarmHostiles {
 }
 
 /** Envoie les pillages d'un village. Renvoie le nombre de pillages partis. */
-export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: number, hostiles: FarmHostiles, now: Date): Promise<number> {
+export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: number, role: VillageRole, hostiles: FarmHostiles, now: Date): Promise<number> {
   if (!env.npcRaids) return 0;
   const village = await loadVillage(c, villageId);
   const home = await getTroops(c, villageId, villageId);
-  const pool = farmPool(home);
+  const pool = { ...emptyUnits(), [RAID_UNIT[role]]: home[RAID_UNIT[role]] };
   // La moitié des éclaireurs reste au village pour les vrais espionnages (joueurs et PNJ) : le pillage ne prend que le reste.
   let scouts = Math.min(Math.floor(home.scout / 2), SCOUTS_PER_THINK);
   if (noTroops(pool) && scouts === 0) return 0;
@@ -135,7 +110,7 @@ export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: 
     const plan = farmPlan(t, history.get(t.id) ?? [], now, env.worldSpeed);
     let units: UnitCounts | null = null;
     if (plan.action === 'scout' && scouts > 0) units = { ...emptyUnits(), scout: 1 };
-    else if (plan.action === 'raid') units = pickFarmUnits(pool, plan.goal, plan.wall);
+    else if (plan.action === 'raid') units = raidGroup(pool, role, plan.wall);
     if (!units) continue;
     try {
       await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: t.id, units }, now);
@@ -145,7 +120,7 @@ export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: 
     }
     if (units.scout) scouts--;
     else {
-      for (const k of FARM_ORDER) pool[k] -= units[k];
+      pool[RAID_UNIT[role]] -= units[RAID_UNIT[role]];
       sent++;
     }
   }

@@ -36,9 +36,9 @@ describe('règles du marché', () => {
   it('un PNJ voit ses excédents et ses manques, publie une offre cohérente et n\'accepte que ce qui l\'arrange', () => {
     const npc = { stock: R(9000, 1000, 5000, 5000), capacity: 10000 };
     expect(marketNeeds(npc)).toEqual({ surplus: ['wood'], shortage: ['clay'] });
-    const plan = planOffer(npc, 'builder');
+    const plan = planOffer(npc, 'defense');
     expect(plan).toEqual({ give: 'wood', giveAmount: 1000, want: 'clay', wantAmount: 900 });
-    expect(planOffer({ stock: R(5000, 5000, 5000, 5000), capacity: 10000 }, 'builder')).toBeNull();
+    expect(planOffer({ stock: R(5000, 5000, 5000, 5000), capacity: 10000 }, 'defense')).toBeNull();
     // Il reçoit de l'argile (qui lui manque) et paie en bois (excédent) : accepté.
     expect(npcAccepts(npc, { give: 'clay', giveAmount: 800, want: 'wood', wantAmount: 800 })).toBe(true);
     // Mauvais taux, ou ressource qui ne lui manque pas, ou paiement en ressource qui n'est pas en excédent : refusé.
@@ -135,7 +135,7 @@ describe('offres de marché', () => {
 
   it("un PNJ publie une offre quand une ressource déborde et qu'une autre manque, puis accepte l'offre d'un joueur qui l'arrange", async () => {
     setNpcRandom(() => 0.5);
-    const npc = await tx((c) => createNpc(c, T0, 'builder'));
+    const npc = await tx((c) => createNpc(c, T0, 'defense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await pool.query(
       "UPDATE villages SET buildings = buildings || '{\"market\": 5, \"warehouse\": 10}'::jsonb, wood = 9000, clay = 500, iron = 5000, wheat = 5000, resources_at = $2 WHERE id = $1",
@@ -165,7 +165,7 @@ describe('offres de marché', () => {
   it("un PNJ ne publie pas plus d'offres que ses marchands ne peuvent en livrer, et retire celles qu'il ne peut plus honorer", async () => {
     let seed = 0;
     setNpcRandom(() => ((seed = (seed * 9301 + 49297) % 233280) / 233280));
-    const npc = await tx((c) => createNpc(c, T0, 'raider'));
+    const npc = await tx((c) => createNpc(c, T0, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     const reserved = async () =>
       (await pool.query("SELECT COALESCE(SUM(CEIL(give_amount / 1000.0)), 0)::int AS n FROM market_offers WHERE player_id = $1 AND status = 'open'", [npc])).rows[0].n as number;
