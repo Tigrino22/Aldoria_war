@@ -15,7 +15,7 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
     setBusy(true);
     setError('');
     try {
-      const { token } = await api<{ token: string }>(`/api/auth/${mode}`, { body: { username, password } });
+      const { token } = await api<{ token: string }>(`/api/auth/${mode}`, { body: { username, password, world: null } });
       setToken(token);
       onLogin();
     } catch (err) {
@@ -53,9 +53,9 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
         />
         {error && <p className="error">{error}</p>}
         <button className="btn primary" disabled={busy}>
-          {mode === 'login' ? 'Entrer dans le royaume' : 'Fonder mon village'}
+          {mode === 'login' ? 'Entrer dans le royaume' : 'Créer mon compte'}
         </button>
-        {mode === 'register' && <p className="hint">Vous serez protégé des attaques pendant vos premiers jours.</p>}
+        {mode === 'register' && <p className="hint">Vous choisirez ensuite votre monde. Vous y serez protégé des attaques pendant vos premiers jours.</p>}
       </form>
     </div>
   );

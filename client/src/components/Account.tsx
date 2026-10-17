@@ -8,7 +8,7 @@ import './account.css';
 
 /** Compte : déconnexion, données personnelles et suppression définitive du compte. */
 export default function Account() {
-  const { me, logout, run } = useGame();
+  const { me, world, logout, chooseWorld, run } = useGame();
   const [confirming, setConfirming] = useState(false);
   const [password, setPassword] = useState('');
   const [titles, setTitles] = useState<{ titles: PlayerTitleView[]; current: CrusadeTitleKey | null } | null>(null);
@@ -35,10 +35,16 @@ export default function Account() {
         kicker="Mon compte"
         title={me.player.username}
         lead={me.player.tribe ? <>Membre de la tribu <b>[{me.player.tribe.tag}] {me.player.tribe.name}</b></> : 'Sans tribu pour le moment'}
-        actions={<button className="btn" onClick={logout}>Se déconnecter</button>}
+        actions={
+          <>
+            <button className="btn" onClick={chooseWorld}>Changer de monde</button>
+            <button className="btn" onClick={logout}>Se déconnecter</button>
+          </>
+        }
         stats={[
           { value: me.player.points, label: 'Points', tone: 'gold' },
           { value: me.villages.length, label: me.villages.length > 1 ? 'Villages' : 'Village' },
+          { value: world.name, label: 'Monde' },
         ]}
       />
 
@@ -80,8 +86,8 @@ export default function Account() {
 
       <Panel title="Supprimer mon compte">
         <p className="small">
-          La suppression est définitive : vos villages deviennent des villages barbares, vos troupes en route sont perdues,
-          vos rapports et messages sont effacés.
+          La suppression est définitive et vaut pour tous vos mondes : vos villages deviennent des villages barbares, vos
+          troupes en route sont perdues, vos rapports et messages sont effacés.
         </p>
         {!confirming ? (
           <button className="btn danger" onClick={() => setConfirming(true)}>Supprimer mon compte…</button>

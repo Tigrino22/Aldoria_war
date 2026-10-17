@@ -35,6 +35,7 @@ import {
 } from '@aldoria/shared';
 import { type Db } from '../db';
 import { env } from '../env';
+import { currentWorld } from '../world-store';
 import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { addKills, insertCommand } from './commands';
@@ -203,18 +204,21 @@ export async function refreshNeutralBastions(c: Db) {
 // ---------- Géographie ----------
 
 type Geography = { key: string; ids: number[]; neighbours: Map<number, number[]>; grid: Int16Array };
-let geoCache: Geography | null = null;
+/** Par monde : chacun a sa carte. */
+const geoCache = new Map<number, Geography>();
 
 /** Découpage et voisines de chaque province, calculés une fois à partir des points (la carte ne change pas en cours de partie). */
 async function geography(c: Pick<Db, 'query'>): Promise<Geography> {
   const rows = (await c.query('SELECT id, x, y, weight FROM provinces ORDER BY id')).rows as ProvinceSeed[];
   const key = `${env.mapSize}:${rows.map((r) => `${r.id},${r.x},${r.y},${r.weight}`).join(';')}`;
-  if (geoCache?.key === key) return geoCache;
+  const cached = geoCache.get(currentWorld().id);
+  if (cached?.key === key) return cached;
   const grid = provinceGrid(env.mapSize, rows);
   const sets = provinceNeighbours(grid, env.mapSize, rows.length);
   const neighbours = new Map(rows.map((r, i) => [r.id, [...sets[i]].map((j) => rows[j].id).sort((a, b) => a - b)]));
-  geoCache = { key, ids: rows.map((r) => r.id), neighbours, grid };
-  return geoCache;
+  const geo = { key, ids: rows.map((r) => r.id), neighbours, grid };
+  geoCache.set(currentWorld().id, geo);
+  return geo;
 }
 
 /** Province d'une case de la carte (null hors carte ou sans provinces). */

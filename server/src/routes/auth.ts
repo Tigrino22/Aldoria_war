@@ -2,13 +2,15 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { BEGINNER_PROTECTION_HOURS, MeResponse, STARTING_BUILDINGS, STARTING_RESOURCES } from '@aldoria/shared';
 import { act } from '../act';
-import { createSession, hashPassword, requirePlayer, verifyPassword, bearer } from '../auth';
-import { pool, type Db } from '../db';
+import { createSession, hashPassword, requireAccount, requirePlayer, verifyPassword, bearer } from '../auth';
+import { corePool, type Db } from '../db';
 import { env } from '../env';
 import { GameError } from '../errors';
 import { createVillage } from '../game/village';
 import { ensureWorld, spawnLocation } from '../game/world';
 import { leaveTribe } from './social';
+import { currentWorld, defaultWorld, inWorld, worldById, type WorldCtx } from '../world-store';
+import { worldMeta } from '../worlds';
 
 const credentials = z.object({
   username: z
@@ -18,7 +20,41 @@ const credentials = z.object({
     .max(20, 'Le pseudo doit faire au plus 20 caractères')
     .regex(/^[\p{L}0-9_-]+$/u, 'Le pseudo ne peut contenir que des lettres, chiffres, _ et -'),
   password: z.string().min(6, 'Le mot de passe doit faire au moins 6 caractères').max(200),
+  /**
+   * Monde où entrer : un numéro, ou null pour choisir ensuite dans la liste des mondes. Absent (anciennes versions de
+   * l'application) : le monde par défaut.
+   */
+  world: z.number().int().positive().nullable().optional(),
 });
+
+/** Inscrit un compte dans un monde : son joueur, son premier village et son inscription. Renvoie le numéro du joueur. */
+export function joinWorld(w: WorldCtx, account: { id: number; username: string }): Promise<number> {
+  return inWorld(w, () =>
+    act(async (c, _outbox, now) => {
+      const exists = await c.query('SELECT 1 FROM players WHERE lower(username) = lower($1)', [account.username]);
+      if (exists.rows.length) throw new GameError('Ce pseudo est déjà pris dans ce monde');
+      const protectionUntil = new Date(now.getTime() + (BEGINNER_PROTECTION_HOURS / env.worldSpeed) * 3_600_000);
+      // Le mot de passe est celui du compte (schéma core) : le joueur du monde n'en a pas.
+      const { rows } = await c.query("INSERT INTO players (username, password_hash, protection_until) VALUES ($1, '!', $2) RETURNING id", [
+        account.username,
+        protectionUntil,
+      ]);
+      const playerId = rows[0].id as number;
+      await spawnVillage(c, playerId, account.username, now);
+      await corePool.query('INSERT INTO core.memberships (account_id, world_id, player_id) VALUES ($1, $2, $3)', [account.id, w.id, playerId]);
+      return playerId;
+    }),
+  );
+}
+
+/** Le monde demandé à l'inscription ou à la connexion (voir `credentials.world`). */
+function askedWorld(world: number | null | undefined): WorldCtx | null {
+  if (world === null) return null;
+  if (world === undefined) return defaultWorld();
+  const w = worldById(world);
+  if (!w) throw new GameError('Monde introuvable', 404);
+  return w;
+}
 
 export async function spawnVillage(c: Db, playerId: number, username: string, now: Date) {
   await ensureWorld(c, now);
@@ -90,40 +126,54 @@ export async function loadMe(c: Db, playerId: number): Promise<MeResponse> {
 }
 
 export default async function authRoutes(app: FastifyInstance) {
-  app.get('/api/world', async () => ({ speed: env.worldSpeed, mapSize: env.mapSize, serverTime: new Date().toISOString() }));
+  app.get('/api/world', async () => {
+    const w = currentWorld();
+    return { id: w.id, name: w.name, speed: env.worldSpeed, mapSize: env.mapSize, serverTime: new Date().toISOString() };
+  });
 
+  /** Crée un compte, commun à tous les mondes, et l'inscrit dans le monde demandé. */
   app.post('/api/auth/register', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
-    const { username, password } = credentials.parse(req.body);
+    const { username, password, world } = credentials.parse(req.body);
+    const target = askedWorld(world);
+    if (target && !worldMeta(target.id).open) throw new GameError('Les inscriptions sont fermées dans ce monde');
+    // Un PNJ du monde peut porter ce nom : le vérifier avant de créer le compte.
+    if (target && (await target.pool.query('SELECT 1 FROM players WHERE lower(username) = lower($1)', [username])).rowCount) {
+      throw new GameError('Ce pseudo est déjà pris');
+    }
     const hash = await hashPassword(password);
-    return act(async (c, _outbox, now) => {
-      const exists = await c.query('SELECT 1 FROM players WHERE lower(username) = lower($1)', [username]);
-      if (exists.rows.length) throw new GameError('Ce pseudo est déjà pris');
-      const protectionUntil = new Date(now.getTime() + (BEGINNER_PROTECTION_HOURS / env.worldSpeed) * 3_600_000);
-      const { rows } = await c.query('INSERT INTO players (username, password_hash, protection_until) VALUES ($1, $2, $3) RETURNING id', [
-        username,
-        hash,
-        protectionUntil,
-      ]);
-      const playerId = rows[0].id;
-      await spawnVillage(c, playerId, username, now);
-      return { token: await createSession(c, playerId) };
-    });
+    const exists = await corePool.query('SELECT 1 FROM core.accounts WHERE lower(username) = lower($1)', [username]);
+    if (exists.rows.length) throw new GameError('Ce pseudo est déjà pris');
+    let accountId: number;
+    try {
+      accountId = (await corePool.query('INSERT INTO core.accounts (username, password_hash) VALUES ($1, $2) RETURNING id', [username, hash])).rows[0].id;
+    } catch {
+      throw new GameError('Ce pseudo est déjà pris');
+    }
+    if (target) {
+      try {
+        await joinWorld(target, { id: accountId, username });
+      } catch (err) {
+        await corePool.query('DELETE FROM core.accounts WHERE id = $1', [accountId]);
+        throw err;
+      }
+    }
+    return { token: await createSession(accountId, target?.id ?? null) };
   });
 
   app.post('/api/auth/login', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
-    const { username, password } = credentials.parse(req.body);
-    const { rows } = await pool.query('SELECT id, password_hash FROM players WHERE lower(username) = lower($1)', [username]);
+    const { username, password, world } = credentials.parse(req.body);
+    const { rows } = await corePool.query('SELECT id, password_hash FROM core.accounts WHERE lower(username) = lower($1)', [username]);
     if (!rows[0] || !(await verifyPassword(password, rows[0].password_hash))) throw new GameError('Pseudo ou mot de passe incorrect', 401);
-    const client = await pool.connect();
-    try {
-      return { token: await createSession(client, rows[0].id) };
-    } finally {
-      client.release();
-    }
+    // Le monde demandé n'est retenu que si le compte y est inscrit ; sinon le joueur choisira dans la liste.
+    const target = askedWorld(world);
+    const member = target
+      ? (await corePool.query('SELECT 1 FROM core.memberships WHERE account_id = $1 AND world_id = $2', [rows[0].id, target.id])).rowCount
+      : 0;
+    return { token: await createSession(rows[0].id, member ? target!.id : null) };
   });
 
   app.post('/api/auth/logout', async (req) => {
-    await pool.query('DELETE FROM sessions WHERE token = $1', [bearer(req) ?? '']);
+    await corePool.query('DELETE FROM core.sessions WHERE token = $1', [bearer(req) ?? '']);
     return { ok: true };
   });
 
@@ -175,23 +225,31 @@ export default async function authRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Suppression définitive du compte (exigée par l'App Store pour toute app qui permet de s'inscrire).
+   * Suppression définitive du compte (exigée par l'App Store pour toute app qui permet de s'inscrire), dans tous les mondes.
    * Les villages deviennent barbares, les troupes en route sont perdues, rapports et messages reçus sont effacés.
    */
   app.delete('/api/me', async (req) => {
-    const playerId = await requirePlayer(req);
+    const session = await requireAccount(req);
     const { password } = z.object({ password: z.string().min(1, 'Mot de passe requis') }).parse(req.body);
-    const { rows } = await pool.query('SELECT password_hash FROM players WHERE id = $1', [playerId]);
+    const { rows } = await corePool.query('SELECT password_hash FROM core.accounts WHERE id = $1', [session.accountId]);
     if (!rows[0] || !(await verifyPassword(password, rows[0].password_hash))) throw new GameError('Mot de passe incorrect', 403);
-    return act(async (c) => {
-      await leaveTribe(c, playerId);
-      const villages = (await c.query('SELECT id FROM villages WHERE owner_id = $1', [playerId])).rows.map((r) => r.id as number);
-      await c.query("UPDATE villages SET owner_id = NULL, name = 'Village abandonné' WHERE owner_id = $1", [playerId]);
-      await c.query('DELETE FROM build_queue WHERE village_id = ANY($1)', [villages]);
-      await c.query('DELETE FROM recruit_queue WHERE village_id = ANY($1)', [villages]);
-      await c.query('DELETE FROM commands WHERE player_id = $1', [playerId]);
-      await c.query('DELETE FROM players WHERE id = $1', [playerId]);
-      return { ok: true };
-    });
+    const memberships = (await corePool.query('SELECT world_id, player_id FROM core.memberships WHERE account_id = $1', [session.accountId])).rows;
+    for (const m of memberships) {
+      const w = worldById(m.world_id);
+      if (w) await inWorld(w, () => act((c) => deletePlayer(c, m.player_id)));
+    }
+    await corePool.query('DELETE FROM core.accounts WHERE id = $1', [session.accountId]);
+    return { ok: true };
   });
+}
+
+/** Retire un joueur d'un monde : ses villages deviennent abandonnés. */
+export async function deletePlayer(c: Db, playerId: number) {
+  await leaveTribe(c, playerId);
+  const villages = (await c.query('SELECT id FROM villages WHERE owner_id = $1', [playerId])).rows.map((r) => r.id as number);
+  await c.query("UPDATE villages SET owner_id = NULL, name = 'Village abandonné' WHERE owner_id = $1", [playerId]);
+  await c.query('DELETE FROM build_queue WHERE village_id = ANY($1)', [villages]);
+  await c.query('DELETE FROM recruit_queue WHERE village_id = ANY($1)', [villages]);
+  await c.query('DELETE FROM commands WHERE player_id = $1', [playerId]);
+  await c.query('DELETE FROM players WHERE id = $1', [playerId]);
 }

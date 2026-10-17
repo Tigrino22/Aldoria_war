@@ -3,7 +3,7 @@ import { ARMY_SIGHT, STARTING_BUILDINGS, emptyUnits, type MapArmy, type UnitCoun
 import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
-import { createSession } from '../src/auth';
+import { sessionForPlayer } from './session-helper';
 import { createVillage } from '../src/game/village';
 
 let app: Awaited<ReturnType<typeof buildApp>>;
@@ -38,7 +38,7 @@ describe('armées en marche sur la carte', () => {
     const meId = await player('Vigie', tribeId);
     const homeId = await village(meId, 50, 50);
     const home = { id: homeId, x: 50, y: 50 };
-    const headers = { authorization: `Bearer ${await tx((c) => createSession(c, meId))}` };
+    const headers = { authorization: `Bearer ${await sessionForPlayer(meId)}` };
     const friend = await player('Compagnon', tribeId);
     const stranger = await player('Inconnu', null);
     const far = await village(stranger, home.x + 40, home.y + 40);

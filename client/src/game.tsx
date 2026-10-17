@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MeResponse, VillageState, WorldInfo } from '@aldoria/shared';
-import { api, ApiError, getToken, setToken } from './api';
+import { api, ApiError, getToken } from './api';
 import { wsUrl } from './config';
 import { alertHaptic } from './native';
 
@@ -23,6 +23,8 @@ interface GameCtx {
   /** Lance une action serveur et affiche son erreur éventuelle. */
   run: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
   logout: () => void;
+  /** Revient à la liste des mondes pour en choisir un autre. */
+  chooseWorld: () => void;
 }
 
 const Ctx = createContext<GameCtx | null>(null);
@@ -97,7 +99,15 @@ export function useNow(intervalMs = 1000) {
   return now;
 }
 
-export function GameProvider({ children, onLogout }: { children: (state: 'loading' | 'ready') => ReactNode; onLogout: () => void }) {
+export function GameProvider({
+  children,
+  onLogout,
+  onChooseWorld,
+}: {
+  children: (state: 'loading' | 'ready') => ReactNode;
+  onLogout: () => void;
+  onChooseWorld: () => void;
+}) {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [world, setWorld] = useState<(WorldInfo & { offset: number }) | null>(null);
   const [villageId, setVillageIdState] = useState<number>(readStoredVillage);
@@ -112,18 +122,17 @@ export function GameProvider({ children, onLogout }: { children: (state: 'loadin
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 5000 : 4000);
   }, []);
 
-  const logout = useCallback(() => {
-    api('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
-    setToken(null);
-    onLogout();
-  }, [onLogout]);
+  const logout = onLogout;
+  const chooseWorld = onChooseWorld;
 
   const handleError = useCallback(
     (err: unknown) => {
       if (err instanceof ApiError && err.status === 401) return logout();
+      // Le compte n'a plus de joueur dans ce monde (session d'un autre appareil, monde quitté) : retour à la liste.
+      if (err instanceof ApiError && err.status === 428) return chooseWorld();
       toast(err instanceof Error ? err.message : 'Erreur inconnue', 'error');
     },
-    [logout, toast],
+    [logout, chooseWorld, toast],
   );
 
   const refreshMe = useMemo(
@@ -255,9 +264,9 @@ export function GameProvider({ children, onLogout }: { children: (state: 'loadin
   const value = useMemo<GameCtx | null>(
     () =>
       me && world
-        ? { me, world, villageId, village, setVillageId, refreshMe, refreshVillage, setVillage, toast, run, logout }
+        ? { me, world, villageId, village, setVillageId, refreshMe, refreshVillage, setVillage, toast, run, logout, chooseWorld }
         : null,
-    [me, world, villageId, village, setVillageId, refreshMe, refreshVillage, toast, run, logout],
+    [me, world, villageId, village, setVillageId, refreshMe, refreshVillage, toast, run, logout, chooseWorld],
   );
 
   return (
