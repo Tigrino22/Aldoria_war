@@ -7,7 +7,6 @@ import {
   BUILD_QUEUE_LIMIT,
   emptyResources,
   merchantCount,
-  normalizeUnits,
   populationCapacity,
   productionRates,
   warehouseCapacity,
@@ -20,7 +19,7 @@ import { env } from '../env';
 import { GameError } from '../errors';
 import { unlocked, type Locker } from '../lock';
 import { sendTrade } from '../game/commands';
-import { busyMerchants, computePopulation, enqueueBuild, enqueueRecruit, getTroops, resourcesOf, syncVillage } from '../game/village';
+import { busyMerchants, computePopulation, enqueueBuild, enqueueRecruit, ownedUnits, resourcesOf, syncVillage } from '../game/village';
 import { Outbox } from '../notify';
 import { describeCargo, planBalance, type BalanceVillage } from './balance';
 import { costOf, nextBuilding, nextTroopLot, parsePlan, reserveFor, troopBudget, type Plan } from './rules';
@@ -90,12 +89,8 @@ export async function runVillage(c: Db, villageId: number, plan: Plan, now: Date
   const goals = UNIT_KEYS.filter((u) => (plan.troops[u] ?? 0) > 0);
   const queuedRecruits = (await c.query('SELECT unit, count - delivered AS remaining FROM recruit_queue WHERE village_id = $1', [villageId])).rows;
   if (goals.length && v.buildings.barracks >= 1 && queuedRecruits.length === 0) {
-    const owned: UnitCounts = await getTroops(c, villageId, villageId);
-    const away = (await c.query("SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed AND type IN ('attack', 'support', 'return')", [villageId])).rows;
-    for (const r of away) {
-      const u = normalizeUnits(r.units);
-      for (const k of UNIT_KEYS) owned[k] += u[k];
-    }
+    // Comptées où qu'elles soient : au village, en renfort ailleurs (dont l'escorte d'un noble), en route ou réservées par un ordre planifié.
+    const owned: UnitCounts = await ownedUnits(c, villageId);
     const cap = warehouseCapacity(v.buildings.warehouse);
     const stock = resourcesOf(v);
     // Les troupes ont tout ce qui dépasse le coût du prochain bâtiment, plus `troopsShare` % de la production prise sur sa réserve.
