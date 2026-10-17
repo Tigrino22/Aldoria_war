@@ -1,3 +1,5 @@
+import { peekWorld } from './world-store';
+
 function num(name: string, fallback: number): number {
   const raw = process.env[name];
   const value = raw === undefined || raw === '' ? fallback : Number(raw);
@@ -12,7 +14,7 @@ function count(name: string, fallback: number): number {
   return Math.floor(value);
 }
 
-export const env = {
+const baseEnv = {
   databaseUrl: process.env.DATABASE_URL ?? 'postgres://aldoria:aldoria@localhost:5432/aldoria',
   port: num('PORT', 3001),
   worldSpeed: num('WORLD_SPEED', 1),
@@ -115,3 +117,39 @@ export const env = {
     .map((o) => o.trim())
     .filter(Boolean),
 };
+
+export type Env = typeof baseEnv;
+
+/** Réglages propres au serveur, communs à tous les mondes. */
+export const SERVER_KEYS = ['databaseUrl', 'port', 'adminUsernames', 'staticDir', 'trustProxy', 'corsOrigins'] as const;
+
+/** Réglages du jeu tels que lus dans l'environnement, avant ceux enregistrés en base : point de départ d'un nouveau monde. */
+export const envDefaults: Readonly<Env> = { ...baseEnv };
+
+/** Les réglages par défaut d'un monde : ceux du jeu (sans les réglages du serveur). */
+export function worldEnvDefaults(): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...envDefaults };
+  for (const k of SERVER_KEYS) delete out[k];
+  return out;
+}
+
+/**
+ * Réglages lus par tout le code : ceux du monde courant (voir world-store), ou ceux de l'environnement pour le monde par
+ * défaut et les réglages du serveur. Modifier un champ modifie le monde courant.
+ */
+export const env: Env = new Proxy(baseEnv, {
+  get(target, key) {
+    const w = peekWorld();
+    if (w && w.env !== target && typeof key === 'string' && key in w.env) return w.env[key];
+    return (target as Record<string | symbol, unknown>)[key];
+  },
+  set(target, key, value) {
+    const w = peekWorld();
+    if (w && w.env !== target && typeof key === 'string' && !(SERVER_KEYS as readonly string[]).includes(key)) w.env[key] = value;
+    else (target as Record<string | symbol, unknown>)[key] = value;
+    return true;
+  },
+});
+
+/** L'objet d'origine, qui sert de réglages au monde par défaut. */
+export const rootEnv = baseEnv as unknown as Record<string, unknown>;

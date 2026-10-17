@@ -7,9 +7,25 @@ import type { BuildingKey, Buildings, Resource, Resources, UnitCounts, UnitKey }
 /** Types échangés entre l'API et le client. */
 
 export interface WorldInfo {
+  id: number;
+  name: string;
   speed: number;
   mapSize: number;
   serverTime: string;
+}
+
+/** Un monde proposé à la connexion ; `member` est rempli quand le compte y joue déjà. */
+export interface WorldChoice {
+  id: number;
+  name: string;
+  speed: number;
+  mapSize: number;
+  /** Joueurs inscrits (sans les PNJ). */
+  players: number;
+  /** Inscriptions ouvertes. */
+  open: boolean;
+  createdAt: string;
+  member: { villages: number; points: number; lastPlayed: string } | null;
 }
 
 export interface PlayerSummary {

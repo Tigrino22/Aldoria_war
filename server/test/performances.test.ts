@@ -45,7 +45,7 @@ describe('performances : envois groupés et notifications', () => {
 
   it('une même notification n’est envoyée qu’une fois par passage', () => {
     const sent: string[] = [];
-    register(424242, { readyState: 1, send: (m: string) => sent.push(m), on: () => undefined } as any);
+    register(1, 424242, { readyState: 1, send: (m: string) => sent.push(m), on: () => undefined } as any);
     const outbox = new Outbox();
     outbox.push(424242, { type: 'village', villageId: 1 });
     outbox.push(424242, { type: 'village', villageId: 1 });

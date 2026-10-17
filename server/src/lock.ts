@@ -1,16 +1,19 @@
+import { currentWorld, inWorld } from './world-store';
+
 /**
- * Toutes les écritures du jeu passent par ce verrou : une seule action est traitée à la fois.
+ * Toutes les écritures du jeu passent par ce verrou : une seule action est traitée à la fois dans un monde
+ * (chaque monde a sa propre file, les mondes avancent donc indépendamment).
  * C'est simple et sûr pour un seul processus serveur (largement suffisant pour quelques milliers de joueurs).
  * Pour passer à plusieurs processus, il faudra le remplacer par des verrous PostgreSQL.
  *
  * Les tâches de fond (PNJ, gestionnaire, mouvements arrivés) prennent le verrou par petits morceaux
  * pour que les clics des joueurs passent entre deux morceaux au lieu d'attendre la fin de toute la passe.
  */
-let tail: Promise<unknown> = Promise.resolve();
-
 export function withGameLock<T>(fn: () => Promise<T>): Promise<T> {
-  const run = tail.then(fn, fn);
-  tail = run.catch(() => undefined);
+  const w = currentWorld();
+  const inside = () => inWorld(w, fn);
+  const run = w.tail.then(inside, inside);
+  w.tail = run.catch(() => undefined);
   return run;
 }
 

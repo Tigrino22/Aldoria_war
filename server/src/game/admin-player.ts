@@ -10,6 +10,7 @@ import {
   type CrusadeTitleKey,
   type UnitCounts,
 } from '@aldoria/shared';
+import { currentWorld } from '../world-store';
 import { pool, type Db } from '../db';
 import { notFound } from '../errors';
 import { boostedRates, computePopulation, estimateResources, productionBonus, type VillageRow } from './village';
@@ -34,9 +35,10 @@ async function detail(c: Db, id: number) {
     await c.query(
       `SELECT p.*, t.id AS t_id, t.name AS t_name, t.tag AS t_tag, t.is_npc AS t_npc, (t.leader_id = p.id) AS is_leader,
               (SELECT count(*)::int FROM players m WHERE m.tribe_id = p.tribe_id) AS t_members,
-              (SELECT count(*)::int FROM sessions s WHERE s.player_id = p.id) AS sessions
+              (SELECT count(*)::int FROM core.sessions s JOIN core.memberships m ON m.account_id = s.account_id
+                WHERE m.world_id = $2 AND m.player_id = p.id) AS sessions
        FROM players p LEFT JOIN tribes t ON t.id = p.tribe_id WHERE p.id = $1`,
-      [id],
+      [id, currentWorld().id],
     )
   ).rows[0];
   if (!p) throw notFound('Joueur introuvable');

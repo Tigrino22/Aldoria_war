@@ -58,6 +58,26 @@ vêtements reçoivent des plis et un matelassage en relief (bruit 3D), maillés 
 Les migrations SQL sont dans `server/migrations/`, appliquées dans l'ordre par `npm run db:migrate` (et au démarrage du serveur).
 Pour une évolution du schéma, ajoutez un fichier `002_….sql` ; ne modifiez jamais une migration déjà appliquée.
 
+## Plusieurs mondes
+
+Un même serveur fait tourner plusieurs mondes. Chaque monde a ses tables dans son propre schéma PostgreSQL : le premier
+monde reste dans `public`, les suivants dans `monde_<numéro>`. Les migrations de `server/migrations/` s'appliquent à chaque
+schéma de monde ; celles de `server/migrations-core/` créent le schéma `core`, commun à tous : liste des mondes
+(`core.worlds`, avec les réglages fixés à la création dans `config`), comptes (`core.accounts`, pseudo et mot de passe),
+inscriptions d'un compte dans un monde (`core.memberships`, qui donne le joueur du compte dans ce monde) et sessions
+(`core.sessions`, avec le monde choisi à la connexion).
+
+Le monde courant suit chaque requête et chaque tâche de fond (`server/src/world-store.ts`, AsyncLocalStorage) : `pool`,
+`env` et le verrou du jeu le consultent, si bien que le code du jeu reste écrit comme pour un seul monde. Une requête
+s'exécute dans le monde de sa session ; l'administrateur peut viser un autre monde avec l'en-tête `x-world` sur les routes
+`/api/admin`. Chaque monde a son propre verrou et ses propres minuteurs (`startWorldLoops` dans `server/src/worlds.ts`).
+Les notifications temps réel sont rangées par monde puis par joueur : les numéros de joueur ne sont uniques que dans un monde.
+
+À la connexion, le client affiche la liste des mondes (`GET /api/worlds`, ceux où le compte joue d'abord), puis
+`POST /api/worlds/:id/enter` y inscrit le compte si besoin (premier village, protection débutant) et y attache la session.
+Les anciennes versions de l'application, qui n'envoient pas de monde, entrent dans le monde n° 1. Un module qui garde des
+données en mémoire doit les ranger par monde (`currentWorld().id`), comme le découpage des provinces.
+
 ## Barbares qui repoussent
 
 Un village sans propriétaire se reconstruit à chaque synchronisation (`regrowBarbarian` dans `village.ts`, règles pures dans

@@ -240,7 +240,7 @@ function useSwipeToClose(onClose: () => void) {
 }
 
 export default function Layout() {
-  const { me, village, villageId, setVillageId, logout, run, refreshMe } = useGame();
+  const { me, world, village, villageId, setVillageId, logout, chooseWorld, run, refreshMe } = useGame();
   const [route, go] = useRoute();
   const page = route[0] ?? 'village';
   const [drawer, setDrawer] = useState(false);
@@ -285,6 +285,7 @@ export default function Layout() {
         <button className="btn primary" onClick={() => run(async () => { await api('/api/me/restart', { method: 'POST' }); await refreshMe(); })}>
           Fonder un nouveau village
         </button>
+        <button className="btn" onClick={chooseWorld}>Changer de monde</button>
         <button className="btn" onClick={logout}>Se déconnecter</button>
       </div>
     );
@@ -352,6 +353,10 @@ export default function Layout() {
               ))}
             </nav>
           ))}
+          <button className="side-quit side-world" onClick={chooseWorld} title="Changer de monde">
+            <NavIcon name="carte" size={18} />
+            Monde {world.name}
+          </button>
           <button className="side-quit" onClick={logout}>
             <NavIcon name="quitter" size={18} />
             Se déconnecter
@@ -435,6 +440,10 @@ export default function Layout() {
                 </div>
               </section>
             ))}
+            <button className="btn ghost sheet-quit" onClick={chooseWorld}>
+              <NavIcon name="carte" size={18} />
+              Changer de monde ({world.name})
+            </button>
             <button className="btn ghost sheet-quit" onClick={logout}>
               <NavIcon name="quitter" size={18} />
               Se déconnecter

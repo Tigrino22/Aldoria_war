@@ -3,7 +3,7 @@ import { STARTING_BUILDINGS, emptyUnits, type UnitCounts } from '@aldoria/shared
 import { buildApp } from '../src/app';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
-import { createSession } from '../src/auth';
+import { sessionForPlayer } from './session-helper';
 import { processDueEvents } from '../src/game/commands';
 import { createVillage } from '../src/game/village';
 
@@ -43,7 +43,7 @@ async function setup(troops: Partial<UnitCounts>) {
   const meId = await player(`Guetteur${n}`);
   const x = 100 + n * 60;
   const homeId = await village(meId, x, 100, troops);
-  const headers = { authorization: `Bearer ${await tx((c) => createSession(c, meId))}` };
+  const headers = { authorization: `Bearer ${await sessionForPlayer(meId)}` };
   const enemy = await player(`Maraudeur${n}`);
   return { meId, homeId, x, headers, enemy };
 }

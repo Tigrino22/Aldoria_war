@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { MODERATION_COMMENT_MAX } from '@aldoria/shared';
-import { requirePlayer } from '../auth';
+import { requireAccount } from '../auth';
 import { pool, tx } from '../db';
 import { env } from '../env';
 import { forbidden } from '../errors';
@@ -20,16 +20,15 @@ import { listModerationReports, resolveModerationReport } from '../game/moderati
 import { clearBio } from '../game/profile';
 import { saveSettings, SETTINGS, settingDefault, settingValue, type SettingDef } from '../settings';
 
-/** Réservé aux pseudos listés dans ADMIN_USERNAMES : vérifié à chaque requête, côté serveur. */
+/** Réservé aux comptes dont le pseudo est listé dans ADMIN_USERNAMES : vérifié à chaque requête, côté serveur. */
 async function requireAdmin(req: FastifyRequest) {
   return (await requireAdminNamed(req)).id;
 }
 
 async function requireAdminNamed(req: FastifyRequest) {
-  const id = await requirePlayer(req);
-  const name = (await pool.query('SELECT username FROM players WHERE id = $1', [id])).rows[0]?.username as string | undefined;
-  if (!name || !env.adminUsernames.includes(name.toLowerCase())) throw forbidden('Réservé à l’administrateur');
-  return { id, name };
+  const s = await requireAccount(req);
+  if (!s.isAdmin) throw forbidden('Réservé à l’administrateur');
+  return { id: s.accountId, name: s.username };
 }
 
 const hoursQuery = z.object({ hours: z.coerce.number().int().min(1).max(168).default(24) });
