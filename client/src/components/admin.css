@@ -33,6 +33,14 @@
 .war-col i { display: block; width: 100%; min-height: 2px; background: var(--muted); border-radius: 3px; }
 .war-col i.conquest { background: var(--gold); }
 .war-col span { position: absolute; bottom: -15px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--muted); }
+.war-line-link { cursor: pointer; }
+.war-line-link:hover td, .war-line-link:focus-visible td { background: var(--panel-2); }
+.war-line-link:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.war-line-more { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--gold); white-space: nowrap; }
+.war-report-dialog { width: min(640px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; margin: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.45); }
+.war-report-dialog h2 { margin: 2px 0 0; }
+.war-report-dialog .row.between { justify-content: space-between; align-items: flex-start; flex-wrap: nowrap; gap: 12px; }
+.war-report-dialog .muted.small { margin: 0; }
 .war-truce { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 .admin { min-width: 0; }
 .admin .tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }

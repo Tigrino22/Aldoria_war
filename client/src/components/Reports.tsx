@@ -228,6 +228,28 @@ function AttackReport({ d }: { d: AttackReportData }) {
   );
 }
 
+/** Contenu d'un rapport selon son type (aussi ouvert depuis le journal des guerres de l'administration). */
+export function ReportBody({ report }: { report: { type: string; data: any } }) {
+  return report.type === 'scout' ? (
+    <ScoutReport d={report.data} />
+  ) : report.type === 'trade' ? (
+    <TradeReport d={report.data} />
+  ) : report.type === 'crusade' ? (
+    <CrusadeReport d={report.data} />
+  ) : report.type === 'province' ? (
+    <ProvinceReport d={report.data} />
+  ) : report.type === 'achievement' ? (
+    <AchievementReport d={report.data} />
+  ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
+    <AttackReport d={report.data} />
+  ) : (
+    <div className="stack">
+      {report.data.units && <UnitList units={report.data.units} />}
+      {report.data.from && <p>Depuis {report.data.from}</p>}
+    </div>
+  );
+}
+
 export default function Reports({ id }: { id?: number }) {
   const { run, refreshMe } = useGame();
   const [, go] = useRoute();
@@ -262,24 +284,7 @@ export default function Reports({ id }: { id?: number }) {
           }
         />
         <section className="pg-card rp-body">
-          {report.type === 'scout' ? (
-            <ScoutReport d={report.data} />
-          ) : report.type === 'trade' ? (
-            <TradeReport d={report.data} />
-          ) : report.type === 'crusade' ? (
-            <CrusadeReport d={report.data} />
-          ) : report.type === 'province' ? (
-            <ProvinceReport d={report.data} />
-          ) : report.type === 'achievement' ? (
-            <AchievementReport d={report.data} />
-          ) : report.type === 'attack' || report.type === 'defense' || report.data.attacker ? (
-            <AttackReport d={report.data} />
-          ) : (
-            <div className="stack">
-              {report.data.units && <UnitList units={report.data.units} />}
-              {report.data.from && <p>Depuis {report.data.from}</p>}
-            </div>
-          )}
+          <ReportBody report={report} />
         </section>
       </div>
     );

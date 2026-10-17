@@ -111,6 +111,20 @@ export default async function adminRoutes(app: FastifyInstance) {
     return warOverview(hours);
   });
 
+  /** Un rapport de bataille, quel que soit son destinataire, ouvert depuis le journal des guerres. Lecture seule : il reste non lu pour son joueur. */
+  app.get('/api/admin/reports/:id', async (req) => {
+    await requireAdmin(req);
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
+    const { rows } = await pool.query(
+      `SELECT r.id, r.type, r.title, r.data, r.created_at, p.username FROM reports r JOIN players p ON p.id = r.player_id
+       WHERE r.id = $1 AND r.type IN ('attack', 'defense')`,
+      [id],
+    );
+    if (!rows[0]) throw new GameError('Rapport introuvable : il a peut-être été supprimé ou il est trop ancien', 404);
+    const r = rows[0];
+    return { id: r.id, type: r.type, title: r.title, data: r.data, createdAt: r.created_at, player: r.username };
+  });
+
   /** Joueurs et PNJ : points, villages, tribu, guerre, gloire, inscription et dernière connexion. */
   app.get('/api/admin/players', async (req) => {
     await requireAdmin(req);
