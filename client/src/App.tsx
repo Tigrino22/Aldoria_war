@@ -54,6 +54,7 @@ export default function App() {
     return (
       <WorldPicker
         username={session.account.username}
+        isAdmin={session.account.isAdmin}
         current={session.world}
         onEnter={(world) => {
           setSession({ ...session, world });

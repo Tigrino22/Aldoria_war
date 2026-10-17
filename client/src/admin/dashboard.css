@@ -1,0 +1,32 @@
+/* Tableau de bord d'administration (page /admin), thème « Heure dorée » (docs/CHARTE-GRAPHIQUE.md) :
+   même barre du haut et même menu latéral que le jeu, contenu en gabarit de page (PageBanner, Panel). */
+.dash .dash-title { font-family: Cinzel, serif; font-weight: 700; letter-spacing: 0.08em; color: #e0b23c; text-transform: uppercase; font-size: 13px; }
+.dash .who { margin-left: auto; text-decoration: none; }
+.dash .content { flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+.dash .side { gap: 18px; }
+.dash .side a.side-quit { text-decoration: none; }
+.dash .side a.side-quit + .side-quit { margin-top: 0; }
+.dash-mnav { display: none; box-sizing: border-box; max-width: 100%; }
+
+.dash-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.dash-card { display: flex; flex-direction: column; gap: 10px; }
+.dash-card .panel-head h2 { font-family: Cinzel, serif; }
+.dash-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 0; }
+.dash-facts div { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.dash-facts dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.dash-facts dd { margin: 2px 0 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dash-card-actions { gap: 8px; flex-wrap: wrap; margin-top: auto; }
+.dash-filters { gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.dash-filters input { flex: 1; min-width: 180px; }
+.dash-worldchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.dash-worldchips .chip { margin-left: 0; text-decoration: none; color: var(--ink); white-space: nowrap; }
+.dash-worldchips .chip:hover { border-color: var(--gold); }
+.dash-submit { gap: 10px; justify-content: flex-end; }
+.dash .admin-setting input:not([type='number']) { width: 220px; }
+
+@media (max-width: 899px) {
+  .dash { padding-bottom: 0; }
+  .dash .content { padding: 12px; }
+  .dash-mnav { display: block; width: 100%; font-weight: 600; }
+  .dash .dash-title { font-size: 12px; }
+}

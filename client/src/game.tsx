@@ -10,7 +10,7 @@ export interface Toast {
   kind: 'info' | 'error' | 'warning';
 }
 
-interface GameCtx {
+export interface GameCtx {
   me: MeResponse;
   world: WorldInfo & { offset: number };
   villageId: number;
@@ -28,6 +28,8 @@ interface GameCtx {
 }
 
 const Ctx = createContext<GameCtx | null>(null);
+/** Fournit le contexte sans GameProvider : le tableau de bord d'administration réutilise ainsi les pages d'administration. */
+export const GameContext = Ctx.Provider;
 export const useGame = () => {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useGame hors de GameProvider');

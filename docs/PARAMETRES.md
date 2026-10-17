@@ -309,9 +309,16 @@ Les ressources offertes sont retirées du village à la publication et rendues �
 
 ## Administration
 
-Page `#/admin` (menu « Mon compte » > « Administration », administrateurs seulement) : signalements et bugs remontés par les joueurs (voir plus bas), activité des PNJ (attaques, espionnages, offres, avec un repère 🌙 pour les heures calmes), onglet « Guerres » (voir plus bas), joueurs et PNJ, totaux et paramètres du monde.
+Tableau de bord séparé du jeu, à l'adresse `/admin` (page `client/admin.html`, code dans `client/src/admin/`). Il a sa propre connexion et ne montre rien d'autre que le formulaire tant que le compte n'est pas administrateur ; un compte ordinaire qui s'y connecte est refusé et déconnecté. Dans le jeu, l'entrée « Administration » du menu (et le bouton « Administration » de la liste des mondes) n'apparaissent qu'aux administrateurs et mènent au tableau de bord.
 
-Elle n'est visible que pour les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie l'identité à chaque requête (`/api/admin/*` répond 403 aux autres).
+- **Tous les mondes** : une carte par monde (vitesse, carte, joueurs, actifs sur 24 h, PNJ, tribus, villages, barbares), ouverture ou fermeture des inscriptions.
+- **Tous les joueurs** : chaque compte, les mondes où il joue (points, villages, tribu), date d'inscription et dernière visite ; recherche et filtre par monde.
+- **Nouveau monde** : nom, inscriptions, réglages fixés à la création (vitesse, taille de la carte, villages barbares, PNJ solitaires, tribus de PNJ et leur taille) et tous les réglages du jeu, préremplis avec leur valeur d'origine. La carte, les provinces et les PNJ sont créés aussitôt et les tâches de fond du monde démarrent sans redémarrage.
+- **Page d'un monde** : nom modifiable, inscriptions, réglages de création (en lecture seule), puis les onglets signalements, bugs, PNJ, guerres, joueurs (fiche détaillée), statistiques et « Monde » (tous les réglages à chaud, croisade d'essai, remplissage des entrepôts des PNJ). Les routes `/api/admin/*` visent le monde choisi par l'en-tête `x-world`.
+
+Routes : `GET/POST /api/admin/worlds`, `GET /api/admin/worlds/template`, `PATCH /api/admin/worlds/:id`, `GET /api/admin/accounts` (`server/src/routes/admin-worlds.ts`). Les messages privés des joueurs ne sont jamais lisibles par l'administration.
+
+Les administrateurs sont les pseudos listés dans la variable d'environnement `ADMIN_USERNAMES` (séparés par des virgules, sans tenir compte des majuscules). Le serveur revérifie le compte à chaque requête (`/api/admin/*` répond 403 aux autres).
 
 ### Signalements (Administration > Signalements)
 

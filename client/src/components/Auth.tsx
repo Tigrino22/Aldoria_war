@@ -3,7 +3,12 @@ import { api, setToken } from '../api';
 import { logo, villageBg } from '../assets';
 import './auth.css';
 
-export default function Auth({ onLogin }: { onLogin: () => void }) {
+export default function Auth({ onLogin, title = 'Aldoria War', lead, allowRegister = true }: {
+  onLogin: () => void;
+  title?: string;
+  lead?: string;
+  allowRegister?: boolean;
+}) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -29,16 +34,16 @@ export default function Auth({ onLogin }: { onLogin: () => void }) {
     <div className="auth" style={{ backgroundImage: `url("${villageBg}")` }}>
       <form className="auth-card" onSubmit={submit}>
         <img src={logo} alt="" width={72} height={72} />
-        <h1>Aldoria War</h1>
-        <p className="muted">Bâtissez votre village, levez une armée, conquérez vos voisins.</p>
-        <div className="tabs" role="tablist">
+        <h1>{title}</h1>
+        <p className="muted">{lead ?? 'Bâtissez votre village, levez une armée, conquérez vos voisins.'}</p>
+        {allowRegister && <div className="tabs" role="tablist">
           <button type="button" role="tab" aria-selected={mode === 'login'} onClick={() => setMode('login')}>
             Connexion
           </button>
           <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => setMode('register')}>
             Inscription
           </button>
-        </div>
+        </div>}
         <label htmlFor="username">Pseudo</label>
         <input id="username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required minLength={3} maxLength={20} />
         <label htmlFor="password">Mot de passe</label>
