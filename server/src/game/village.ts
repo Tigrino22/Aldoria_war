@@ -106,15 +106,23 @@ export async function addTroops(c: Db, villageId: number, homeId: number, units:
   await setTroops(c, villageId, homeId, addUnits(current, units));
 }
 
-/** Population occupée par toutes les troupes appartenant au village, où qu'elles soient, y compris en recrutement. */
-export async function computePopulation(c: Db, villageId: number): Promise<number> {
+/**
+ * Toutes les troupes appartenant au village, où qu'elles soient (chez lui, en renfort ailleurs, en route,
+ * réservées par un ordre planifié), hors recrutement en cours.
+ */
+export async function ownedUnits(c: Db, villageId: number): Promise<UnitCounts> {
   const { rows } = await c.query(
     `SELECT units FROM troops WHERE home_village_id = $1
      UNION ALL SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed
      UNION ALL SELECT units FROM planned_commands WHERE origin_village_id = $1`,
     [villageId],
   );
-  let population = rows.reduce((sum, r) => sum + populationOf(normalizeUnits(r.units)), 0);
+  return rows.reduce((sum: UnitCounts, r) => addUnits(sum, normalizeUnits(r.units)), emptyUnits());
+}
+
+/** Population occupée par toutes les troupes appartenant au village, où qu'elles soient, y compris en recrutement. */
+export async function computePopulation(c: Db, villageId: number): Promise<number> {
+  let population = populationOf(await ownedUnits(c, villageId));
   const queue = await c.query('SELECT unit, count - delivered AS remaining FROM recruit_queue WHERE village_id = $1', [villageId]);
   for (const r of queue.rows) population += UNITS[r.unit as UnitKey].population * Number(r.remaining);
   return population;

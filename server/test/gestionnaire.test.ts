@@ -157,6 +157,31 @@ describe('gestionnaire de compte', () => {
     expect(await processManager(new Date())).toBe(1);
   });
 
+  it('compte les troupes du village en renfort ailleurs et celles réservées par un ordre planifié', async () => {
+    const tpl = await app.inject({
+      method: 'POST', url: '/api/manager/templates', headers,
+      payload: { name: 'Objectif 50', plan: { buildings: [], troops: { spearman: 50 }, troopsShare: 100 } },
+    });
+    expect((await put(`/api/manager/villages/${villageId}`, { enabled: true, templateId: tpl.json().id })).statusCode).toBe(200);
+    await tx(async (c) => {
+      await c.query('DELETE FROM recruit_queue WHERE village_id = $1', [villageId]);
+      await c.query('DELETE FROM troops WHERE home_village_id = $1', [villageId]);
+    });
+    const player = (await pool.query('SELECT owner_id FROM villages WHERE id = $1', [villageId])).rows[0].owner_id;
+    const elsewhere = (await pool.query('SELECT id FROM villages WHERE id <> $1 ORDER BY id LIMIT 1', [villageId])).rows[0].id;
+    // 30 lanciers en renfort dans un autre village (comme l'escorte d'un noble après une conquête), 20 réservés par un ordre planifié.
+    await pool.query('INSERT INTO troops (village_id, home_village_id, units) VALUES ($1, $2, $3)', [elsewhere, villageId, JSON.stringify({ spearman: 30 })]);
+    await pool.query(
+      `INSERT INTO planned_commands (group_id, player_id, origin_village_id, target_village_id, type, units, depart_at, arrive_at)
+       VALUES ($1, $2, $3, $4, 'attack', $5, now() + interval '1 hour', now() + interval '2 hours')`,
+      [randomUUID(), player, villageId, elsewhere, JSON.stringify({ spearman: 20 })],
+    );
+    await give(R(50000, 50000, 50000, 50000), { barracks: 1, townhall: 3, farm: 10 });
+    await processManager(new Date());
+    // Les 50 lanciers demandés existent déjà : rien à recruter.
+    expect((await pool.query('SELECT count(*)::int AS n FROM recruit_queue WHERE village_id=$1', [villageId])).rows[0].n).toBe(0);
+  });
+
   it('refuse de régler le village de quelqu\'un d\'autre', async () => {
     const other = await app.inject({ method: 'POST', url: '/api/auth/register', payload: account('Voisin') });
     const h2 = { authorization: `Bearer ${other.json().token}` };
