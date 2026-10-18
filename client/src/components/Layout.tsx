@@ -37,6 +37,7 @@ const PAGES = {
   BugReport: () => import('./BugReport'),
   VillageSheet: () => import('./VillageSheet'),
   Raid: () => import('./Raid'),
+  IncomingAttacks: () => import('./IncomingAttacks'),
   Crusade: () => import('./Crusade'),
   Provinces: () => import('./Provinces'),
   Inventory: () => import('./Inventory'),
@@ -59,6 +60,7 @@ const Admin = lazy(PAGES.Admin);
 const BugReport = lazy(PAGES.BugReport);
 const VillageSheet = lazy(PAGES.VillageSheet);
 const Raid = lazy(PAGES.Raid);
+const IncomingAttacks = lazy(PAGES.IncomingAttacks);
 const Crusade = lazy(PAGES.Crusade);
 const Provinces = lazy(PAGES.Provinces);
 const Inventory = lazy(PAGES.Inventory);
@@ -97,7 +99,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         path: 'troupes',
         label: 'Troupes',
         icon: 'troupes',
-        tabs: [{ path: 'troupes', label: 'Troupes' }, { path: 'ralliement', label: 'Ralliement' }, { path: 'pillage', label: 'Pillage' }],
+        tabs: [{ path: 'troupes', label: 'Troupes' }, { path: 'ralliement', label: 'Ralliement' }, { path: 'pillage', label: 'Pillage' }, { path: 'attaques', label: 'Attaques entrantes' }],
       },
       { path: 'croisade', label: 'Croisades', icon: 'croisade', tabs: [{ path: 'croisade', label: 'Croisades' }, { path: 'provinces', label: 'Provinces' }] },
     ],
@@ -372,6 +374,7 @@ export default function Layout() {
           {page === 'troupes' && <RallyPoint />}
           {page === 'ralliement' && <RallyPage focus={route[1]} />}
           {page === 'pillage' && <Raid />}
+          {page === 'attaques' && <IncomingAttacks />}
           {page === 'croisade' && <Crusade />}
           {page === 'provinces' && <Provinces />}
           {page === 'inventaire' && <Inventory />}

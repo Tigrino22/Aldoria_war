@@ -278,7 +278,7 @@ export default function WikiGuide() {
       <Panel title="Ne pas se faire piller">
         <ul>
           <li>Avant la fin de la protection, ayez une muraille et quelques dizaines de défenseurs. Un village vide n'a que {BASE_VILLAGE_DEFENSE} de défense : n'importe qui le pille.</li>
-          <li>Vous êtes prévenu dès le départ d'une attaque vers vous : les « Mouvements entrants » de la page Troupes et les menaces de la page Tribu montrent ce qui arrive.</li>
+          <li>Vous êtes prévenu dès le départ d'une attaque vers vous : la page « Attaques entrantes » (onglet de Troupes) les liste toutes avec leur origine et leur destination, et les menaces de la page Tribu montrent ce qui arrive sur vos compagnons.</li>
           <li>Un espion ennemi ne vous voit pas si vous avez autant ou plus d'éclaireurs que lui : quelques éclaireurs à la maison gardent vos secrets.</li>
           <li>Demandez des renforts à votre tribu quand une grosse attaque arrive : ils se battent avec vous et profitent de votre muraille.</li>
           <li>

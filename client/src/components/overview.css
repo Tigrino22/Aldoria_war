@@ -14,6 +14,7 @@
   background: linear-gradient(90deg, rgb(160 30 30 / 0.92), rgb(110 20 20 / 0.86)); border: 1px solid #ff8a7a;
 }
 .app .pg .ov-war .countdown { color: #fff; }
+.app .pg .ov-war a { color: #fff; font-weight: 700; }
 .app .pg .ov-res-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .app .pg .ov-res-tile { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); min-width: 0; }
 .app .pg .ov-res-tile.full b { color: var(--danger); }

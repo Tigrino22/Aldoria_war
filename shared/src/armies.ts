@@ -34,6 +34,28 @@ export interface MapArmy {
   owner: string | null;
 }
 
+/**
+ * Attaque qui vise l'un des villages du joueur (page « Attaques entrantes »). Mêmes règles de visibilité que la carte :
+ * l'origine, la destination et l'heure d'arrivée sont connues dès le départ, la composition seulement une fois l'armée
+ * repérée (à `ARMY_SIGHT` cases ou moins de l'un de ses villages).
+ */
+export interface IncomingAttack {
+  id: number;
+  sentAt: string;
+  arriveAt: string;
+  /** Distance en cases entre le village d'origine et le village visé. */
+  distance: number;
+  origin: { id: number; name: string; x: number; y: number; ownerName: string | null; ownerTag: string | null; npc: boolean };
+  target: { id: number; name: string; x: number; y: number };
+  /** Moment où l'armée entre à portée de vue (null si elle y est déjà ou si elle ne l'atteint pas avant d'arriver). */
+  spotFrom: string | null;
+  spotted: boolean;
+  /** Contenu vu une fois repérée : taille, genres d'unités, éclaireurs seuls. Null tant qu'elle ne l'est pas. */
+  size: 1 | 2 | 3 | null;
+  kinds: ArmyKind[] | null;
+  scouts: boolean;
+}
+
 /** Silhouettes dessinées sur la carte. */
 export type ArmyKind = 'foot' | 'horse' | 'scout' | 'noble' | 'ram';
 
