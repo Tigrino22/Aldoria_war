@@ -195,7 +195,8 @@ describe('PNJ : nobles, conquêtes et pillage', () => {
     const nobles = sent.filter((r) => r.units.noble > 0);
     expect(nobles).toHaveLength(4);
     const strike = sent.find((r) => !r.units.noble)!;
-    expect(strike.units).toEqual(expect.objectContaining({ swordsman: 600 - 4 * 20, ram: 20 }));
+    // Béliers au plus juste : 3 abattent une muraille 2 (2 + 1), les autres restent au village.
+    expect(strike.units).toEqual(expect.objectContaining({ swordsman: 600 - 4 * 20, ram: 3 }));
     // Réglage coupé : il laisse les joueurs tranquilles et garde ses nobles.
     env.npcPlayerConquest = 0;
     try {

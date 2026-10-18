@@ -4,6 +4,8 @@ import {
   UNIT_KEYS,
   UNITS,
   emptyUnits,
+  RESOURCES,
+  ramsToBreakWall,
   resolveCombat,
   wallDuringCombat,
 } from '@aldoria/shared';
@@ -133,21 +135,73 @@ export const scoutPaused = (f: ScoutFailures | undefined, now: Date, worldSpeed:
  * Un PNJ attaque dès que son armée bat l'armée espionnée : la marge de sécurité (`npcAttackMargin`, en % de la défense estimée) vaut 0 par défaut.
  * La victoire est celle du combat (force d'attaque strictement supérieure).
  */
-export const attackBeats = (r: { attackPower: number; defensePower: number }) => r.attackPower > r.defensePower && r.attackPower >= (1 + env.npcAttackMargin / 100) * r.defensePower;
+export const attackBeats = (r: { attackPower: number; defensePower: number }, marginPct = 0) =>
+  r.attackPower > r.defensePower && r.attackPower >= (1 + Math.max(env.npcAttackMargin, marginPct) / 100) * r.defensePower;
 
 const noTroops = (u: UnitCounts) => UNIT_KEYS.every((k) => u[k] === 0);
 
-/** Parts d'armée essayées : une seule (toute l'armée) face à des défenseurs, car un petit détachement perd trop de soldats ; toutes face à un village sans troupes. */
-const sharesFor = (defenders: UnitCounts, minShare: number) => (noTroops(defenders) ? [0.25, 0.35, 0.5, 0.7, 1] : [1]).filter((x) => x >= minShare);
+/** Béliers utiles contre une muraille : de quoi l'abattre entièrement (N × (N + 1) / 2 pour le niveau N), pas un de plus ; aucun sans muraille. */
+export const ramsFor = (available: number, wall: number) => Math.min(available, ramsToBreakWall(Math.max(0, Math.floor(wall))));
 
-/** Toute l'armée disponible si elle bat la défense estimée avec la marge voulue, sauf face à un village sans troupes : alors la plus petite part (au moins `minShare`) qui suffit. Null si elle ne suffit pas. */
-export function pickWinningUnits(available: UnitCounts, defenders: UnitCounts, wall: number, minShare = 0): UnitCounts | null {
-  for (const share of sharesFor(defenders, minShare)) {
-    const units = emptyUnits();
-    for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
+/** Valeur en ressources de troupes. */
+const valueOf = (units: UnitCounts) => UNIT_KEYS.reduce((sum, k) => sum + units[k] * RESOURCES.reduce((t, r) => t + UNITS[k].cost[r], 0), 0);
+
+const STRIKE_FRACTIONS = [0, 0.25, 0.5, 0.75, 1];
+
+/**
+ * Assaut taillé sur les statistiques des troupes, face à des défenseurs espionnés. La défense de chaque unité dépend de la part d'infanterie
+ * et de cavalerie de l'attaque (le lancier arrête la cavalerie, le hallebardier l'infanterie) : le PNJ essaie les mélanges d'épéistes
+ * et de cavaliers (par quarts) et garde celui qui gagne avec la marge voulue en perdant le moins de ressources (pertes du vainqueur :
+ * (défense / attaque)^1,5 de ses troupes, sans arrondi). Plus l'assaut est fort, moins il perd : face à des défenseurs, c'est souvent toute l'armée,
+ * moins les unités que la défense arrête le mieux.
+ * Les béliers partent juste assez nombreux pour abattre la muraille. `minShare` : part minimale de la force d'attaque disponible à engager.
+ * Null si aucun mélange ne gagne.
+ */
+export function planStrike(available: UnitCounts, defenders: UnitCounts, wall: number, opts: { minShare?: number; marginPct?: number } = {}): UnitCounts | null {
+  const full = available.swordsman * UNITS.swordsman.attack + available.cavalry * UNITS.cavalry.attack;
+  const rams = ramsFor(available.ram, wall);
+  let best: { units: UnitCounts; loss: number; power: number } | null = null;
+  for (const a of STRIKE_FRACTIONS) {
+    for (const b of STRIKE_FRACTIONS) {
+      const units = { ...emptyUnits(), swordsman: Math.floor(available.swordsman * a), cavalry: Math.floor(available.cavalry * b), ram: rams };
+      const power = units.swordsman * UNITS.swordsman.attack + units.cavalry * UNITS.cavalry.attack;
+      if (power === 0 || power < (opts.minShare ?? 0) * full) continue;
+      const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
+      if (!attackBeats(r, opts.marginPct)) continue;
+      const loss = Math.pow(r.defensePower / r.attackPower, 1.5) * valueOf(units);
+      if (!best || loss < best.loss) best = { units, loss, power };
+    }
+  }
+  return best?.units ?? null;
+}
+
+/** Troupes survivantes d'un assaut gagné (pour estimer le butin qu'elles rapportent). */
+function survivorsOf(units: UnitCounts, defenders: UnitCounts, wall: number): UnitCounts {
+  const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
+  const out = emptyUnits();
+  for (const k of UNIT_KEYS) out[k] = units[k] - r.attackerLosses[k];
+  return out;
+}
+
+/** Parts d'armée essayées face à un village sans troupes : la plus petite qui suffit. */
+const EMPTY_SHARES = [0.25, 0.35, 0.5, 0.7, 1];
+
+/** Part `share` des troupes disponibles, béliers comptés au plus juste pour la muraille. */
+function shareOf(available: UnitCounts, share: number, wall: number): UnitCounts {
+  const units = emptyUnits();
+  for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
+  units.ram = Math.min(units.ram, ramsFor(available.ram, wall));
+  return units;
+}
+
+/** Troupes qui battent la défense estimée (voir `planStrike`), ou face à un village sans troupes la plus petite part (au moins `minShare`) qui suffit. Null si rien ne suffit. */
+export function pickWinningUnits(available: UnitCounts, defenders: UnitCounts, wall: number, minShare = 0, marginPct = 0): UnitCounts | null {
+  if (!noTroops(defenders)) return planStrike(available, defenders, wall, { minShare, marginPct });
+  for (const share of EMPTY_SHARES.filter((x) => x >= minShare)) {
+    const units = shareOf(available, share, wall);
     if (UNIT_KEYS.every((k) => units[k] === 0)) continue;
     const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
-    if (attackBeats(r)) return units;
+    if (attackBeats(r, marginPct)) return units;
   }
   return null;
 }
@@ -227,8 +281,9 @@ export function carryOf(units: UnitCounts): number {
 export const MIN_LOOT = 200;
 
 /**
- * Choisit les troupes d'un pillage. Face à des défenseurs, toute l'armée part (si elle gagne avec la marge voulue) pour limiter les pertes.
- * Face à un village sans troupes, la plus petite part qui peut emporter l'essentiel du stock. Renvoie aussi le butin attendu.
+ * Choisit les troupes d'un pillage. Face à des défenseurs, l'assaut taillé sur les statistiques des troupes (`planStrike`).
+ * Face à un village sans troupes, la plus petite part qui peut emporter l'essentiel du stock. Renvoie aussi le butin attendu,
+ * celui que les survivants peuvent rapporter.
  */
 export function pickRaidUnits(
   available: UnitCounts,
@@ -236,19 +291,22 @@ export function pickRaidUnits(
   wall: number,
   stock: Resources,
   minShare = 0,
+  marginPct = 0,
 ): { units: UnitCounts; loot: number } | null {
   const total = stock.wood + stock.clay + stock.iron + stock.wheat;
   let best: UnitCounts | null = null;
-  for (const share of sharesFor(defenders, minShare)) {
-    const units = emptyUnits();
-    for (const k of UNIT_KEYS) units[k] = Math.floor(available[k] * share);
-    if (UNIT_KEYS.every((k) => units[k] === 0)) continue;
-    const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
-    if (!attackBeats(r)) continue;
-    best = units;
-    if (carryOf(units) >= 0.8 * total) break;
+  if (!noTroops(defenders)) best = planStrike(available, defenders, wall, { minShare, marginPct });
+  else {
+    for (const share of EMPTY_SHARES.filter((x) => x >= minShare)) {
+      const units = shareOf(available, share, wall);
+      if (UNIT_KEYS.every((k) => units[k] === 0)) continue;
+      const r = resolveCombat({ attackers: units, defenders: [defenders], wallLevel: wallDuringCombat(wall, units.ram) });
+      if (!attackBeats(r, marginPct)) continue;
+      best = units;
+      if (carryOf(units) >= 0.8 * total) break;
+    }
   }
-  return best ? { units: best, loot: Math.min(carryOf(best), total) } : null;
+  return best ? { units: best, loot: Math.min(carryOf(survivorsOf(best, defenders, wall)), total) } : null;
 }
 
 /** Points de loyauté qu'un noble fait tomber en moyenne (entre 20 et 35 par attaque gagnée). */
