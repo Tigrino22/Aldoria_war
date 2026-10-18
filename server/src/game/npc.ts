@@ -49,7 +49,7 @@ import {
   scoutPaused,
   scoutWave,
   afterScoutFailure,
-  harassUnits,
+  realAttack,
   type ScoutFailures,
   tribeMemberProfiles,
   tribeRelations,
@@ -423,7 +423,9 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const op = tribe?.state.op;
   if (tribe && op && Date.parse(op.landBy) > now.getTime() && !op.joined.includes(npcId) && !quiet) {
     const target = await loadVillage(c, op.targetId).catch(() => null);
-    const units = target && pickWinningUnits(attackers, op.troops, op.wall);
+    // Vraie attaque ou rien : un compagnon qui ne peut envoyer qu'une poignée de soldats ne se joint pas.
+    const won = target && pickWinningUnits(attackers, op.troops, op.wall);
+    const units = won ? realAttack(won, attackers, env.npcMinAttack) : null;
     if (target && units) {
       const arrival = arrivalOf(units, target);
       const inWindow = arrival.getTime() >= Date.parse(op.landAt) - opWindowMs() && arrival.getTime() <= Date.parse(op.landBy);
@@ -552,15 +554,16 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
         if (lastMove && now.getTime() - new Date(lastMove).getTime() < (cooldownHours * 3_600_000) / env.worldSpeed) return;
         let move = afterScoutFailure(scoutFailureRoll());
         // Un joueur déjà frappé par un PNJ pendant la période n'essuie pas de vraie attaque à l'aveugle : seulement de l'intimidation.
-        if (move === 'strike' && hostileToPlayer && (await recentlyHit(c, target.ownerId!, now))) move = 'harass';
-        // Hors guerre et hors riposte, intimider ou frapper à l'aveugle ne sert à rien et ne fait que remplir les rapports :
-        // le PNJ réespionne ou passe son tour.
+        if (move === 'strike' && hostileToPlayer && (await recentlyHit(c, target.ownerId!, now))) move = 'wait';
+        // Vraie attaque ou rien : plus d'intimidation à quelques dizaines de soldats, qui ne fait que remplir les rapports.
+        if (move === 'harass') move = 'wait';
+        // Hors guerre et hors riposte, frapper à l'aveugle ne sert à rien : le PNJ réespionne.
         const fighting = target.enemy || (hostileToPlayer && grudges.includes(target.ownerId!));
-        if (!fighting && move === 'harass') move = 'wait';
         if (!fighting && move === 'strike') move = 'rescout';
         if (move === 'wait') return;
         if (move !== 'rescout') {
-          const units = move === 'harass' ? harassUnits(attackers) : pickOffensiveUnits(attackers);
+          const share = pickOffensiveUnits(attackers);
+          const units = share && realAttack(share, attackers, env.npcMinAttack);
           if (!units || arrivesQuiet(units)) return;
           await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units }, now);
           return;
@@ -581,7 +584,8 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       // Sinon, le meilleur mélange de toute l'armée offensive s'il suffit ; sinon le PNJ renonce et retentera plus tard.
       const opts = { marginPct: hostileToPlayer ? PLAYER_MARGIN : 0 };
       const share = pickOffensiveUnits(attackers);
-      const units = (share && planStrike(share, intel.troops, intel.wall, opts)) ?? planStrike(attackers, intel.troops, intel.wall, opts);
+      const planned = (share && planStrike(share, intel.troops, intel.wall, opts)) ?? planStrike(attackers, intel.troops, intel.wall, opts);
+      const units = planned && realAttack(planned, attackers, env.npcMinAttack);
       if (!units) return void (await finishOffensive(4));
       const arrival = arrivalOf(units, target);
       if (hostileToPlayer && isQuietAt(arrival)) return;
@@ -594,8 +598,9 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     // Chaque noble a son escorte de 20 épéistes, mise de côté avant de choisir l'assaut.
     // Réglage « Conquête des joueurs » coupé : seules la riposte et la guerre emmènent un train chez un joueur.
     const nobles = target === conquest ? conquestTrain : hostileToPlayer && (env.npcPlayerConquest || avenging) ? await trainFor(target.id) : 0;
-    // Un barbare ou un PNJ vu sans défense est laissé au pillage intensif, par groupes de 50 épéistes ou lanciers (voir npc-raids.ts).
-    if (!hostileToPlayer && !avenging && nobles === 0 && UNIT_KEYS.every((k) => intel.troops[k] === 0)) return;
+    // Un barbare vu sans défense est laissé au pillage intensif, par groupes de 50 épéistes ou lanciers (voir npc-raids.ts) ;
+    // un PNJ, même vide, reçoit une vraie attaque.
+    if (target.ownerId === null && !avenging && nobles === 0 && UNIT_KEYS.every((k) => intel.troops[k] === 0)) return;
     // Chez un joueur, qui peut renforcer son village en voyant venir l'attaque, l'assaut d'une conquête part avec au moins 70 % de l'armée (toute l'armée s'il y a des défenseurs).
     const strong = avenging || (hostileToPlayer && nobles > 0);
     const raid = pickRaidUnits(
@@ -612,10 +617,12 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       if (conquest || avenging || hostileToPlayer) {
         const strikeArmy = { ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT };
         const where = { id: target.id, x: target.x, y: target.y, wall: intel.wall };
+        const own = waveOf(strikeArmy, intel.wall);
         const waves: Wave[] = [
-          { playerId: npcId, villageId, x: village.x, y: village.y, units: waveOf(strikeArmy, intel.wall) },
+          ...(realAttack(own, own, env.npcMinAttack) ? [{ playerId: npcId, villageId, x: village.x, y: village.y, units: own }] : []),
           ...(await siegeHelpers(c, npcId, tribe?.id ?? null, villageId, where)),
         ];
+        if (!waves.length) return;
         const plan = planSiege(waves.map((w) => w.units), intel.troops, intel.wall, hostileToPlayer ? PLAYER_MARGIN : 0);
         // Pas besoin d'être sûr de gagner : un assaut d'usure part s'il tue au moins 30 % de la défense et plus qu'il ne perd.
         const worth = plan.cleared || (plan.killed >= ATTRITION_MIN_KILL * plan.defenseValue && plan.killed > plan.lost);
@@ -643,7 +650,9 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       }
       return;
     }
-    const units = raid.units;
+    // Contre un joueur ou un PNJ, vraie attaque ou rien (réglage « Taille minimale d'une attaque ») ; les barbares gardent le pillage au plus juste.
+    const units = target.ownerId === null ? raid.units : realAttack(raid.units, { ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT }, env.npcMinAttack);
+    if (!units) return;
     // Hors riposte et conquête, un pillage ne vaut le déplacement que s'il y a de quoi remplir les sacs.
     if (!avenging && nobles === 0 && raid.loot < MIN_LOOT) return;
     // Tous les envois arrivent à la suite : l'assaut d'abord, puis un noble par seconde.

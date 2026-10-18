@@ -65,6 +65,8 @@ describe('règles des tribus de PNJ', () => {
 
 describe('tribus de PNJ', () => {
   beforeAll(async () => {
+    // Ces scénarios jouent avec de petites armées : la taille minimale d'une attaque (testée à part) est coupée, la moitié de l'armée reste exigée.
+    env.npcMinAttack = 0;
     await migrate(true);
     let seed = 7;
     setNpcRandom(() => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296));
@@ -207,7 +209,7 @@ describe('tribus de PNJ', () => {
     await pool.query('UPDATE villages SET x = 0, y = 0 WHERE owner_id IS NULL');
     await tx(async (c) => {
       await setTroops(c, va.id, va.id, { ...emptyUnits(), swordsman: 200, cavalry: 100, spearman: 60, scout: 5 });
-      // Vu vide, le village rival est pillé par 50 lanciers (le PNJ est défensif).
+      // Vu vide, le village rival reçoit une vraie attaque (plus de pillage à 50 soldats chez un PNJ).
       await c.query(
         `INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`,
         [a, JSON.stringify({ attacker: {}, defender: { village: { id: vb.id } }, intel: { resources: { wood: 5000, clay: 5000, iron: 5000, wheat: 5000 }, buildings: { wall: 0 }, troops: emptyUnits() } }), NIGHT],

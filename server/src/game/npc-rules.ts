@@ -86,16 +86,6 @@ export function afterScoutFailure(roll: number): ScoutFailureMove {
   return SCOUT_FAILURE_MOVES[SCOUT_FAILURE_MOVES.length - 1][0];
 }
 
-/** Troupe d'intimidation : un dixième des épéistes et cavaliers du village, entre 10 et 40 unités. Null s'il y en a moins de 10. */
-export function harassUnits(available: UnitCounts): UnitCounts | null {
-  const pool = available.swordsman + available.cavalry;
-  if (pool < 10) return null;
-  const n = Math.min(40, Math.max(10, Math.round(pool / 10)));
-  const units = emptyUnits();
-  units.cavalry = Math.min(available.cavalry, Math.round((n * available.cavalry) / pool));
-  units.swordsman = Math.min(available.swordsman, n - units.cavalry);
-  return units;
-}
 
 /** Échecs d'espionnage consécutifs après lesquels un PNJ laisse une cible tranquille un temps. */
 export const SCOUT_MAX_FAILURES = 3;
@@ -300,6 +290,28 @@ export function pickRaidUnits(
     }
   }
   return best ? { units: best, loot: Math.min(carryOf(survivorsOf(best, defenders, wall)), total) } : null;
+}
+
+/** Part minimale de l'armée offensive du village engagée dans une vraie attaque. */
+export const REAL_ATTACK_SHARE = 0.5;
+const offensePower = (u: UnitCounts) => u.swordsman * UNITS.swordsman.attack + u.cavalry * UNITS.cavalry.attack;
+
+/**
+ * Vraie attaque ou rien (contre un joueur ou un village de PNJ) : au moins la moitié de l'armée offensive du village et au moins la force
+ * de `minSwordsmen` épéistes. Des troupes trop petites sont grossies jusque-là (béliers et nobles inchangés) ; un village trop faible n'attaque pas (null).
+ */
+export function realAttack(units: UnitCounts, available: UnitCounts, minSwordsmen: number): UnitCounts | null {
+  const full = offensePower(available);
+  const min = minSwordsmen * UNITS.swordsman.attack;
+  if (full === 0 || full < min) return null;
+  const needed = Math.max(min, REAL_ATTACK_SHARE * full);
+  if (offensePower(units) >= needed) return units;
+  const share = Math.min(1, needed / full);
+  return {
+    ...units,
+    swordsman: Math.max(units.swordsman, Math.ceil(available.swordsman * share)),
+    cavalry: Math.max(units.cavalry, Math.ceil(available.cavalry * share)),
+  };
 }
 
 /** Points de loyauté qu'un noble fait tomber en moyenne (entre 20 et 35 par attaque gagnée). */

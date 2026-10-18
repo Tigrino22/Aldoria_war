@@ -31,6 +31,8 @@ const due = (npc: number, at: Date) => pool.query("UPDATE players SET npc_state 
 
 describe('Offensives des PNJ', () => {
   beforeAll(async () => {
+    // Ces scénarios jouent avec de petites armées : la taille minimale d'une attaque (testée à part) est coupée, la moitié de l'armée reste exigée.
+    env.npcMinAttack = 0;
     await migrate(true);
     let seed = 5;
     setNpcRandom(() => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296));

@@ -5,7 +5,7 @@ import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { sendCommand } from '../src/game/commands';
 import { createNpc, ensureDailyNpc, npcThink, processNpcs, setNpcRandom, setScoutFailureRandom } from '../src/game/npc';
-import { afterScoutFailure, consecutiveScoutFailures, harassUnits, scoutWave } from '../src/game/npc-rules';
+import { afterScoutFailure, consecutiveScoutFailures, realAttack, scoutWave } from '../src/game/npc-rules';
 import { alertAttackedNpcs, grudgesOf } from '../src/game/npc-tribes';
 import { env } from '../src/env';
 import { createVillage, setTroops, syncVillage } from '../src/game/village';
@@ -42,6 +42,8 @@ const attacksOn = async (npc: number, target: number) =>
 
 describe('PNJ agressifs', () => {
   beforeAll(async () => {
+    // Ces scénarios jouent avec de petites armées : la taille minimale d'une attaque (testée à part) est coupée, la moitié de l'armée reste exigée.
+    env.npcMinAttack = 0;
     await migrate(true);
     // Ces scénarios comptent attaques et éclaireurs : les interceptions (testées à part) videraient les casernes entre deux réflexions.
     env.npcIntercept = 0;
@@ -233,12 +235,21 @@ describe('PNJ agressifs', () => {
     expect(await attacksOn(npc, v)).toHaveLength(0);
   });
 
+  it('vraie attaque ou rien : au moins la moitié de l’armée offensive et la force du minimum réglé', () => {
+    const home = { ...emptyUnits(), swordsman: 400, cavalry: 100 };
+    // 40 épéistes : grossis jusqu'à la moitié de l'armée.
+    expect(realAttack({ ...emptyUnits(), swordsman: 40 }, home, 100)).toEqual({ ...emptyUnits(), swordsman: 200, cavalry: 50 });
+    // Déjà assez fort : inchangé.
+    expect(realAttack(home, home, 100)).toEqual(home);
+    // Village trop faible (60 épéistes pour un minimum de 100) : rien.
+    expect(realAttack({ ...emptyUnits(), swordsman: 60 }, { ...emptyUnits(), swordsman: 60 }, 100)).toBeNull();
+    // Petite armée mais au-dessus du minimum : la moitié ne suffit pas, il en faut l'équivalent de 100 épéistes.
+    expect(realAttack({ ...emptyUnits(), swordsman: 20 }, { ...emptyUnits(), swordsman: 150 }, 100)).toEqual({ ...emptyUnits(), swordsman: 100 });
+  });
+
   it('après un espionnage raté : attente, nouvel espionnage, intimidation ou vraie attaque', () => {
     expect([0, 0.34, 0.35, 0.59, 0.6, 0.84, 0.85, 0.99].map(afterScoutFailure)).toEqual(['wait', 'wait', 'rescout', 'rescout', 'harass', 'harass', 'strike', 'strike']);
-    // Un dixième des épéistes et cavaliers, entre 10 et 40 unités.
-    expect(harassUnits({ ...emptyUnits(), swordsman: 8 })).toBeNull();
-    expect(harassUnits({ ...emptyUnits(), swordsman: 50, cavalry: 0 })).toEqual({ ...emptyUnits(), swordsman: 10 });
-    expect(harassUnits({ ...emptyUnits(), swordsman: 1500, cavalry: 500 })).toEqual({ ...emptyUnits(), swordsman: 30, cavalry: 10 });
+    // L'intimidation n'envoie plus rien (vraie attaque ou rien) : voir « vraie attaque ou rien » ci-dessous.
   });
 
   it('espionnage : plus d’éclaireurs après un échec, puis la cible est laissée tranquille après trois échecs', async () => {
@@ -320,7 +331,7 @@ describe('PNJ agressifs', () => {
     env.npcOffensive = 1;
     expect(await scoutsSent()).toEqual([50]);
 
-    // Autres réactions à un échec : attendre, intimider avec une petite troupe, ou frapper à l'aveugle.
+    // Autres réactions à un échec : attendre, ou frapper à l'aveugle avec une vraie attaque (plus d'intimidation à quelques dizaines de soldats).
     const t3 = new Date(t.getTime() + 50 * HOUR);
     const attacksSent = async () =>
       (await pool.query("SELECT units FROM commands WHERE player_id = $1 AND target_village_id = $2 AND type = 'attack' AND coalesce((units->>'scout')::int, 0) = 0", [npc, v])).rows.map((r) => r.units);
@@ -328,8 +339,8 @@ describe('PNJ agressifs', () => {
     await pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $1) WHERE id = $2', [home.id, v]);
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 300, scout: 300 })));
     env.npcOffensive = 0;
-    // Hors riposte, l'intimidation ne fait que remplir les rapports : le PNJ attend. Le joueur qui l'a attaqué, lui, est intimidé.
-    for (const [roll, grudge, expected] of [[0.1, false, 0], [0.7, false, 0], [0.7, true, 30]] as const) {
+    // L'intimidation ne fait que remplir les rapports : le PNJ attend, même contre le joueur qui l'a attaqué. Celui-là reçoit une vraie attaque à l'aveugle (la moitié de l'armée).
+    for (const [roll, grudge, expected] of [[0.1, false, 0], [0.7, false, 0], [0.7, true, 0], [0.9, true, 150]] as const) {
       await pool.query('DELETE FROM commands');
       await pool.query('DELETE FROM reports WHERE player_id = $1', [npc]);
       await failed(new Date(t3.getTime() - HOUR));
