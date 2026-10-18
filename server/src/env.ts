@@ -34,6 +34,8 @@ const baseEnv = {
   npcWars: count('NPC_WARS', 1) > 0 ? 1 : 0,
   /** Guerres entre tribus de PNJ et tribus de joueurs (1 = activées), indépendantes de la riposte et modifiables à chaud. */
   npcPlayerWars: count('NPC_PLAYER_WARS', 1) > 0 ? 1 : 0,
+  /** Conquête des villages de joueurs par les PNJ (1 = activée), modifiable à chaud. */
+  npcPlayerConquest: count('NPC_PLAYER_CONQUEST', 1) > 0 ? 1 : 0,
   /** Offensives occasionnelles des PNJ (1 = activées), part de l'armée offensive engagée (%) et rythme (heures de jeu) ; modifiables à chaud. */
   npcOffensive: count('NPC_OFFENSIVE', 1) > 0 ? 1 : 0,
   npcOffensiveShare: count('NPC_OFFENSIVE_SHARE', 50),

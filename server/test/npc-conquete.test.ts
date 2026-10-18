@@ -160,4 +160,49 @@ describe('PNJ : nobles, conquêtes et pillage', () => {
     sent = await think({ noble: 4 }, t);
     expect(sent.filter((r) => r.units.noble > 0)).toHaveLength(2);
   });
+
+  it('un PNJ prépare la conquête du village d’un joueur de sa taille : espionnage, assaut de toute son armée puis train de nobles', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
+    const home = await homeOf(npc);
+    await pool.query('UPDATE villages SET x = $2, y = $3 WHERE id = $1', [home.id, 900, 900]);
+    const player = (await pool.query("INSERT INTO players (username, password_hash) VALUES ('Voisin', 'x') RETURNING id")).rows[0].id as number;
+    const village = await tx((c) =>
+      createVillage(c, { ownerId: player, name: 'Voisin', x: 904, y: 900, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 100, clay: 100, iron: 100, wheat: 100 }, at: NOON }),
+    );
+    // De la taille du PNJ (qui grandit un peu pendant le test).
+    await pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $2) + 2 WHERE id = $1', [village, home.id]);
+    await pool.query('UPDATE players SET protection_until = NULL WHERE id = $1', [player]);
+    const army = troops({ swordsman: 600, ram: 20, scout: 20, noble: 4 });
+    const think = async (at: Date) => {
+      await pool.query('DELETE FROM commands WHERE player_id = $1', [npc]);
+      await tx((c) => setTroops(c, home.id, home.id, army));
+      await tx((c) => npcThink(c, new Outbox(), npc, at));
+      return (await sentFrom(home.id)).filter((r) => r.target_village_id === village);
+    };
+    // Sans renseignement, il espionne d'abord le village.
+    let sent = await think(NOON);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].units).toEqual(expect.objectContaining({ scout: expect.any(Number) }));
+    expect(sent[0].units.noble ?? 0).toBe(0);
+    // Le village est défendu : toute l'armée offensive part en assaut, puis quatre nobles escortés.
+    const t = new Date(NOON.getTime() + 5 * HOUR);
+    await pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`, [
+      npc,
+      JSON.stringify({ attacker: {}, defender: { village: { id: village } }, intel: { resources: { wood: 500, clay: 500, iron: 500, wheat: 500 }, buildings: { wall: 2 }, troops: troops({ spearman: 40 }) } }),
+      new Date(t.getTime() - 60_000),
+    ]);
+    sent = await think(t);
+    const nobles = sent.filter((r) => r.units.noble > 0);
+    expect(nobles).toHaveLength(4);
+    const strike = sent.find((r) => !r.units.noble)!;
+    expect(strike.units).toEqual(expect.objectContaining({ swordsman: 600 - 4 * 20, ram: 20 }));
+    // Réglage coupé : il laisse les joueurs tranquilles et garde ses nobles.
+    env.npcPlayerConquest = 0;
+    try {
+      sent = await think(new Date(t.getTime() + 60_000));
+      expect(sent.filter((r) => r.units.noble > 0)).toEqual([]);
+    } finally {
+      env.npcPlayerConquest = 1;
+    }
+  });
 });

@@ -285,6 +285,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         accountManager: env.accountManager ? 'activé' : 'désactivé',
         npcRevenge: env.npcRevenge ? 'activée' : 'désactivée',
         npcPlayerWars: env.npcPlayerWars ? 'activées' : 'désactivées',
+        npcPlayerConquest: env.npcPlayerConquest ? 'activée' : 'désactivée',
         npcOffensive: env.npcOffensive ? 'activées' : 'désactivées',
         npcOffensiveShare: `${env.npcOffensiveShare} %`,
         npcOffensiveHours: `${env.npcOffensiveHours} h`,

@@ -68,6 +68,7 @@ const SETTING_LABEL: Record<string, string> = {
   npcRevenge: 'Riposte des PNJ',
   npcWars: 'Guerres entre tribus de PNJ',
   npcPlayerWars: 'Guerres contre les tribus de joueurs',
+  npcPlayerConquest: 'Conquête des joueurs par les PNJ',
   npcOffensive: 'Offensives des PNJ',
   npcOffensiveShare: 'Part de l’armée engagée',
   npcOffensiveHours: 'Rythme des offensives',
