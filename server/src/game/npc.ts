@@ -43,6 +43,7 @@ import {
   isQuiet,
   npcType,
   pickRaidUnits,
+  planStrike,
   pickWinningUnits,
   MIN_LOOT,
   SCOUT_MEMORY_GAME_HOURS,
@@ -88,6 +89,11 @@ const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 const RAID_RADIUS = 20;
 /** Épéistes qui accompagnent chaque noble d'un train : assez pour passer la défense de base et la muraille d'un village vidé par l'assaut. Sans eux, le noble ne part pas. */
 const NOBLE_ESCORT = 20;
+/**
+ * Marge de sécurité (en % de la défense espionnée) d'une attaque contre un joueur : son armée a pu grossir depuis l'espionnage
+ * (jusqu'à une heure) et il peut envoyer des renforts en voyant venir l'attaque. Les barbares et les PNJ ne recrutent pas en cachette.
+ */
+const PLAYER_MARGIN = 20;
 /** Rayon (en cases) dans lequel un PNJ choisit le village à conquérir. */
 const CONQUEST_RADIUS = 20;
 /** Villages à conquérir écartés (trop bien défendus pour l'armée du PNJ), retenus pour ne pas y revenir aussitôt. */
@@ -566,11 +572,11 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     // Les troupes dépendent du butin : assez pour gagner et emporter l'essentiel du stock, toute l'armée s'il le faut.
     // Pour se venger ou faire la guerre, un PNJ frappe fort : au moins 70 % de son armée offensive.
     if (offensive) {
-      // Offensive : une part de l'armée, seulement si elle bat la défense espionnée (une attaque perdue d'avance ne fait que remplir les rapports).
-      // Sinon, toute l'armée offensive si elle suffit ; sinon le PNJ renonce et retentera plus tard.
+      // Offensive : la part réglée de l'armée, dans le mélange qui bat la défense espionnée au moindre coût (une attaque perdue d'avance ne fait que remplir les rapports).
+      // Sinon, le meilleur mélange de toute l'armée offensive s'il suffit ; sinon le PNJ renonce et retentera plus tard.
+      const opts = { marginPct: hostileToPlayer ? PLAYER_MARGIN : 0 };
       const share = pickOffensiveUnits(attackers);
-      const wins = (u: UnitCounts | null) => !!u && attackBeats(resolveCombat({ attackers: u, defenders: [intel.troops], wallLevel: wallDuringCombat(intel.wall, u.ram) }));
-      const units = wins(share) ? share : wins(pickOffensiveUnits(attackers, 100)) ? pickOffensiveUnits(attackers, 100) : null;
+      const units = (share && planStrike(share, intel.troops, intel.wall, opts)) ?? planStrike(attackers, intel.troops, intel.wall, opts);
       if (!units) return void (await finishOffensive(4));
       const arrival = arrivalOf(units, target);
       if (hostileToPlayer && isQuietAt(arrival)) return;
@@ -587,7 +593,14 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     if (!hostileToPlayer && !avenging && nobles === 0 && UNIT_KEYS.every((k) => intel.troops[k] === 0)) return;
     // Chez un joueur, qui peut renforcer son village en voyant venir l'attaque, l'assaut d'une conquête part avec au moins 70 % de l'armée (toute l'armée s'il y a des défenseurs).
     const strong = avenging || (hostileToPlayer && nobles > 0);
-    const raid = pickRaidUnits({ ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, strong ? 0.7 : 0);
+    const raid = pickRaidUnits(
+      { ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT },
+      intel.troops,
+      intel.wall,
+      intel.resources,
+      strong ? 0.7 : 0,
+      hostileToPlayer ? PLAYER_MARGIN : 0,
+    );
     if (!raid) {
       // Village trop bien défendu pour l'armée du PNJ : il en choisit un autre à la prochaine réflexion.
       if (conquest) {
