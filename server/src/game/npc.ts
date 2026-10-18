@@ -390,7 +390,7 @@ async function knownLoyalty(c: Db, npcId: number, villageId: number, now: Date):
  * Attaques d'un village de PNJ : barbares, PNJ hostiles et joueurs (jamais pendant les heures calmes), toujours avec ses unités offensives
  * (épéistes, cavaliers, béliers) : lanciers et hallebardiers restent défendre le village.
  * Les nobles ne partent qu'en train complet : assez pour faire tomber la loyauté estimée de la cible d'un seul passage (quatre pour une loyauté pleine),
- * chacun avec 20 épéistes, juste derrière l'assaut qui nettoie la défense. La conquête d'un barbare ou d'un PNJ hostile passe avant tout (sauf la riposte).
+ * chacun avec 20 épéistes, juste derrière l'assaut qui nettoie la défense. La conquête (barbare, PNJ hostile ou joueur de sa taille) passe avant tout (sauf la riposte).
  * Dans une tribu, seul le chef lance une opération contre un joueur ; les autres s'y joignent si leur troupe peut arriver dans la fenêtre.
  */
 async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, tribe: TribeInfo | null, now: Date) {
@@ -472,13 +472,15 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     nextOff = nextOffensiveAt(now, rng()).getTime();
     await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text)) WHERE id = $1", [npcId, new Date(nextOff).toISOString()]);
   }
-  // Conquête : dès que le village a un train complet (nobles et escorte), le PNJ choisit un village à prendre (barbare ou PNJ hostile, jamais un joueur),
-  // le plus gros au plus près de chez lui, et s'y tient d'une réflexion à l'autre au lieu de frapper au hasard.
+  // Conquête : dès que le village a un train complet (nobles et escorte), le PNJ choisit un village à prendre, le plus gros au plus près de chez lui,
+  // et s'y tient d'une réflexion à l'autre au lieu de frapper au hasard. Barbares et PNJ hostiles, et (réglage « Conquête des joueurs ») les villages
+  // des joueurs de sa taille ou de la tribu en guerre, jamais pendant les heures calmes.
   let conquest: Candidate | undefined;
   let conquestTrain = 0;
   const avoid: number[] = Array.isArray(npcState.conquest?.avoid) ? npcState.conquest.avoid : [];
   if (!revengePool.length && home.noble > 0) {
-    const options = all.filter((t) => (t.ownerId === null || t.rival) && t.dist <= CONQUEST_RADIUS && !avoid.includes(t.id));
+    const playerPrey = (t: Candidate) => !!env.npcPlayerConquest && !quiet && (sameSize.includes(t) || warPlayers.includes(t));
+    const options = all.filter((t) => (t.ownerId === null || t.rival || playerPrey(t)) && t.dist <= CONQUEST_RADIUS && !avoid.includes(t.id));
     const kept = npcState.conquest?.targetId as number | undefined;
     conquest = options.find((t) => t.id === kept) ?? options.sort((a, b) => b.points / (1 + b.dist) - a.points / (1 + a.dist))[0];
     conquestTrain = conquest ? await trainFor(conquest.id) : 0;
@@ -579,10 +581,13 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     const avenging = (hostileToPlayer && grudges.includes(target.ownerId!)) || target.enemy;
     // Le train part complet ou pas du tout : vers la cible de la conquête, ou vers un joueur attaqué (un PNJ peut aussi lui prendre un village).
     // Chaque noble a son escorte de 20 épéistes, mise de côté avant de choisir l'assaut.
-    const nobles = target === conquest ? conquestTrain : hostileToPlayer ? await trainFor(target.id) : 0;
+    // Réglage « Conquête des joueurs » coupé : seules la riposte et la guerre emmènent un train chez un joueur.
+    const nobles = target === conquest ? conquestTrain : hostileToPlayer && (env.npcPlayerConquest || avenging) ? await trainFor(target.id) : 0;
     // Un barbare ou un PNJ vu sans défense est laissé au pillage intensif, par groupes de 50 épéistes ou lanciers (voir npc-raids.ts).
     if (!hostileToPlayer && !avenging && nobles === 0 && UNIT_KEYS.every((k) => intel.troops[k] === 0)) return;
-    const raid = pickRaidUnits({ ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
+    // Chez un joueur, qui peut renforcer son village en voyant venir l'attaque, l'assaut d'une conquête part avec au moins 70 % de l'armée (toute l'armée s'il y a des défenseurs).
+    const strong = avenging || (hostileToPlayer && nobles > 0);
+    const raid = pickRaidUnits({ ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, strong ? 0.7 : 0);
     if (!raid) {
       // Village trop bien défendu pour l'armée du PNJ : il en choisit un autre à la prochaine réflexion.
       if (conquest) {
