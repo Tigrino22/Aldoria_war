@@ -38,6 +38,18 @@ export function pickOffensiveUnits(available: UnitCounts, shareOverride?: number
   return units.swordsman + units.cavalry < 1 ? null : units;
 }
 
+/** Joueurs qu'un PNJ a déjà frappés (hors espionnage) pendant le dernier rythme d'offensive. */
+export async function hitPlayers(c: Db, now: Date): Promise<Set<number>> {
+  const since = new Date(now.getTime() - offensiveIntervalMs());
+  const { rows } = await c.query(
+    `SELECT DISTINCT v.owner_id FROM commands cm JOIN players a ON a.id = cm.player_id JOIN villages v ON v.id = cm.target_village_id JOIN players o ON o.id = v.owner_id
+     WHERE a.is_npc AND NOT o.is_npc AND cm.type = 'attack' AND cm.sent_at >= $1
+       AND coalesce((cm.units->>'swordsman')::int, 0) + coalesce((cm.units->>'cavalry')::int, 0) > 0`,
+    [since],
+  );
+  return new Set(rows.map((r) => r.owner_id as number));
+}
+
 /** Vrai si un PNJ a déjà frappé ce joueur (hors espionnage) pendant le dernier rythme d'offensive : au plus une offensive reçue par période. */
 export async function recentlyHit(c: Db, ownerId: number, now: Date): Promise<boolean> {
   const since = new Date(now.getTime() - offensiveIntervalMs());

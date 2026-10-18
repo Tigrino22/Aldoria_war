@@ -175,12 +175,12 @@ describe('tribus de PNJ', () => {
     await tx((c) => npcThink(c, new Outbox(), others[0], new Date(day.getTime() + 30_000)));
     expect(new Set(await hits())).toEqual(new Set([leader, others[0]]));
 
-    // Un compagnon qui arrive trop tard (fenêtre dépassée) ne rejoint pas.
+    // Un compagnon qui réfléchit trop tard (fenêtre dépassée) ne rejoint pas l'opération : elle est effacée.
+    // (Il peut toujours attaquer le joueur de lui-même : tout PNJ peut s'en prendre aux joueurs, chef ou non.)
     const late = new Date(Date.parse(info!.state.op!.landBy) + 60_000);
     await tx((c) => npcThink(c, new Outbox(), others[1], late));
-    expect(await hits()).not.toContain(others[1]);
-    // L'opération expirée est effacée.
-    expect((await tx((c) => npcTribeOf(c, leader)))!.state.op).toBeNull();
+    const after = (await tx((c) => npcTribeOf(c, leader)))!.state.op;
+    expect(!after || after.joined.every((id) => id === others[1])).toBe(true);
   });
 
   it('pas d’opération contre un joueur pendant les heures calmes', async () => {

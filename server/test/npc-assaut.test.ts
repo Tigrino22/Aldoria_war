@@ -48,3 +48,25 @@ describe('assaut des PNJ taillé sur les statistiques des troupes', () => {
     expect(raid.loot).toBeGreaterThan(0);
   });
 });
+
+describe('assauts groupés des PNJ', () => {
+  it('deux vagues trop faibles chacune nettoient ensemble : la première use la défense, la seconde gagne', async () => {
+    const { planSiege } = await import('../src/game/npc-siege');
+    const defenders = troops({ spearman: 1000 });
+    const wave = troops({ swordsman: 330 });
+    // Seule, une vague perd (13 200 contre 15 020).
+    expect(resolveCombat({ attackers: wave, defenders: [defenders], wallLevel: 0 }).attackerWins).toBe(false);
+    const plan = planSiege([wave, wave], defenders, 0);
+    expect(plan.cleared).toBe(true);
+    expect(plan.order).toHaveLength(2);
+  });
+
+  it('même sans victoire, l’assaut d’usure vaut le coup s’il tue plus qu’il ne perd', async () => {
+    const { planSiege } = await import('../src/game/npc-siege');
+    const plan = planSiege([troops({ cavalry: 100 })], troops({ halberdier: 1000 }), 0);
+    expect(plan.cleared).toBe(false);
+    expect(plan.killed).toBeGreaterThan(0);
+    // Les vagues partent de la plus faible à la plus forte.
+    expect(planSiege([troops({ swordsman: 900 }), troops({ swordsman: 100 })], troops({ spearman: 5000 }), 0).order).toEqual([1, 0]);
+  });
+});

@@ -265,13 +265,6 @@ export function tribeRelations(ids: number[]): Map<number, TribeRelations> {
   return out;
 }
 
-/** Un PNJ n'attaque sans provocation qu'un joueur dont les points sont entre 70 % et 150 % des siens. */
-export function pointRatioOk(npcPoints: number, targetPoints: number): boolean {
-  if (npcPoints <= 0) return false;
-  const ratio = targetPoints / npcPoints;
-  return ratio >= 0.7 && ratio <= 1.5;
-}
-
 /** Capacité de transport (en ressources) d'un groupe d'unités. */
 export function carryOf(units: UnitCounts): number {
   return UNIT_KEYS.reduce((sum, k) => sum + units[k] * UNITS[k].carry, 0);
