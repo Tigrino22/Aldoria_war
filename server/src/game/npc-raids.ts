@@ -11,7 +11,7 @@ import { getTroops, loadVillage } from './village';
 
 /**
  * Pillage intensif des PNJ : à chaque réflexion, chaque village envoie autant de pillages qu'il le peut vers les villages sans défense
- * qu'il connaît (barbares, et villages vides des PNJ hostiles), comme un joueur avec l'assistant de pillage. Chaque pillage compte
+ * qu'il connaît (les barbares seulement), comme un joueur avec l'assistant de pillage. Chaque pillage compte
  * 50 épéistes depuis un village offensif, 50 lanciers depuis un village défensif. Le PNJ ne triche pas :
  * il se fie à ses propres rapports (dernier espionnage ou dernière attaque) et estime le butin comme l'assistant des joueurs
  * (`estimateLoot`). Un barbare jamais vu reçoit d'abord un éclaireur. Les joueurs n'en font jamais partie : ils restent visés
@@ -79,15 +79,16 @@ export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: 
   let scouts = Math.min(Math.floor(home.scout / 2), SCOUTS_PER_THINK);
   if (noTroops(pool) && scouts === 0) return 0;
 
-  // Barbares et villages des PNJ hostiles dans le rayon, sauf ceux qu'une attaque (la nôtre ou celle d'un autre) vise déjà.
+  // Barbares dans le rayon, sauf ceux qu'une attaque (la nôtre ou celle d'un autre) vise déjà. Les villages des PNJ hostiles reçoivent
+  // de vraies attaques (`attackStep`), jamais un pillage de 50 soldats.
   const { rows } = await c.query(
     `SELECT v.id, (v.owner_id IS NULL) AS barbarian, sqrt((v.x - $2)^2 + (v.y - $3)^2) AS dist
      FROM villages v LEFT JOIN players p ON p.id = v.owner_id
      WHERE v.id <> $1 AND v.kind = 'village' AND (v.x - $2)^2 + (v.y - $3)^2 <= $4
-       AND (v.owner_id IS NULL OR (p.is_npc AND v.owner_id <> $5 AND (p.tribe_id = ANY($6::int[]) OR p.id = ANY($7::int[]))))
+       AND v.owner_id IS NULL
        AND NOT EXISTS (SELECT 1 FROM commands cm WHERE cm.target_village_id = v.id AND NOT cm.processed AND cm.type = 'attack')
      ORDER BY dist, v.id LIMIT 60`,
-    [villageId, village.x, village.y, env.npcRaidRadius * env.npcRaidRadius, npcId, hostiles.tribes, hostiles.npcs],
+    [villageId, village.x, village.y, env.npcRaidRadius * env.npcRaidRadius],
   );
   const targets: FarmTarget[] = rows.map((r) => ({ id: r.id, barbarian: r.barbarian, dist: Number(r.dist) }));
   if (!targets.length) return 0;

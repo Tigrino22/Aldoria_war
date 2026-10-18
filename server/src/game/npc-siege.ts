@@ -16,8 +16,6 @@ import { getTroops } from './village';
 
 /** Distance maximale (en cases) d'un village qui se joint à un assaut groupé. */
 export const SIEGE_RADIUS = 25;
-/** Force minimale (attaque) d'une vague : en dessous, elle ne pèse rien et remplit les rapports. */
-const MIN_WAVE_POWER = 800;
 /** Part minimale de la défense (en ressources) qu'un assaut d'usure doit tuer pour partir. */
 export const ATTRITION_MIN_KILL = 0.3;
 
@@ -74,7 +72,7 @@ export function waveOf(home: UnitCounts, wall: number): UnitCounts {
 
 /**
  * Villages qui peuvent se joindre à un assaut : les autres villages du PNJ et ceux des PNJ de sa tribu, à `SIEGE_RADIUS` cases au plus de la cible,
- * avec une armée offensive qui pèse quelque chose au village.
+ * avec une armée offensive d'au moins « Taille minimale d'une attaque » au village.
  */
 export async function siegeHelpers(c: Db, npcId: number, tribeId: number | null, exceptVillageId: number, target: { id: number; x: number; y: number; wall: number }): Promise<Wave[]> {
   const { rows } = await c.query(
@@ -86,7 +84,8 @@ export async function siegeHelpers(c: Db, npcId: number, tribeId: number | null,
   const waves: Wave[] = [];
   for (const r of rows) {
     const units = waveOf(await getTroops(c, r.id, r.id), target.wall);
-    if (powerOf(units) >= MIN_WAVE_POWER) waves.push({ playerId: r.owner_id, villageId: r.id, x: r.x, y: r.y, units });
+    // Vraie attaque ou rien : une vague plus faible que le minimum réglé ne pèse rien et remplit les rapports.
+    if (powerOf(units) > 0 && powerOf(units) >= env.npcMinAttack * UNITS.swordsman.attack) waves.push({ playerId: r.owner_id, villageId: r.id, x: r.x, y: r.y, units });
   }
   return waves;
 }

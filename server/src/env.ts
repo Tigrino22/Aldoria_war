@@ -45,6 +45,8 @@ const baseEnv = {
   /** Pillage intensif des PNJ (1 = activé) : pillages par village et par réflexion, rayon (cases) ; modifiables à chaud. */
   /** Marge de sécurité des attaques des PNJ, en % de la défense estimée (0 = ils attaquent dès que leur armée bat celle d'en face) ; modifiable à chaud. */
   npcAttackMargin: count('NPC_ATTACK_MARGIN', 0),
+  /** Force minimale (en épéistes) d'une attaque de PNJ contre un joueur ou un PNJ : en dessous, il n'envoie rien. */
+  npcMinAttack: count('NPC_MIN_ATTACK', 100),
   npcRaids: count('NPC_RAIDS', 1) > 0 ? 1 : 0,
   npcRaidsPerThink: count('NPC_RAIDS_PER_THINK', 20),
   npcRaidRadius: count('NPC_RAID_RADIUS', 25),

@@ -292,6 +292,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         npcIntercept: env.npcIntercept ? 'activées' : 'désactivées',
         npcRaids: env.npcRaids ? `activé (${env.npcRaidsPerThink} par réflexion, ${env.npcRaidRadius} cases)` : 'désactivé',
         npcAttackMargin: `${env.npcAttackMargin} %`,
+        npcMinAttack: `${env.npcMinAttack} épéistes`,
         npcThinkMinutes: `${env.npcThinkMinutes} min`,
         npcRecruitBatches: `${env.npcRecruitBatches} lots par réflexion`,
         npcWars: env.npcWars ? 'activées' : 'désactivées',
