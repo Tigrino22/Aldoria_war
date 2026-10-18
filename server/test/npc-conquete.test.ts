@@ -206,4 +206,31 @@ describe('PNJ : nobles, conquêtes et pillage', () => {
       env.npcPlayerConquest = 1;
     }
   });
+
+  it('trop faible seul, un village de PNJ fait donner ses autres villages : vagues à la suite, puis le train de nobles', async () => {
+    const npc = await tx((c) => createNpc(c, NOON, 'offense'));
+    const home = await homeOf(npc);
+    await pool.query('UPDATE villages SET x = $2, y = $3 WHERE id = $1', [home.id, 1000, 1000]);
+    const second = await tx((c) =>
+      createVillage(c, { ownerId: npc, name: 'Second', x: 1000, y: 1004, buildings: { ...STARTING_BUILDINGS }, resources: { wood: 100, clay: 100, iron: 100, wheat: 100 }, at: NOON }),
+    );
+    const target = await barbarian(1003, 1002);
+    const defenders = troops({ spearman: 1000 });
+    await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 410, scout: 20, noble: 4 })));
+    await tx((c) => setTroops(c, second, second, troops({ swordsman: 300 })));
+    await pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`, [
+      npc,
+      JSON.stringify({ attacker: {}, defender: { village: { id: target } }, intel: { resources: { wood: 100, clay: 100, iron: 100, wheat: 100 }, buildings: { wall: 0 }, troops: defenders } }),
+      new Date(NOON.getTime() - 60_000),
+    ]);
+    await tx((c) => npcThink(c, new Outbox(), npc, NOON));
+    const sent = (
+      await pool.query("SELECT home_village_id, units, arrive_at FROM commands WHERE target_village_id = $1 AND type = 'attack' ORDER BY arrive_at, id", [target])
+    ).rows as { home_village_id: number; units: Record<string, number>; arrive_at: Date }[];
+    // Deux vagues (les 300 épéistes du second village, la plus faible, puis les 330 restants du premier), puis quatre nobles escortés.
+    expect(sent.map((r) => r.home_village_id)).toEqual([second, home.id, home.id, home.id, home.id, home.id]);
+    expect(sent.slice(2).every((r) => r.units.noble === 1 && r.units.swordsman === 20)).toBe(true);
+    const gaps = sent.slice(1).map((r, i) => new Date(r.arrive_at).getTime() - new Date(sent[i].arrive_at).getTime());
+    expect(gaps.every((g) => g === 1000)).toBe(true);
+  });
 });

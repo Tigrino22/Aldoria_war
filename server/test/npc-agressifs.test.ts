@@ -155,34 +155,18 @@ describe('PNJ agressifs', () => {
     expect(gaps.every((g) => g === 1000)).toBe(true);
   });
 
-  it('un PNJ n’attaque sans provocation qu’un joueur de 70 % à 150 % de ses points, sauf s’il a été attaqué', async () => {
-    const { pointRatioOk } = await import('../src/game/npc-rules');
-    expect(pointRatioOk(100, 70)).toBe(true);
-    expect(pointRatioOk(100, 150)).toBe(true);
-    expect(pointRatioOk(100, 69)).toBe(false);
-    expect(pointRatioOk(100, 151)).toBe(false);
-    expect(pointRatioOk(0, 50)).toBe(false);
-
+  it('un PNJ peut s’en prendre à un joueur bien plus gros que lui, sans provocation', async () => {
     const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = (await pool.query('SELECT id, x, y FROM villages WHERE owner_id = $1', [npc])).rows[0];
     await tx((c) => setTroops(c, home.id, home.id, troops({ swordsman: 80, scout: 10 })));
     const giant = await makePlayer('Géant');
-    // Trois villages : trois fois les points du PNJ, hors de la fourchette.
-    const big = await villageOf(giant, home.x + 2, home.y + 3);
-    const giantVillages = [big, await villageOf(giant, home.x + 4, home.y + 3), await villageOf(giant, home.x + 6, home.y + 3)];
+    // Trois villages : trois fois les points du PNJ, bien au-delà de l'ancienne fourchette de 70 % à 150 %.
+    const giantVillages = [await villageOf(giant, home.x + 2, home.y + 3), await villageOf(giant, home.x + 4, home.y + 3), await villageOf(giant, home.x + 6, home.y + 3)];
     await pool.query('UPDATE players SET protection_until = NULL');
     const t = new Date(NOON.getTime() + 75 * HOUR);
-    // Les trois villages sont espionnés : la riposte peut viser n'importe lequel.
     for (const id of giantVillages) await scouted(npc, id, t);
-    const attacksOnGiant = async () => (await Promise.all(giantVillages.map((id) => attacksOn(npc, id)))).flat();
     await tx((c) => npcThink(c, new Outbox(), npc, t));
-    expect(await attacksOnGiant()).toHaveLength(0);
-
-    // S'il a été attaqué par ce joueur, la fourchette ne compte plus.
-    await tx((c) => setTroops(c, big, big, troops({ swordsman: 20 })));
-    await tx((c) => sendCommand(c, new Outbox(), giant, big, { type: 'attack', targetId: home.id, units: { swordsman: 20 } }, t));
-    await tx((c) => npcThink(c, new Outbox(), npc, new Date(t.getTime() + 1000)));
-    expect((await attacksOnGiant()).length).toBeGreaterThan(0);
+    expect((await Promise.all(giantVillages.map((id) => attacksOn(npc, id)))).flat().length).toBeGreaterThan(0);
   });
 
   it('aucune limite journalière : un PNJ attaqué frappe le même joueur autant de fois que nécessaire', async () => {
@@ -322,11 +306,12 @@ describe('PNJ agressifs', () => {
     await tx((c) => npcThink(c, new Outbox(), npc, t));
     expect(await scoutsSent()).toEqual([]);
     // La pause dure 12 heures après le dernier échec ; ensuite il y retourne avec la plus forte vague, pas de zéro (ici en journée : jamais d'espionnage chez un joueur la nuit).
-    // (Le PNJ a grandi entre-temps : on remet les deux villages à la même taille pour qu'il vise toujours ce joueur.)
     const later = new Date(t.getTime() + 21 * HOUR);
     await tx((c) => syncVillage(c, home.id, later));
-    await pool.query('UPDATE villages SET points = (SELECT points FROM villages WHERE id = $1) WHERE id = $2', [home.id, v]);
+    // (Hors offensive, qui engagerait le gros des éclaireurs : son heure dépend des tirages des tests précédents.)
+    env.npcOffensive = 0;
     await tx((c) => npcThink(c, new Outbox(), npc, later));
+    env.npcOffensive = 1;
     expect(await scoutsSent()).toEqual([200]);
     // Les échecs sont retenus 36 heures : passé ce délai, il repart avec 10 éclaireurs (hors offensive, qui engagerait le gros des éclaireurs).
     await pool.query('DELETE FROM commands');

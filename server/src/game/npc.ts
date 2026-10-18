@@ -36,7 +36,6 @@ import {
   attackBeats,
   estimateLoyalty,
   nobleTrain,
-  pointRatioOk,
   npcTribeNameCandidates,
   SOLO_PROFILES,
   consecutiveScoutFailures,
@@ -59,11 +58,12 @@ import {
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
 import { TRAIN_SIZE, npcPlan, villageRoles, type VillageRole } from './npc-roles';
 import { costOf, nextBuilding, nextTroopLot, reserveFor, troopBudget } from '../manager/rules';
-import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, recentlyHit } from './npc-offensive';
+import { hitPlayers, nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, recentlyHit } from './npc-offensive';
 import { interceptStep } from './npc-intercept';
 import { npcGrudgesOf, refreshWars, warEnemiesOf, WAR_RADIUS } from './npc-wars';
 import { refreshTribeWars } from './tribe-wars';
 import { raidStep } from './npc-raids';
+import { ATTRITION_MIN_KILL, latestArrival, planSiege, sendWaves, siegeHelpers, waveOf, type Wave } from './npc-siege';
 import { crusadeHold, crusadeStep } from './npc-crusade';
 import { pickIntel } from './intel';
 import { acceptOffer, cancelOffer, createOffer, expireOffers, freeMerchants } from './market';
@@ -87,6 +87,10 @@ const delayMs = () => Math.max(30_000, ((0.5 + rng()) * env.npcThinkMinutes * 60
 const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 /** Rayon (en cases) dans lequel un PNJ cherche des cibles. */
 const RAID_RADIUS = 20;
+/** Rayon (en cases) dans lequel un PNJ cherche des villages de joueurs : plus large, pour qu'aucun joueur de la carte ne reste à l'écart. */
+const PLAYER_RADIUS = 30;
+/** Pénalité (en cases) d'un joueur déjà frappé par un PNJ pendant la période : les PNJ se répartissent entre les joueurs. */
+const ALREADY_HIT_PENALTY = 15;
 /** Épéistes qui accompagnent chaque noble d'un train : assez pour passer la défense de base et la muraille d'un village vidé par l'assaut. Sans eux, le noble ne part pas. */
 const NOBLE_ESCORT = 20;
 /**
@@ -358,12 +362,13 @@ async function candidates(c: Db, npcId: number, from: { id: number; x: number; y
   const { rows } = await c.query(
     `SELECT v.id, v.x, v.y, v.points, v.owner_id, p.tribe_id AS owner_tribe, (p.is_npc IS TRUE) AS rival, coalesce((SELECT sum(w.points) FROM villages w WHERE w.owner_id = v.owner_id), 0)::int AS owner_points FROM villages v LEFT JOIN players p ON p.id = v.owner_id
      WHERE v.id <> $1 AND v.kind = 'village'
-       AND ((v.x - $2)^2 + (v.y - $3)^2 <= $5 OR (p.tribe_id = ANY($8::int[]) AND (v.x - $2)^2 + (v.y - $3)^2 <= $9))
+       AND ((v.x - $2)^2 + (v.y - $3)^2 <= $5 OR (p.tribe_id = ANY($8::int[]) AND (v.x - $2)^2 + (v.y - $3)^2 <= $9)
+            OR (NOT p.is_npc AND (v.x - $2)^2 + (v.y - $3)^2 <= $11))
        AND (v.owner_id IS NULL
             OR (NOT p.is_npc AND (p.protection_until IS NULL OR p.protection_until <= $4))
             OR (p.is_npc AND (p.tribe_id = ANY($7::int[]) OR p.tribe_id = ANY($8::int[]) OR p.id = ANY($10::int[]))))
        AND NOT EXISTS (SELECT 1 FROM commands cm WHERE cm.target_village_id = v.id AND cm.player_id = $6 AND NOT cm.processed)`,
-    [from.id, from.x, from.y, now, RAID_RADIUS * RAID_RADIUS, npcId, hostiles.rivals, hostiles.warTribes, WAR_RADIUS * WAR_RADIUS, hostiles.grudges],
+    [from.id, from.x, from.y, now, RAID_RADIUS * RAID_RADIUS, npcId, hostiles.rivals, hostiles.warTribes, WAR_RADIUS * WAR_RADIUS, hostiles.grudges, PLAYER_RADIUS * PLAYER_RADIUS],
   );
   return rows.map((r) => ({
     id: r.id,
@@ -396,7 +401,7 @@ async function knownLoyalty(c: Db, npcId: number, villageId: number, now: Date):
  * Attaques d'un village de PNJ : barbares, PNJ hostiles et joueurs (jamais pendant les heures calmes), toujours avec ses unités offensives
  * (épéistes, cavaliers, béliers) : lanciers et hallebardiers restent défendre le village.
  * Les nobles ne partent qu'en train complet : assez pour faire tomber la loyauté estimée de la cible d'un seul passage (quatre pour une loyauté pleine),
- * chacun avec 20 épéistes, juste derrière l'assaut qui nettoie la défense. La conquête (barbare, PNJ hostile ou joueur de sa taille) passe avant tout (sauf la riposte).
+ * chacun avec 20 épéistes, juste derrière l'assaut qui nettoie la défense. La conquête (barbare, PNJ hostile ou joueur) passe avant tout (sauf la riposte).
  * Dans une tribu, seul le chef lance une opération contre un joueur ; les autres s'y joignent si leur troupe peut arriver dans la fenêtre.
  */
 async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, tribe: TribeInfo | null, now: Date) {
@@ -448,18 +453,14 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   );
   const barbarians = all.filter((t) => t.ownerId === null);
   const rivalVillages = all.filter((t) => t.rival);
-  // Tous les PNJ peuvent s'en prendre aux joueurs sans provocation (dans une tribu, le chef ou le conquérant) : leur type ne règle que leur évolution.
+  // Tous les PNJ peuvent s'en prendre aux joueurs sans provocation ni guerre, membres d'une tribu compris : leur type ne règle que leur évolution.
   // Celui qui a été attaqué riposte en plus, sans attendre.
-  const isLeader = !tribe || tribe.leaderId === npcId;
-  const opCooldownOk = !tribe || !tribe.state.lastOpAt || now.getTime() - Date.parse(tribe.state.lastOpAt) >= (12 * 3_600_000) / env.worldSpeed;
   const humans = all.filter((t) => t.ownerId !== null && !t.rival);
   const revenge = quiet ? [] : humans.filter((t) => grudges.includes(t.ownerId!));
   // En guerre contre une tribu de joueurs, tous les membres frappent ses villages (pas seulement le chef), sans condition de taille : jamais pendant les heures calmes.
   const warPlayers = quiet ? [] : humans.filter((t) => t.enemy);
-  // Sans provocation, un PNJ ne s'attaque qu'à un joueur de sa taille : entre 70 % et 150 % de ses points.
-  const myPoints = (await c.query('SELECT coalesce(sum(points), 0)::int AS p FROM villages WHERE owner_id = $1', [npcId])).rows[0].p as number;
-  const sameSize = humans.filter((t) => pointRatioOk(myPoints, t.ownerPoints));
-  const aggressive = !quiet && isLeader && opCooldownOk ? sameSize : [];
+  // Tous les joueurs hors protection sont des cibles possibles, quelle que soit leur taille.
+  const aggressive = !quiet ? humans : [];
   const players = [...new Set([...revenge, ...aggressive, ...warPlayers])];
   // Un PNJ défensif se développe surtout en pillant les barbares et ne s'en prend que de temps en temps à un joueur.
   // Les ennemis déclarés (guerre de tribu, PNJ qui nous a attaqués) passent avant tout ; viennent ensuite les rivaux, puis les barbares.
@@ -468,9 +469,9 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   const prey = enemyVillages.length && rng() < 0.9 ? enemyVillages : rivalVillages.length && rng() < 0.6 ? rivalVillages : barbarians;
   const revengePool = players.filter((t) => revenge.includes(t));
   // Quand une guerre ou une vengeance contre un autre PNJ occupe la tribu, les joueurs passent au second plan.
-  const playerChance = enemyVillages.length ? 0.1 : profile === 'defense' ? 0.15 : 0.4;
+  const playerChance = enemyVillages.length ? 0.1 : profile === 'defense' ? 0.3 : 0.6;
   const pool = revengePool.length ? revengePool : players.length && (prey.length === 0 || rng() < playerChance) ? players : prey;
-  // Offensive occasionnelle : à l'heure programmée, le PNJ vise un ennemi de guerre, un rival ou un joueur de sa taille (jamais celui qu'un PNJ a déjà frappé
+  // Offensive occasionnelle : à l'heure programmée, le PNJ vise un ennemi de guerre, un rival ou un joueur (jamais celui qu'un PNJ a déjà frappé
   // pendant la période), garde la même cible d'un tour à l'autre le temps de l'espionner, puis frappe avec une part de son armée.
   const npcState = (await c.query('SELECT npc_state FROM players WHERE id = $1', [npcId])).rows[0]?.npc_state ?? {};
   let nextOff = parseNextOffensive(npcState);
@@ -480,12 +481,12 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   }
   // Conquête : dès que le village a un train complet (nobles et escorte), le PNJ choisit un village à prendre, le plus gros au plus près de chez lui,
   // et s'y tient d'une réflexion à l'autre au lieu de frapper au hasard. Barbares et PNJ hostiles, et (réglage « Conquête des joueurs ») les villages
-  // des joueurs de sa taille ou de la tribu en guerre, jamais pendant les heures calmes.
+  // des joueurs hors protection, quelle que soit leur taille, jamais pendant les heures calmes.
   let conquest: Candidate | undefined;
   let conquestTrain = 0;
   const avoid: number[] = Array.isArray(npcState.conquest?.avoid) ? npcState.conquest.avoid : [];
   if (!revengePool.length && home.noble > 0) {
-    const playerPrey = (t: Candidate) => !!env.npcPlayerConquest && !quiet && (sameSize.includes(t) || warPlayers.includes(t));
+    const playerPrey = (t: Candidate) => !!env.npcPlayerConquest && !quiet && humans.includes(t);
     const options = all.filter((t) => (t.ownerId === null || t.rival || playerPrey(t)) && t.dist <= CONQUEST_RADIUS && !avoid.includes(t.id));
     const kept = npcState.conquest?.targetId as number | undefined;
     conquest = options.find((t) => t.id === kept) ?? options.sort((a, b) => b.points / (1 + b.dist) - a.points / (1 + a.dist))[0];
@@ -503,18 +504,22 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
   let offensive = false;
   let offensivePool: Candidate[] = [];
   if (!conquest && !revengePool.length && offensiveDue(nextOff, now)) {
-    const fresh = sameSize.filter((t) => !quiet);
+    const fresh = humans.filter((t) => !quiet);
     const hitSafe: Candidate[] = [];
     for (const t of fresh) if (!(await recentlyHit(c, t.ownerId!, now))) hitSafe.push(t);
     offensivePool = [...warPlayers, ...enemyVillages, ...hitSafe, ...rivalVillages.filter((t) => !t.enemy)];
     offensive = offensivePool.length > 0;
   }
   if (!offensive && !conquest && pool.length === 0) return;
+  // Joueurs déjà frappés par un PNJ pendant la période : visés en dernier, pour que les attaques se répartissent sur toute la carte.
+  const hitOwners = await hitPlayers(c, now);
   const keptId = offensive ? (npcState.offensive?.targetId as number | undefined) : undefined;
   const target =
     conquest ??
     (offensive ? offensivePool.find((t) => t.id === keptId) : undefined) ??
-    (offensive ? offensivePool : pool).map((t) => ({ t, score: t.dist + rng() * 6 })).sort((a, b) => a.score - b.score)[0].t;
+    (offensive ? offensivePool : pool)
+      .map((t) => ({ t, score: t.dist + rng() * 6 + (t.ownerId !== null && hitOwners.has(t.ownerId) ? ALREADY_HIT_PENALTY : 0) }))
+      .sort((a, b) => a.score - b.score)[0].t;
   if (offensive) {
     await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text, 'targetId', $3::int)) WHERE id = $1", [npcId, new Date(nextOff!).toISOString(), target.id]);
   }
@@ -602,7 +607,34 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       hostileToPlayer ? PLAYER_MARGIN : 0,
     );
     if (!raid) {
-      // Village trop bien défendu pour l'armée du PNJ : il en choisit un autre à la prochaine réflexion.
+      // Village trop bien défendu pour l'armée de ce seul village : assaut groupé avec les autres villages du PNJ et de sa tribu (voir npc-siege.ts),
+      // contre la cible d'une conquête, d'une riposte, d'une guerre ou un joueur.
+      if (conquest || avenging || hostileToPlayer) {
+        const strikeArmy = { ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT };
+        const where = { id: target.id, x: target.x, y: target.y, wall: intel.wall };
+        const waves: Wave[] = [
+          { playerId: npcId, villageId, x: village.x, y: village.y, units: waveOf(strikeArmy, intel.wall) },
+          ...(await siegeHelpers(c, npcId, tribe?.id ?? null, villageId, where)),
+        ];
+        const plan = planSiege(waves.map((w) => w.units), intel.troops, intel.wall, hostileToPlayer ? PLAYER_MARGIN : 0);
+        // Pas besoin d'être sûr de gagner : un assaut d'usure part s'il tue au moins 30 % de la défense et plus qu'il ne perd.
+        const worth = plan.cleared || (plan.killed >= ATTRITION_MIN_KILL * plan.defenseValue && plan.killed > plan.lost);
+        if (worth) {
+          const sent = plan.order.map((i) => waves[i]);
+          const train = plan.cleared ? nobles : 0;
+          const single = { ...emptyUnits(), noble: 1, swordsman: NOBLE_ESCORT };
+          const landTime = Math.max(latestArrival(sent, target, now), train ? arrivalOf(single, target).getTime() : 0);
+          if (hostileToPlayer && isQuietAt(new Date(landTime + (sent.length + train) * 1000))) return;
+          const last = await sendWaves(c, outbox, sent, target, landTime, now);
+          if (last === null) return;
+          for (let i = 0; i < train; i++) {
+            const cmd = await sendCommand(c, outbox, npcId, villageId, { type: 'attack', targetId: target.id, units: single }, now);
+            await c.query('UPDATE commands SET arrive_at = $2 WHERE id = $1', [cmd.id, new Date(last + (i + 1) * 1000)]);
+          }
+          return;
+        }
+      }
+      // Village trop bien défendu même pour un assaut groupé : il en choisit un autre à la prochaine réflexion.
       if (conquest) {
         await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('conquest', jsonb_build_object('avoid', $2::jsonb)) WHERE id = $1", [
           npcId,
