@@ -5,6 +5,7 @@ import { act } from '../act';
 import { requirePlayer } from '../auth';
 import { pool, type Db } from '../db';
 import { GameError, forbidden } from '../errors';
+import { incomingAttacks } from '../game/incoming';
 import { pickIntel } from '../game/intel';
 import { villageSheet } from '../game/village-sheet';
 import { cancelOrder, placeOrder, plannedOrders } from '../game/orders';
@@ -47,6 +48,12 @@ export default async function villageRoutes(app: FastifyInstance) {
       for (const r of rows) out.push(await villageState(c, await syncVillage(c, r.id, now), playerId));
       return out;
     });
+  });
+
+  /** Attaques en route vers les villages du joueur (page « Attaques entrantes »). */
+  app.get('/api/incoming', async (req) => {
+    const playerId = await requirePlayer(req);
+    return incomingAttacks(pool, playerId, new Date());
   });
 
   /** Fiche d'un village par ses coordonnées (`#/fiche/x,y`), avec les rapports et renseignements du joueur. */

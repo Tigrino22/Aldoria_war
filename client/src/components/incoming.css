@@ -1,0 +1,36 @@
+/* Attaques entrantes : une carte par attaque, bord rouge (or pour une conquête, ciel pour un espionnage). */
+.app .pg .in-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+.app .pg .in-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.app .pg .in-card {
+  position: relative; display: flex; flex-direction: column; gap: 10px; overflow: hidden;
+  background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--pg-war); border-radius: 10px; padding: 11px 14px 15px;
+}
+.app .pg .in-card.kind-conquest { border-left-color: var(--pg-gold); }
+.app .pg .in-card.kind-scout { border-left-color: var(--pg-sky); }
+.app .pg .in-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 14px; flex-wrap: wrap; }
+.app .pg .in-kind { font: 700 12px var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--pg-war); }
+.app .pg .in-card.kind-conquest .in-kind { color: var(--pg-gold); }
+.app .pg .in-card.kind-scout .in-kind { color: var(--pg-sky); }
+.app .pg .in-arrive { display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
+.app .pg .in-arrive .countdown { font: 700 18px var(--body); color: var(--pg-gold); }
+.app .pg .in-route { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.app .pg .in-end { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.app .pg .in-end > a, .app .pg .in-target { font-weight: 600; }
+.app .pg .in-target { text-align: left; padding: 0; background: none; border: 0; cursor: pointer; font-size: inherit; }
+.app .pg .in-label { font: 700 11px var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.app .pg .in-arrow { color: var(--pg-gold); font-size: 20px; }
+.app .pg .in-npc { margin-left: 6px; font-size: 11px; padding: 0 7px; }
+.app .pg .in-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; margin: 0; }
+.app .pg .in-facts .wide { grid-column: 1 / -1; }
+.app .pg .in-facts dt { font: 700 11px var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.app .pg .in-facts dd { margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.app .pg .in-facts .countdown { color: var(--pg-gold); }
+.app .pg .in-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgb(0 0 0 / 0.25); }
+.app .pg .in-fill { height: 100%; background: var(--pg-war); }
+.app .pg .in-card.kind-conquest .in-fill { background: linear-gradient(90deg, #a77a14, #f1cc63); }
+.app .pg .in-card.kind-scout .in-fill { background: var(--pg-sky); }
+@media (max-width: 640px) {
+  .app .pg .in-route { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .app .pg .in-arrow { transform: rotate(90deg); width: max-content; line-height: 1; }
+  .app .pg .in-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

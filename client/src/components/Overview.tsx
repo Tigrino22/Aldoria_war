@@ -83,7 +83,7 @@ export default function Overview() {
             </header>
             {attacks.length > 0 && (
               <p className="ov-war">
-                {attacks.length} attaque{attacks.length > 1 ? 's' : ''} en approche : la première arrive dans <Countdown to={attacks[0].arriveAt} />
+                {attacks.length} attaque{attacks.length > 1 ? 's' : ''} en approche : la première arrive dans <Countdown to={attacks[0].arriveAt} /> · <a href="#/attaques">Tout voir</a>
               </p>
             )}
             <IncomingDetail incoming={v.incoming} />

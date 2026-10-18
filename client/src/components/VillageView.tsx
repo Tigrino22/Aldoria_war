@@ -338,7 +338,7 @@ export default function VillageView() {
                   {enemyIncoming.length} attaque{enemyIncoming.length > 1 ? 's' : ''} en approche
                 </b>
                 <span className="vv-war-sub">
-                  Prochaine arrivée dans <Countdown to={enemyIncoming[0].arriveAt} />
+                  Prochaine arrivée dans <Countdown to={enemyIncoming[0].arriveAt} /> · <a href="#/attaques">Tout voir</a>
                 </span>
               </span>
             </div>

@@ -28,6 +28,7 @@
 .app .vv .vv-war > span:last-child { display: flex; flex-direction: column; line-height: 1.25; }
 .app .vv .vv-war b { font-size: 15px; color: #fff; }
 .app .vv .vv-war-sub { font-size: 13px; color: #ffc9bf; }
+.app .vv .vv-war-sub a { color: #fff; font-weight: 700; }
 .app .vv .vv-war-sub .countdown { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
 .app .vv .vv-war-icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgb(0 0 0 / 0.3); box-shadow: inset 0 0 0 1px #ff8a7a; color: #fff; animation: vv-pulse 1.8s ease-in-out infinite; }
 @keyframes vv-pulse { 50% { box-shadow: inset 0 0 0 1px #ff8a7a, 0 0 0 6px rgb(224 72 72 / 0.25); } }
