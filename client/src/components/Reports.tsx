@@ -69,10 +69,20 @@ function IntelBlock({ intel }: { intel: Intel }) {
 }
 
 
+/** Verdict tiré des effectifs, pas des renseignements : la copie du défenseur n'en contient jamais. */
+function scoutVerdict(d: ScoutReportData): { win: boolean; text: string } {
+  const back = (d.attacker.units?.scout ?? 0) - (d.attacker.losses?.scout ?? 0);
+  if (back <= 0) return { win: false, text: "Aucun éclaireur n'est revenu" };
+  const s = back > 1 ? 's' : '';
+  if (!d.intel) return { win: false, text: `${back} éclaireur${s} ennemi${s} ${back > 1 ? 'sont repartis' : 'est reparti'} avec des renseignements sur votre village` };
+  return { win: true, text: d.attacker.losses?.scout ? `Espionnage réussi · ${back} éclaireur${s} revenu${s}` : 'Espionnage réussi' };
+}
+
 function ScoutReport({ d }: { d: ScoutReportData }) {
+  const verdict = scoutVerdict(d);
   return (
     <div className="stack">
-      <p className={`verdict ${d.intel ? 'win' : 'loss'}`}>{d.intel ? 'Espionnage réussi' : "Aucun éclaireur n'est revenu"}</p>
+      <p className={`verdict ${verdict.win ? 'win' : 'loss'}`}>{verdict.text}</p>
       <h3>
         Éclaireurs de {d.attacker.playerName ? <PlayerLink name={d.attacker.playerName} /> : 'inconnu'} · <VillageLink v={d.attacker.village} />
       </h3>
