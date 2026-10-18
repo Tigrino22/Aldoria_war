@@ -23,6 +23,7 @@ import {
   warehouseCapacity,
   resolveCombat,
   wallDuringCombat,
+  LOYALTY_REGEN_PER_HOUR,
 } from '@aldoria/shared';
 import { pool, tx, type Db } from '../db';
 import { env } from '../env';
@@ -33,6 +34,8 @@ import { processDueEvents, sendCommand } from './commands';
 import { pickNpcName } from './npc-names';
 import {
   attackBeats,
+  estimateLoyalty,
+  nobleTrain,
   pointRatioOk,
   npcTribeNameCandidates,
   SOLO_PROFILES,
@@ -53,7 +56,7 @@ import {
   type NpcProfile,
 } from './npc-rules';
 import { alertAttackedNpcs, alertTribes, defendStep, grudgesOf, npcTribeOf, opWindowMs, saveTribeState, type TribeInfo } from './npc-tribes';
-import { npcPlan, villageRoles, type VillageRole } from './npc-roles';
+import { TRAIN_SIZE, npcPlan, villageRoles, type VillageRole } from './npc-roles';
 import { costOf, nextBuilding, nextTroopLot, reserveFor, troopBudget } from '../manager/rules';
 import { nextOffensiveAt, offensiveDue, parseNextOffensive, pickOffensiveUnits, recentlyHit } from './npc-offensive';
 import { interceptStep } from './npc-intercept';
@@ -83,13 +86,10 @@ const delayMs = () => Math.max(30_000, ((0.5 + rng()) * env.npcThinkMinutes * 60
 const respawnMs = () => (2 * 3_600_000) / Math.sqrt(env.worldSpeed);
 /** Rayon (en cases) dans lequel un PNJ cherche des cibles. */
 const RAID_RADIUS = 20;
-/** Fantassins qui accompagnent chaque noble d'un train (épéistes depuis un village offensif, lanciers depuis un village défensif) : assez pour passer la défense de base et la muraille d'un village vidé par l'assaut. Sans eux, le noble ne part pas. */
+/** Épéistes qui accompagnent chaque noble d'un train : assez pour passer la défense de base et la muraille d'un village vidé par l'assaut. Sans eux, le noble ne part pas. */
 const NOBLE_ESCORT = 20;
-const ESCORT_UNIT: Record<VillageRole, keyof UnitCounts> = { offense: 'swordsman', defense: 'spearman' };
-/** Nombre maximal de nobles dans un train. */
-const MAX_TRAIN = 6;
 /** Rayon (en cases) dans lequel un PNJ choisit le village à conquérir. */
-const CONQUEST_RADIUS = 12;
+const CONQUEST_RADIUS = 20;
 /** Villages à conquérir écartés (trop bien défendus pour l'armée du PNJ), retenus pour ne pas y revenir aussitôt. */
 const CONQUEST_AVOID = 5;
 const DAY_MS = 86_400_000;
@@ -373,31 +373,40 @@ async function candidates(c: Db, npcId: number, from: { id: number; x: number; y
   }));
 }
 
+/** Loyauté estimée d'un village, d'après le dernier rapport d'attaque du PNJ qui l'a vue tomber (pleine s'il n'en a pas). */
+async function knownLoyalty(c: Db, npcId: number, villageId: number, now: Date): Promise<number> {
+  const row = (
+    await c.query(
+      `SELECT (data->'loyalty'->>'after')::float AS after, created_at FROM reports
+       WHERE player_id = $1 AND type = 'attack' AND (data->'defender'->'village'->>'id')::int = $2 AND jsonb_typeof(data->'loyalty') = 'object'
+       ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [npcId, villageId],
+    )
+  ).rows[0];
+  return estimateLoyalty(row ? { after: row.after, at: new Date(row.created_at) } : null, now, LOYALTY_REGEN_PER_HOUR * env.worldSpeed);
+}
+
 /**
- * Attaques d'un village de PNJ : barbares, PNJ hostiles et joueurs (jamais pendant les heures calmes), avec ses épéistes, cavaliers et béliers.
- * Un village défensif n'en a guère : il ne sort sa garnison (lanciers et hallebardiers) que pour escorter ses nobles.
- * Dès qu'un village a un noble chez lui, il part avec chaque attaque, et la conquête d'un barbare ou d'un PNJ hostile passe avant tout (sauf la riposte).
+ * Attaques d'un village de PNJ : barbares, PNJ hostiles et joueurs (jamais pendant les heures calmes), toujours avec ses unités offensives
+ * (épéistes, cavaliers, béliers) : lanciers et hallebardiers restent défendre le village.
+ * Les nobles ne partent qu'en train complet : assez pour faire tomber la loyauté estimée de la cible d'un seul passage (quatre pour une loyauté pleine),
+ * chacun avec 20 épéistes, juste derrière l'assaut qui nettoie la défense. La conquête d'un barbare ou d'un PNJ hostile passe avant tout (sauf la riposte).
  * Dans une tribu, seul le chef lance une opération contre un joueur ; les autres s'y joignent si leur troupe peut arriver dans la fenêtre.
  */
 async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, tribe: TribeInfo | null, now: Date) {
   const village = await loadVillage(c, villageId);
   const home = await getTroops(c, villageId, villageId);
   const attackers: UnitCounts = { ...emptyUnits(), swordsman: home.swordsman, cavalry: home.cavalry, ram: home.ram };
-  if (role === 'defense' && home.noble > 0) {
-    attackers.spearman = home.spearman;
-    attackers.halberdier = home.halberdier;
-  }
-  if (attackers.spearman + attackers.halberdier + attackers.swordsman + attackers.cavalry < 5) return;
-  // L'escorte des nobles : l'unité du rôle (lanciers ou épéistes), ou l'autre si le village en a davantage.
-  const escortUnit: keyof UnitCounts = attackers[ESCORT_UNIT[role]] >= Math.max(attackers.spearman, attackers.swordsman) ? ESCORT_UNIT[role] : role === 'offense' ? 'spearman' : 'swordsman';
+  if (attackers.swordsman + attackers.cavalry < 5) return;
   const grudges = await grudgesOf(c, npcId, tribe, now);
   const quiet = isQuietAt(now);
   const arrivalOf = (units: UnitCounts, to: { x: number; y: number }) => new Date(now.getTime() + travelTime(units, village, to, env.worldSpeed) * 1000);
-  /**
-   * « Train de nobles » : un PNJ qui a au moins 4 nobles les envoie un par un, arrivant à une seconde d'écart juste après l'assaut qui nettoie la défense.
-   * Renvoie le nombre de nobles du train (0 si aucun).
-   */
-  const trainSize = (): number => Math.min(home.noble, MAX_TRAIN);
+  /** Train qu'il faut contre un village (selon sa loyauté estimée), ou 0 si le village n'a pas assez de nobles ou d'épéistes pour l'escorter : jamais de noble isolé. */
+  const trainFor = async (targetId: number): Promise<number> => {
+    if (home.noble === 0) return 0;
+    const needed = nobleTrain(await knownLoyalty(c, npcId, targetId, now), TRAIN_SIZE);
+    return home.noble >= needed && attackers.swordsman >= needed * NOBLE_ESCORT + 5 ? needed : 0;
+  };
 
   // 1. Une opération de la tribu est en cours : on tente de s'y joindre.
   const op = tribe?.state.op;
@@ -463,14 +472,18 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     nextOff = nextOffensiveAt(now, rng()).getTime();
     await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('offensive', jsonb_build_object('nextAt', $2::text)) WHERE id = $1", [npcId, new Date(nextOff).toISOString()]);
   }
-  // Conquête : dès qu'un noble est au village, le PNJ choisit un village à prendre (barbare ou PNJ hostile, jamais un joueur),
+  // Conquête : dès que le village a un train complet (nobles et escorte), le PNJ choisit un village à prendre (barbare ou PNJ hostile, jamais un joueur),
   // le plus gros au plus près de chez lui, et s'y tient d'une réflexion à l'autre au lieu de frapper au hasard.
   let conquest: Candidate | undefined;
+  let conquestTrain = 0;
   const avoid: number[] = Array.isArray(npcState.conquest?.avoid) ? npcState.conquest.avoid : [];
-  if (!revengePool.length && trainSize() > 0) {
+  if (!revengePool.length && home.noble > 0) {
     const options = all.filter((t) => (t.ownerId === null || t.rival) && t.dist <= CONQUEST_RADIUS && !avoid.includes(t.id));
     const kept = npcState.conquest?.targetId as number | undefined;
     conquest = options.find((t) => t.id === kept) ?? options.sort((a, b) => b.points / (1 + b.dist) - a.points / (1 + a.dist))[0];
+    conquestTrain = conquest ? await trainFor(conquest.id) : 0;
+    // Train incomplet : les nobles attendent au village et l'armée continue ses attaques ordinaires.
+    if (!conquestTrain) conquest = undefined;
     if (conquest && conquest.id !== kept) {
       await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('conquest', jsonb_build_object('targetId', $2::int, 'avoid', $3::jsonb)) WHERE id = $1", [
         npcId,
@@ -564,13 +577,12 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
       return;
     }
     const avenging = (hostileToPlayer && grudges.includes(target.ownerId!)) || target.enemy;
-    // Chaque noble du train part avec une petite escorte (un noble seul ne survit pas à la défense de base) : on la met de côté avant de choisir l'assaut.
-    // Un seul noble suffit : il revient à la charge jusqu'à faire tomber la loyauté.
-    let nobles = trainSize();
-    if (nobles > 0) nobles = Math.min(nobles, Math.floor(Math.max(0, attackers[escortUnit] - 5) / NOBLE_ESCORT));
+    // Le train part complet ou pas du tout : vers la cible de la conquête, ou vers un joueur attaqué (un PNJ peut aussi lui prendre un village).
+    // Chaque noble a son escorte de 20 épéistes, mise de côté avant de choisir l'assaut.
+    const nobles = target === conquest ? conquestTrain : hostileToPlayer ? await trainFor(target.id) : 0;
     // Un barbare ou un PNJ vu sans défense est laissé au pillage intensif, par groupes de 50 épéistes ou lanciers (voir npc-raids.ts).
     if (!hostileToPlayer && !avenging && nobles === 0 && UNIT_KEYS.every((k) => intel.troops[k] === 0)) return;
-    const raid = pickRaidUnits({ ...attackers, [escortUnit]: attackers[escortUnit] - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
+    const raid = pickRaidUnits({ ...attackers, swordsman: attackers.swordsman - nobles * NOBLE_ESCORT }, intel.troops, intel.wall, intel.resources, avenging ? 0.7 : 0);
     if (!raid) {
       // Village trop bien défendu pour l'armée du PNJ : il en choisit un autre à la prochaine réflexion.
       if (conquest) {
@@ -585,7 +597,7 @@ async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProf
     // Hors riposte et conquête, un pillage ne vaut le déplacement que s'il y a de quoi remplir les sacs.
     if (!avenging && nobles === 0 && raid.loot < MIN_LOOT) return;
     // Tous les envois arrivent à la suite : l'assaut d'abord, puis un noble par seconde.
-    const single = { ...emptyUnits(), noble: 1, [escortUnit]: NOBLE_ESCORT };
+    const single = { ...emptyUnits(), noble: 1, swordsman: NOBLE_ESCORT };
     const naturals = [arrivalOf(units, target), ...(nobles ? [arrivalOf(single, target)] : [])];
     const landTime = Math.max(...naturals.map((d) => d.getTime()));
     if (hostileToPlayer && isQuietAt(new Date(landTime + nobles * 1000))) return;
@@ -629,8 +641,8 @@ async function queuedLevels(c: Db, villageId: number, buildings: Buildings) {
  * ne peut pas le payer, bâtiments et autres troupes laissent son prix de côté.
  * `troopsUntil` (date ISO par village) dit jusqu'à quand les troupes ne doivent plus entamer la réserve du bâtiment ; il est mis à jour ici.
  */
-async function economyStep(c: Db, npcId: number, role: VillageRole, villageId: number, now: Date, troopsUntil: Record<string, string>) {
-  const plan = npcPlan(role);
+async function economyStep(c: Db, npcId: number, role: VillageRole, solo: boolean, villageId: number, now: Date, troopsUntil: Record<string, string>) {
+  const plan = npcPlan(role, solo);
   let v = await syncVillage(c, villageId, now);
   // Troupes comptées où qu'elles soient (au village, en renfort, en route, planifiées) et en formation.
   const owned = await ownedUnits(c, villageId);
@@ -795,7 +807,7 @@ export async function npcThink(c: Db, outbox: Outbox, npcId: number, now: Date):
   const roles = villageRoles(profile, villages.length);
   const troopsUntil: Record<string, string> = { ...(npc.npc_state?.troopsUntil ?? {}) };
   // Chaque village se développe, même au-delà des trois premiers.
-  for (const [i, v] of villages.entries()) await economyStep(c, npcId, roles[i], v.id, now, troopsUntil);
+  for (const [i, v] of villages.entries()) await economyStep(c, npcId, roles[i], roles.length === 1, v.id, now, troopsUntil);
   await c.query("UPDATE players SET npc_state = npc_state || jsonb_build_object('troopsUntil', $2::jsonb) WHERE id = $1", [
     npcId,
     JSON.stringify(Object.fromEntries(Object.entries(troopsUntil).filter(([id]) => villages.some((v) => String(v.id) === id)))),

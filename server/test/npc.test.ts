@@ -56,8 +56,10 @@ describe('règles des PNJ', () => {
     }
     expect(npcPlan('offense').buildings[2]).toEqual({ building: 'barracks', level: 3 });
     expect(npcPlan('defense').buildings[2]).toEqual({ building: 'barracks', level: 1 });
-    expect(npcPlan('offense').troops.noble).toBe(2);
-    expect(npcPlan('defense').troops.noble).toBe(1);
+    expect(npcPlan('offense').troops.noble).toBe(4);
+    expect(npcPlan('defense').troops.noble).toBe(0);
+    // Le village unique d'un PNJ défensif forme son propre train, avec les épéistes qui l'escortent.
+    expect(npcPlan('defense', true).troops).toEqual(expect.objectContaining({ noble: 4, swordsman: 300 }));
     expect(nextBuilding(npcPlan('defense').buildings, { ...STARTING_BUILDINGS })?.building).toBe('claypit');
   });
 

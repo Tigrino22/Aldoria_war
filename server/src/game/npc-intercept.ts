@@ -28,10 +28,10 @@ export interface InterceptHostiles {
   quiet: boolean;
 }
 
-/** Troupes que le PNJ peut lancer à l'interception : fantassins et cavaliers (ni éclaireurs, ni nobles, ni béliers trop lents). */
+/** Troupes que le PNJ peut lancer à l'interception : ses unités offensives, épéistes et cavaliers (les lanciers et hallebardiers gardent le village ; ni éclaireurs, ni nobles, ni béliers trop lents). */
 export function interceptUnits(available: UnitCounts, share: number): UnitCounts {
   const u = emptyUnits();
-  for (const k of ['spearman', 'halberdier', 'swordsman', 'cavalry'] as const) u[k] = Math.floor(available[k] * share);
+  for (const k of ['swordsman', 'cavalry'] as const) u[k] = Math.floor(available[k] * share);
   return u;
 }
 

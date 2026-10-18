@@ -250,3 +250,21 @@ export function pickRaidUnits(
   }
   return best ? { units: best, loot: Math.min(carryOf(best), total) } : null;
 }
+
+/** Points de loyauté qu'un noble fait tomber en moyenne (entre 20 et 35 par attaque gagnée). */
+const NOBLE_DROP = 25;
+
+/**
+ * Taille du train de nobles à envoyer sur une loyauté estimée : assez de nobles pour la faire tomber à zéro d'un seul passage
+ * (quatre pour une loyauté pleine), un seul quand il ne reste qu'à achever la conquête.
+ */
+export function nobleTrain(loyalty: number, max: number): number {
+  return Math.max(1, Math.min(max, Math.ceil(Math.max(0, loyalty) / NOBLE_DROP)));
+}
+
+/** Loyauté d'un village estimée depuis le dernier rapport d'attaque qui l'a vue (`null` : jamais vue, donc pleine), avec sa remontée depuis. */
+export function estimateLoyalty(seen: { after: number; at: Date } | null, now: Date, regenPerHour: number): number {
+  if (!seen) return 100;
+  const hours = Math.max(0, now.getTime() - seen.at.getTime()) / 3_600_000;
+  return Math.min(100, seen.after + hours * regenPerHour);
+}

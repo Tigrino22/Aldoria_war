@@ -6,6 +6,8 @@ import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
 import { processDueEvents } from '../src/game/commands';
 import { createNpc, npcThink, setNpcRandom } from '../src/game/npc';
+import { estimateLoyalty, nobleTrain } from '../src/game/npc-rules';
+import { interceptUnits } from '../src/game/npc-intercept';
 import { createVillage, getTroops, setTroops } from '../src/game/village';
 
 const HOUR = 3_600_000;
@@ -92,7 +94,7 @@ describe('PNJ : nobles, conquêtes et pillage', () => {
     const npc = await tx((c) => createNpc(c, NOON, 'offense'));
     const home = await homeOf(npc);
     await pool.query('UPDATE villages SET x = $2, y = $3 WHERE id = $1', [home.id, 700, 700]);
-    const army = troops({ swordsman: 300, scout: 20, noble: 2 });
+    const army = troops({ swordsman: 300, scout: 20, noble: 4 });
     await tx((c) => setTroops(c, home.id, home.id, army));
     const target = await barbarian(703, 700);
     let t = NOON;
@@ -114,5 +116,48 @@ describe('PNJ : nobles, conquêtes et pillage', () => {
     // Deux villages : la gestion devient mixte, le second village suit le modèle défensif.
     const villages = (await pool.query('SELECT id FROM villages WHERE owner_id = $1 ORDER BY id', [npc])).rows;
     expect(villages).toHaveLength(2);
+  });
+
+  it('les nobles ne partent qu’en train complet, taillé sur la loyauté de la cible, et jamais avec des unités défensives', async () => {
+    expect(nobleTrain(100, 4)).toBe(4);
+    expect(nobleTrain(30, 4)).toBe(2);
+    expect(nobleTrain(5, 4)).toBe(1);
+    expect(estimateLoyalty(null, NOON, 1)).toBe(100);
+    expect(estimateLoyalty({ after: 30, at: new Date(NOON.getTime() - 5 * HOUR) }, NOON, 1)).toBe(35);
+    expect(interceptUnits(troops({ spearman: 100, halberdier: 100, swordsman: 100, cavalry: 10 }), 1)).toEqual(troops({ swordsman: 100, cavalry: 10 }));
+
+    const npc = await tx((c) => createNpc(c, NOON, 'defense'));
+    const home = await homeOf(npc);
+    await pool.query('UPDATE villages SET x = $2, y = $3 WHERE id = $1', [home.id, 800, 800]);
+    const target = await barbarian(803, 800);
+    await pool.query(`UPDATE troops SET units = $2::jsonb WHERE village_id = $1 AND home_village_id = $1`, [target, JSON.stringify(troops({ spearman: 10 }))]);
+    const think = async (army: Partial<UnitCounts>, at: Date) => {
+      await pool.query("DELETE FROM commands WHERE player_id = $1", [npc]);
+      await tx((c) => setTroops(c, home.id, home.id, troops({ spearman: 500, halberdier: 200, swordsman: 300, scout: 20, ...army })));
+      await pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'scout', 'Espionnage', $2::jsonb, $3)`, [
+        npc,
+        JSON.stringify({ attacker: {}, defender: { village: { id: target } }, intel: { resources: { wood: 100, clay: 100, iron: 100, wheat: 100 }, buildings: { wall: 0 }, troops: troops({ spearman: 10 }) } }),
+        new Date(at.getTime() - 60_000),
+      ]);
+      await tx((c) => npcThink(c, new Outbox(), npc, at));
+      return (await sentFrom(home.id)).filter((r) => r.target_village_id === target);
+    };
+    // Deux nobles ne suffisent pas pour une loyauté pleine : ils attendent le reste du train.
+    expect((await think({ noble: 2 }, NOON)).filter((r) => r.units.noble > 0)).toEqual([]);
+    // Quatre nobles : l'assaut d'épéistes, puis quatre nobles escortés chacun de 20 épéistes, sans lanciers ni hallebardiers.
+    let t = new Date(NOON.getTime() + 2 * HOUR);
+    let sent = await think({ noble: 4 }, t);
+    expect(sent.filter((r) => r.units.noble > 0)).toHaveLength(4);
+    for (const r of sent) expect((r.units.spearman ?? 0) + (r.units.halberdier ?? 0)).toBe(0);
+    for (const r of sent.filter((r) => r.units.noble > 0)) expect(r.units).toEqual(expect.objectContaining({ noble: 1, swordsman: 20 }));
+    // La loyauté est déjà tombée à 30 : deux nobles suffisent pour achever la conquête.
+    await pool.query(`INSERT INTO reports (player_id, type, title, data, created_at) VALUES ($1, 'attack', 'Attaque', $2::jsonb, $3)`, [
+      npc,
+      JSON.stringify({ attacker: {}, defender: { village: { id: target } }, loyalty: { before: 60, after: 30 } }),
+      t,
+    ]);
+    t = new Date(t.getTime() + 2 * HOUR);
+    sent = await think({ noble: 4 }, t);
+    expect(sent.filter((r) => r.units.noble > 0)).toHaveLength(2);
   });
 });
