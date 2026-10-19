@@ -15,13 +15,12 @@ import type { Db } from '../db';
 import { GameError, forbidden } from '../errors';
 import { saveVillage, syncVillage } from './village';
 
-/** Troupes des villages donnés où qu'elles soient : chez elles ou en renfort, en route, planifiées ou en cours de recrutement. */
+/** Troupes des villages donnés où qu'elles soient : chez elles (planifiées comprises) ou en renfort, en route, ou en cours de recrutement. */
 export async function unitsOfVillages(c: Pick<Db, 'query'>, ids: number[]): Promise<UnitCounts> {
   let units = emptyUnits();
   if (!ids.length) return units;
   for (const r of (await c.query('SELECT units FROM troops WHERE home_village_id = ANY($1)', [ids])).rows) units = addUnits(units, normalizeUnits(r.units));
   for (const r of (await c.query('SELECT units FROM commands WHERE home_village_id = ANY($1) AND NOT processed', [ids])).rows) units = addUnits(units, normalizeUnits(r.units));
-  for (const r of (await c.query('SELECT units FROM planned_commands WHERE origin_village_id = ANY($1)', [ids])).rows) units = addUnits(units, normalizeUnits(r.units));
   for (const r of (await c.query('SELECT unit, count - delivered AS left FROM recruit_queue WHERE village_id = ANY($1)', [ids])).rows) {
     units = addUnits(units, { ...emptyUnits(), [r.unit as UnitKey]: Number(r.left) });
   }

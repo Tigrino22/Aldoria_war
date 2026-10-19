@@ -25,7 +25,7 @@ import type { Outbox } from '../notify';
 import { addKills, chargeAttackWheat, insertCommand } from './commands';
 import { createReport } from './reports';
 import { allyTribeIdsOf } from './tribe-alliances';
-import { getTroops, loadVillage, setTroops, syncVillage } from './village';
+import { freeTroops, getTroops, loadVillage, setTroops, syncVillage } from './village';
 
 /**
  * Interceptions : une armée étrangère repérée à portée de vue de l'un de nos villages (voir shared/src/armies.ts) peut être
@@ -88,12 +88,11 @@ export async function planInterception(c: Pick<Db, 'query'>, playerId: number, o
 export async function sendInterception(c: Db, outbox: Outbox, playerId: number, originId: number, input: { commandId: number; units: Partial<UnitCounts> }, now: Date) {
   const origin = await syncVillage(c, originId, now);
   const { target, units, meet } = await planInterception(c, playerId, origin, input, now);
-  const available = await getTroops(c, origin.id, origin.id);
-  if (!hasUnits(available, units)) throw new GameError("Vous n'avez pas assez de troupes au village");
+  if (!hasUnits(await freeTroops(c, origin.id), units)) throw new GameError("Vous n'avez pas assez de troupes libres au village");
 
   await chargeAttackWheat(c, playerId, origin, units);
   await c.query('UPDATE players SET protection_until = NULL WHERE id = $1 AND protection_until > $2', [playerId, now]);
-  await setTroops(c, origin.id, origin.id, subtractUnits(available, units));
+  await setTroops(c, origin.id, origin.id, subtractUnits(await getTroops(c, origin.id, origin.id), units));
   const id = await insertCommand(c, {
     type: 'intercept',
     originId: origin.id,

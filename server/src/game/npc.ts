@@ -72,7 +72,7 @@ import { acceptOffer, cancelOffer, createOffer, expireOffers, freeMerchants } fr
 const MARKET_ROUNDS = 10;
 import { npcAccepts, planOffer } from './market-rules';
 import { ensureLetters } from './nobility';
-import { computePopulation, createVillage, enqueueBuild, enqueueRecruit, getTroops, loadVillage, ownedUnits, resourcesOf, syncVillage, transitMerchants } from './village';
+import { computePopulation, createVillage, enqueueBuild, enqueueRecruit, freeTroops, loadVillage, ownedUnits, resourcesOf, syncVillage, transitMerchants } from './village';
 
 let rng: () => number = Math.random;
 /** Permet aux tests de rendre les décisions des PNJ déterministes. */
@@ -406,7 +406,7 @@ async function knownLoyalty(c: Db, npcId: number, villageId: number, now: Date):
  */
 async function attackStep(c: Db, outbox: Outbox, npcId: number, profile: NpcProfile, role: VillageRole, villageId: number, tribe: TribeInfo | null, now: Date) {
   const village = await loadVillage(c, villageId);
-  const home = await getTroops(c, villageId, villageId);
+  const home = await freeTroops(c, villageId);
   const attackers: UnitCounts = { ...emptyUnits(), swordsman: home.swordsman, cavalry: home.cavalry, ram: home.ram };
   if (attackers.swordsman + attackers.cavalry < 5) return;
   const grudges = await grudgesOf(c, npcId, tribe, now);

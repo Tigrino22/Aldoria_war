@@ -10,6 +10,7 @@ import {
   Resources,
   TroopGroup,
   UNITS,
+  UNIT_KEYS,
   UnitCounts,
   UnitKey,
   VillageState,
@@ -107,14 +108,31 @@ export async function addTroops(c: Db, villageId: number, homeId: number, units:
 }
 
 /**
- * Toutes les troupes appartenant au village, où qu'elles soient (chez lui, en renfort ailleurs, en route,
- * réservées par un ordre planifié), hors recrutement en cours.
+ * Troupes réservées par les ordres planifiés du village qui ne sont pas encore partis. Elles restent au village et le défendent
+ * jusqu'à leur départ : elles sont comptées dans `getTroops`, mais ne peuvent plus servir à un autre envoi.
+ */
+export async function reservedTroops(c: Db, villageId: number): Promise<UnitCounts> {
+  const { rows } = await c.query('SELECT units FROM planned_commands WHERE origin_village_id = $1', [villageId]);
+  return rows.reduce((sum: UnitCounts, r) => addUnits(sum, normalizeUnits(r.units)), emptyUnits());
+}
+
+/** Troupes du village libres pour un envoi : celles qui sont au village, moins celles qu'un ordre planifié a réservées. */
+export async function freeTroops(c: Db, villageId: number): Promise<UnitCounts> {
+  const home = await getTroops(c, villageId, villageId);
+  const reserved = await reservedTroops(c, villageId);
+  const free = emptyUnits();
+  for (const k of UNIT_KEYS) free[k] = Math.max(0, home[k] - reserved[k]);
+  return free;
+}
+
+/**
+ * Toutes les troupes appartenant au village, où qu'elles soient (chez lui, y compris celles réservées par un ordre planifié,
+ * en renfort ailleurs, en route), hors recrutement en cours.
  */
 export async function ownedUnits(c: Db, villageId: number): Promise<UnitCounts> {
   const { rows } = await c.query(
     `SELECT units FROM troops WHERE home_village_id = $1
-     UNION ALL SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed
-     UNION ALL SELECT units FROM planned_commands WHERE origin_village_id = $1`,
+     UNION ALL SELECT units FROM commands WHERE home_village_id = $1 AND NOT processed`,
     [villageId],
   );
   return rows.reduce((sum: UnitCounts, r) => addUnits(sum, normalizeUnits(r.units)), emptyUnits());
@@ -468,7 +486,9 @@ export async function villageState(c: Db, v: VillageRow, viewerId: number): Prom
     })),
     population,
     populationMax: populationCapacity(v.buildings.farm),
-    troopsHome: await getTroops(c, v.id, v.id),
+    // Les troupes réservées par un ordre planifié défendent le village, mais ne sont plus disponibles pour un envoi.
+    troopsHome: await freeTroops(c, v.id),
+    troopsReserved: await reservedTroops(c, v.id),
     supportHere: await troopGroups(c, 'here', v.id),
     supportAway: await troopGroups(c, 'away', v.id),
     // On voit ce qui arrive chez soi, sauf la composition des attaques et des renforts envoyés par un autre joueur.

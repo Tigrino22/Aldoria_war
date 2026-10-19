@@ -5,7 +5,7 @@ import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { sendCommand } from './commands';
 import { attackBeats, ramsFor } from './npc-rules';
-import { getTroops } from './village';
+import { freeTroops } from './village';
 
 /**
  * Assaut groupé des PNJ : quand l'armée d'un seul village ne suffit pas contre un village bien défendu, le PNJ fait donner tous ses villages
@@ -83,7 +83,7 @@ export async function siegeHelpers(c: Db, npcId: number, tribeId: number | null,
   );
   const waves: Wave[] = [];
   for (const r of rows) {
-    const units = waveOf(await getTroops(c, r.id, r.id), target.wall);
+    const units = waveOf(await freeTroops(c, r.id), target.wall);
     // Vraie attaque ou rien : une vague plus faible que le minimum réglé ne pèse rien et remplit les rapports.
     if (powerOf(units) > 0 && powerOf(units) >= env.npcMinAttack * UNITS.swordsman.attack) waves.push({ playerId: r.owner_id, villageId: r.id, x: r.x, y: r.y, units });
   }
