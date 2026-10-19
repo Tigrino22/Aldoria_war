@@ -260,7 +260,7 @@ export default function AdminPlayers() {
 }
 
 function PlayerDetail({ id, onBack }: { id: number; onBack: () => void }) {
-  const { run } = useGame();
+  const { run, toast } = useGame();
   const [d, setD] = useState<AdminPlayerDetail | null>(null);
   const load = useCallback(() => run(async () => setD(await api<AdminPlayerDetail>(`/api/admin/players/${id}`))), [run, id]);
   useEffect(() => {
@@ -281,6 +281,17 @@ function PlayerDetail({ id, onBack }: { id: number; onBack: () => void }) {
         <p className="muted">Chargement…</p>
       </>
     );
+
+  const fillTroops = () => {
+    if (!window.confirm(`Remplir les troupes de tous les villages de ${d.username} selon son modèle du gestionnaire, sans coût, dans la limite de la ferme ?`)) return;
+    run(async () => {
+      const r = await api<{ villages: { added: UnitCounts; noPlan: boolean }[] }>(`/api/admin/players/${id}/fill-troops`, { method: 'POST', body: {} });
+      const filled = r.villages.filter((v) => UNIT_KEYS.some((u) => v.added[u] > 0)).length;
+      const noPlan = r.villages.filter((v) => v.noPlan).length;
+      toast(`Troupes ajoutées dans ${filled} village${filled > 1 ? 's' : ''} sur ${r.villages.length}${noPlan ? ` (${noPlan} sans modèle)` : ''}`);
+      setD(await api<AdminPlayerDetail>(`/api/admin/players/${id}`));
+    });
+  };
 
   const sumRes = Object.fromEntries(RESOURCES.map((r) => [r, d.villages.reduce((s, v) => s + v.resources[r], 0)])) as unknown as Resources;
   const sumRates = Object.fromEntries(RESOURCES.map((r) => [r, d.villages.reduce((s, v) => s + v.rates[r], 0)])) as unknown as Resources;
@@ -391,7 +402,14 @@ function PlayerDetail({ id, onBack }: { id: number; onBack: () => void }) {
         </Panel>
       </div>
 
-      <Panel title="Armée">
+      <Panel
+        title="Armée"
+        actions={
+          <button className="btn small" onClick={fillTroops}>
+            Remplir selon le modèle
+          </button>
+        }
+      >
         <dl className="admin-dl">
           <dt>Au village</dt>
           <dd>

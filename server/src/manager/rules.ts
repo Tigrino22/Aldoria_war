@@ -1,6 +1,7 @@
 import {
   BUILDINGS,
   BUILDING_KEYS,
+  emptyUnits,
   RESOURCES,
   UNITS,
   UNIT_KEYS,
@@ -201,3 +202,33 @@ export const PRESETS: { name: string; plan: Plan }[] = [
     },
   },
 ];
+
+/**
+ * Troupes à ajouter d'un coup pour atteindre les objectifs d'un plan, sans coût (outil d'administration) : seules les unités dont
+ * les prérequis sont remplis, dans la limite des places libres de la ferme. Si tout ne tient pas, chaque unité reçoit la même part
+ * de ce qui lui manque, puis les places restantes vont à l'unité la plus en retard.
+ */
+export function fillToPlan(targets: Partial<Record<UnitKey, number>>, owned: UnitCounts, buildings: Buildings, freePopulation: number): UnitCounts {
+  const add = emptyUnits();
+  const missing = emptyUnits();
+  let need = 0;
+  for (const u of UNIT_KEYS) {
+    if (!meetsRequirements(buildings, UNITS[u].requires)) continue;
+    missing[u] = Math.max(0, (targets[u] ?? 0) - owned[u]);
+    need += missing[u] * UNITS[u].population;
+  }
+  let free = Math.max(0, freePopulation);
+  const scale = need <= free ? 1 : free / need;
+  for (const u of UNIT_KEYS) {
+    add[u] = Math.floor(missing[u] * scale);
+    free -= add[u] * UNITS[u].population;
+  }
+  for (;;) {
+    const fits = UNIT_KEYS.filter((u) => add[u] < missing[u] && UNITS[u].population <= free);
+    if (!fits.length) break;
+    const u = fits.reduce((a, b) => ((missing[b] - add[b]) / missing[b] > (missing[a] - add[a]) / missing[a] ? b : a));
+    add[u]++;
+    free -= UNITS[u].population;
+  }
+  return add;
+}
