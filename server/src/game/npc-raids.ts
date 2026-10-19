@@ -7,7 +7,7 @@ import { sendCommand } from './commands';
 import { estimateLoot, pickIntel } from './intel';
 import { attackBeats } from './npc-rules';
 import { RAID_SIZE, RAID_UNIT, type VillageRole } from './npc-roles';
-import { getTroops, loadVillage } from './village';
+import { freeTroops, loadVillage } from './village';
 
 /**
  * Pillage intensif des PNJ : à chaque réflexion, chaque village envoie autant de pillages qu'il le peut vers les villages sans défense
@@ -73,7 +73,7 @@ export interface FarmHostiles {
 export async function raidStep(c: Db, outbox: Outbox, npcId: number, villageId: number, role: VillageRole, hostiles: FarmHostiles, now: Date): Promise<number> {
   if (!env.npcRaids) return 0;
   const village = await loadVillage(c, villageId);
-  const home = await getTroops(c, villageId, villageId);
+  const home = await freeTroops(c, villageId);
   const pool = { ...emptyUnits(), [RAID_UNIT[role]]: home[RAID_UNIT[role]] };
   // La moitié des éclaireurs reste au village pour les vrais espionnages (joueurs et PNJ) : le pillage ne prend que le reste.
   let scouts = Math.min(Math.floor(home.scout / 2), SCOUTS_PER_THINK);

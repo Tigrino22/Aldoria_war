@@ -7,6 +7,7 @@ import IncomingDetail from './IncomingDetail';
 import { ManagerSwitch, useManager } from './Manager';
 import { buildingImg } from '../assets';
 import { Countdown, ResIcon, UnitList, liveResources } from '../ui';
+import { homeTroops } from '../troops';
 import { PageBanner } from './PageBanner';
 import { CrusadeBanner } from './CrusadeBanner';
 import './overview.css';
@@ -139,9 +140,9 @@ export default function Overview() {
                 </dd>
               </div>
               <div className="wide">
-                <dt>Troupes ({fmt(totalUnits(v.troopsHome))})</dt>
+                <dt>Troupes ({fmt(totalUnits(homeTroops(v)))})</dt>
                 <dd>
-                  <UnitList units={v.troopsHome} />
+                  <UnitList units={homeTroops(v)} />
                 </dd>
               </div>
             </dl>

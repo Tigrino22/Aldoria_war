@@ -275,7 +275,7 @@ export function PlannedOrders() {
   return (
     <Panel title="Ordres planifiés">
       {!orders?.length ? (
-        <p className="muted">Aucun ordre en attente. Les troupes d’un ordre planifié sont réservées jusqu’au départ.</p>
+        <p className="muted">Aucun ordre en attente. Les troupes d’un ordre planifié sont réservées : elles restent au village et le défendent jusqu’à leur départ.</p>
       ) : (
         <ul className="movements">
           {orders.map((o) => (

@@ -4,7 +4,7 @@ import { env } from '../env';
 import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { sendInterception } from './intercept';
-import { getTroops } from './village';
+import { freeTroops } from './village';
 
 /**
  * Interceptions des PNJ : une armée hostile repérée à portée de vue d'un village de PNJ (10 cases, voir shared/src/armies.ts)
@@ -65,7 +65,7 @@ export async function interceptStep(c: Db, outbox: Outbox, npcId: number, villag
     const enemy = hostiles.players.includes(r.player_id) || (r.tribe_id !== null && hostiles.tribes.includes(r.tribe_id));
     if (!defends && !enemy) continue;
     const theirs = normalizeUnits(r.units);
-    const available = await getTroops(c, villageId, villageId);
+    const available = await freeTroops(c, villageId);
     const units = SHARES.map((s) => interceptUnits(available, s)).find((u) => winsInField(u, theirs));
     if (!units) continue;
     // L'envoi vérifie le reste (armée repérée, rencontre possible, rations) : un refus n'est pas une erreur.

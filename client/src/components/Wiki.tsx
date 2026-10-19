@@ -305,7 +305,8 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           </li>
           <li>
             <b>Ordres du Point de ralliement :</b> on y envoie une attaque ou un soutien vers des coordonnées, tout de suite ou pour une heure d'arrivée précise : les troupes sont alors réservées et partent seules à l'heure
-            qui convient, et l'on peut annuler l'ordre tant qu'il n'est pas parti. Le Point de ralliement est un onglet de la rubrique Troupes, distinct de la page « Troupes » ; depuis la carte, « Ouvrir au point de ralliement » y mène avec la cible déjà remplie. Les unités les plus rapides partent plus tard que les lentes pour que tous les mouvements arrivent à l'heure choisie.
+            qui convient, et l'on peut annuler l'ordre tant qu'il n'est pas parti. En attendant, elles restent au village et le défendent si on l'attaque ; si une partie périt, l'assaut part avec ce qui reste
+            (le blé des absents est rendu), et un train de nobles ne part que si chaque noble a encore toute son escorte, sinon aucun noble du train ne part. Le Point de ralliement est un onglet de la rubrique Troupes, distinct de la page « Troupes » ; depuis la carte, « Ouvrir au point de ralliement » y mène avec la cible déjà remplie. Les unités les plus rapides partent plus tard que les lentes pour que tous les mouvements arrivent à l'heure choisie.
           </li>
           <li>
             <b>Assistant de pillage :</b> une page dédiée pour piller les villages barbares en un clic, avec deux modèles de troupes. Voir <a href="#/wiki/pillage">le guide de l'assistant de pillage</a>.
@@ -410,7 +411,7 @@ function Guide({ id }: { id: Exclude<SectionId, 'batiments' | 'troupes' | 'guide
           <li>Si l'attaque est victorieuse et qu'au moins un noble survit, la loyauté baisse de {NOBLE_LOYALTY_MIN} à {NOBLE_LOYALTY_MAX} points (tirage au hasard), quel que soit le nombre de nobles : un seul tirage par attaque. Pour conquérir plus vite, lancez un train de nobles : une attaque par noble.</li>
           <li>
             <b>Train de nobles :</b> le Point de ralliement l'organise : l'assaut nettoie la défense, puis chaque noble part dans sa propre attaque, une seconde après le précédent. Un noble seul ne survit pas à la
-            défense de base d'un village : vous choisissez les troupes et leur quantité qui escortent chaque noble (2 épéistes par défaut). S'il n'y a pas assez de troupes pour tous les nobles demandés (3 escortes possibles sur 4, par exemple), seules 3 attaques partent.
+            défense de base d'un village : vous choisissez les troupes et leur quantité qui escortent chaque noble (2 épéistes par défaut). S'il n'y a pas assez de troupes pour tous les nobles demandés (3 escortes possibles sur 4, par exemple), seules 3 attaques partent. Jusqu'au départ, l'escorte défend le village : si elle n'est plus complète à l'heure du départ, le train ne part pas (l'assaut lui laisse ses escortes et part avec le reste).
           </li>
           <li>La loyauté remonte de {fmt(LOYALTY_REGEN_PER_HOUR * s)} point{LOYALTY_REGEN_PER_HOUR * s > 1 ? 's' : ''} par heure, jusqu'à 100.</li>
           <li>À 0, le village est à vous : sa loyauté repart à {LOYALTY_AFTER_CONQUEST}, un noble s'y installe pour gouverner (il disparaît de l'armée) et les autres survivants deviennent la garnison.</li>

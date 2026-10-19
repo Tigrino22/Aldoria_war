@@ -491,10 +491,8 @@ export async function endCrusade(c: Db, outbox: Outbox, cr: CrusadeRow, now: Dat
     }
     await c.query('DELETE FROM troops WHERE village_id = $1', [citadel.id]);
     const planned = (await c.query('DELETE FROM planned_commands WHERE target_village_id = $1 RETURNING player_id, origin_village_id, type, units', [citadel.id])).rows;
-    for (const p of planned) {
-      await addTroops(c, p.origin_village_id, p.origin_village_id, normalizeUnits(p.units));
-      outbox.push(p.player_id, { type: 'village', villageId: p.origin_village_id });
-    }
+    // Leurs troupes n'ont pas quitté le village : elles redeviennent simplement libres.
+    for (const p of planned) outbox.push(p.player_id, { type: 'village', villageId: p.origin_village_id });
   }
   await c.query(
     `UPDATE crusades SET status = 'ended', ended_at = $2, winner_tribe_id = $3, winner_player_id = $4, winner_name = $5 WHERE id = $1`,

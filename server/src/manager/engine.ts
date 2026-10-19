@@ -89,7 +89,7 @@ export async function runVillage(c: Db, villageId: number, plan: Plan, now: Date
   const goals = UNIT_KEYS.filter((u) => (plan.troops[u] ?? 0) > 0);
   const queuedRecruits = (await c.query('SELECT unit, count - delivered AS remaining FROM recruit_queue WHERE village_id = $1', [villageId])).rows;
   if (goals.length && v.buildings.barracks >= 1 && queuedRecruits.length === 0) {
-    // Comptées où qu'elles soient : au village, en renfort ailleurs (dont l'escorte d'un noble), en route ou réservées par un ordre planifié.
+    // Comptées où qu'elles soient : au village (dont celles réservées par un ordre planifié), en renfort ailleurs (dont l'escorte d'un noble) ou en route.
     const owned: UnitCounts = await ownedUnits(c, villageId);
     const cap = warehouseCapacity(v.buildings.warehouse);
     const stock = resourcesOf(v);

@@ -14,7 +14,7 @@ import {
 } from '@aldoria/shared';
 import { api } from '../api';
 import { duration, fmt } from '../format';
-import { awayTroops } from '../troops';
+import { awayTroops, homeTroops } from '../troops';
 import { useGame, useNow, useRoute } from '../game';
 import { buildingImg } from '../assets';
 import { CancelButton, Cost, Countdown, liveResources, UnitIcon } from '../ui';
@@ -62,7 +62,9 @@ export default function Barracks() {
   const training = emptyUnits();
   for (const q of v.recruitQueue) training[q.unit] += q.count - q.delivered;
   const away = awayTroops(v);
-  const total = (k: UnitKey) => v.troopsHome[k] + training[k] + away[k];
+  // Au village : les troupes réservées par un ordre planifié y sont encore et le défendent jusqu'à leur départ.
+  const home = homeTroops(v);
+  const total = (k: UnitKey) => home[k] + training[k] + away[k];
   const owned = UNIT_KEYS.filter((k) => total(k) > 0);
 
   const recruit = (k: UnitKey) =>
@@ -73,7 +75,7 @@ export default function Barracks() {
     });
 
   const inTraining = v.recruitQueue.reduce((n, q) => n + q.count - q.delivered, 0);
-  const homeTotal = UNIT_KEYS.reduce((n, k) => n + v.troopsHome[k], 0);
+  const homeTotal = UNIT_KEYS.reduce((n, k) => n + home[k], 0);
   const awayTotal = UNIT_KEYS.reduce((n, k) => n + away[k], 0);
 
   return (
@@ -165,7 +167,13 @@ export default function Barracks() {
                       </span>
                     </td>
                     <td>
-                      <b>{fmt(v.troopsHome[k])}</b>
+                      <b>{fmt(home[k])}</b>
+                      {v.troopsReserved[k] > 0 && (
+                        <span className="muted small" title="Réservées par un ordre planifié : elles défendent le village jusqu'à leur départ">
+                          {' '}
+                          (dont {fmt(v.troopsReserved[k])} réservées)
+                        </span>
+                      )}
                     </td>
                     <td className={training[k] ? '' : 'muted'}>{fmt(training[k])}</td>
                     <td className={away[k] ? '' : 'muted'}>{fmt(away[k])}</td>
@@ -201,15 +209,19 @@ export default function Barracks() {
                     <p className="muted small">{def.description}</p>
                   </div>
                   <div className="unit-owned" title="Troupes présentes au village">
-                    <b>{fmt(v.troopsHome[k])}</b>
+                    <b>{fmt(home[k])}</b>
                     <span>au village</span>
                   </div>
                 </header>
-                {(training[k] > 0 || away[k] > 0) && (
+                {(training[k] > 0 || away[k] > 0 || v.troopsReserved[k] > 0) && (
                   <p className="muted small unit-owned-more">
-                    {training[k] > 0 && <>+{fmt(training[k])} en formation</>}
-                    {training[k] > 0 && away[k] > 0 && ' · '}
-                    {away[k] > 0 && <>{fmt(away[k])} hors du village</>}
+                    {[
+                      training[k] > 0 && `+${fmt(training[k])} en formation`,
+                      v.troopsReserved[k] > 0 && `dont ${fmt(v.troopsReserved[k])} réservées par un ordre`,
+                      away[k] > 0 && `${fmt(away[k])} hors du village`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
                 )}
                 <dl className="stats">

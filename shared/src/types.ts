@@ -172,8 +172,10 @@ export interface VillageState {
   population: number;
   /** Population maximale selon la ferme. */
   populationMax: number;
-  /** Troupes du village présentes chez lui. */
+  /** Troupes du village présentes chez lui et libres pour un envoi (sans celles réservées par un ordre planifié). */
   troopsHome: UnitCounts;
+  /** Troupes réservées par un ordre planifié : elles restent au village et le défendent jusqu'à leur départ. */
+  troopsReserved: UnitCounts;
   /** Renforts d'autres villages stationnés ici. */
   supportHere: TroopGroup[];
   /** Troupes de ce village stationnées en renfort ailleurs. */

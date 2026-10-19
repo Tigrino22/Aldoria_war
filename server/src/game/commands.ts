@@ -44,7 +44,7 @@ import { handleIntercept } from './intercept';
 import { launchDueOrders } from './orders';
 import { createReport } from './reports';
 import { recordBattle } from './war-stats';
-import { VillageRow, addTroops, busyMerchants, getTroops, loadVillage, resourcesOf, saveVillage, setTroops, syncVillage } from './village';
+import { VillageRow, addTroops, busyMerchants, freeTroops, getTroops, loadVillage, resourcesOf, saveVillage, setTroops, syncVillage } from './village';
 
 let rng: () => number = Math.random;
 /** Permet aux tests de rendre la baisse de loyauté déterministe. */
@@ -179,15 +179,15 @@ export async function sendCommand(
 
   const units = normalizeUnits(input.units);
   if (totalUnits(units) === 0) throw new GameError('Sélectionnez au moins une unité');
-  const available = await getTroops(c, origin.id, origin.id);
-  if (!hasUnits(available, units)) throw new GameError("Vous n'avez pas assez de troupes au village");
+  // Les troupes réservées par un ordre planifié défendent le village mais ne peuvent pas partir ailleurs.
+  if (!hasUnits(await freeTroops(c, origin.id), units)) throw new GameError("Vous n'avez pas assez de troupes libres au village");
 
   if (input.type === 'attack') {
     await assertCanAttack(c, playerId, target, now);
     await chargeAttackWheat(c, playerId, origin, units);
   }
 
-  await setTroops(c, origin.id, origin.id, subtractUnits(available, units));
+  await setTroops(c, origin.id, origin.id, subtractUnits(await getTroops(c, origin.id, origin.id), units));
   return dispatchCommand(c, outbox, { type: input.type, playerId, origin, target, units, sentAt: now });
 }
 
@@ -201,7 +201,7 @@ export async function disbandTroops(c: Db, outbox: Outbox, playerId: number, vil
   if (village.owner_id !== playerId) throw forbidden("Ce village n'est pas à vous");
   if (!Number.isInteger(count) || count < 1) throw new GameError("Indiquez un nombre d'unités à dissoudre");
   const troops = await getTroops(c, villageId, villageId);
-  if (troops[unit] < count) throw new GameError("Vous n'avez pas autant d'unités au village");
+  if ((await freeTroops(c, villageId))[unit] < count) throw new GameError("Vous n'avez pas autant d'unités libres au village (hors ordres planifiés)");
   await setTroops(c, villageId, villageId, { ...troops, [unit]: troops[unit] - count });
   outbox.push(playerId, { type: 'village', villageId });
 }

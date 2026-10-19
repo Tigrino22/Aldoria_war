@@ -169,8 +169,9 @@ describe('gestionnaire de compte', () => {
     });
     const player = (await pool.query('SELECT owner_id FROM villages WHERE id = $1', [villageId])).rows[0].owner_id;
     const elsewhere = (await pool.query('SELECT id FROM villages WHERE id <> $1 ORDER BY id LIMIT 1', [villageId])).rows[0].id;
-    // 30 lanciers en renfort dans un autre village (comme l'escorte d'un noble après une conquête), 20 réservés par un ordre planifié.
+    // 30 lanciers en renfort dans un autre village (comme l'escorte d'un noble après une conquête), 20 au village réservés par un ordre planifié.
     await pool.query('INSERT INTO troops (village_id, home_village_id, units) VALUES ($1, $2, $3)', [elsewhere, villageId, JSON.stringify({ spearman: 30 })]);
+    await pool.query('INSERT INTO troops (village_id, home_village_id, units) VALUES ($1, $1, $2)', [villageId, JSON.stringify({ spearman: 20 })]);
     await pool.query(
       `INSERT INTO planned_commands (group_id, player_id, origin_village_id, target_village_id, type, units, depart_at, arrive_at)
        VALUES ($1, $2, $3, $4, 'attack', $5, now() + interval '1 hour', now() + interval '2 hours')`,

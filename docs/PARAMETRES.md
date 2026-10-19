@@ -442,8 +442,9 @@ Onglet « Ralliement » de la rubrique Troupes, distinct de la page « Troupes �
 | Règle | Valeur |
 |---|---|
 | Ordre | Attaque ou soutien vers un village (coordonnées), depuis le village actif ; tout de suite ou à une heure d'arrivée précise |
-| Heure d'arrivée précise | Les troupes sont retirées du village à la planification (réservées, comptées dans la population) et partent à `arrivée - trajet` ; 14 jours au plus à l'avance ; annulables avant le départ (les troupes reviennent) |
-| Cible devenue inattaquable | Au départ, si la cible est sous protection ou devenue la nôtre, l'ordre est annulé et les troupes rentrent |
+| Heure d'arrivée précise | Les troupes sont réservées à la planification mais restent au village (`reservedTroops`, `freeTroops` dans `village.ts`) : elles le défendent jusqu'à leur départ à `arrivée - trajet`, et aucun autre envoi (joueur ou PNJ) ne peut les prendre ; 14 jours au plus à l'avance ; annulables avant le départ (elles redeviennent libres) |
+| Pertes avant le départ | L'assaut part avec ce qui reste (en laissant au village l'escorte du train s'il peut encore partir au complet) et est annulé s'il ne reste personne ; un noble du train ne part que si le train restant a toute son escorte, sinon aucun noble du train ne part. Le blé des unités qui ne partent pas est rendu |
+| Cible devenue inattaquable | Au départ, si la cible est sous protection ou devenue la nôtre, l'ordre est annulé et les troupes restent au village |
 | Départ en retard (serveur arrêté) | Plus de 5 s après l'heure prévue : l'heure d'arrivée précise est abandonnée, les troupes partent aussitôt |
 | Village d'origine conquis | Les ordres planifiés depuis ce village disparaissent avec lui |
 | Loyauté | Une attaque victorieuse avec au moins un noble survivant fait baisser la loyauté de 20 à 35, **une seule fois**, quel que soit le nombre de nobles |

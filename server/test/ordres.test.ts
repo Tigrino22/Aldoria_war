@@ -4,9 +4,9 @@ import { pool, tx } from '../src/db';
 import { env } from '../src/env';
 import { migrate } from '../src/migrate';
 import { Outbox } from '../src/notify';
-import { processDueEvents, setRandom } from '../src/game/commands';
+import { processDueEvents, sendCommand, setRandom } from '../src/game/commands';
 import { cancelOrder, launchDueOrders, orderParts, placeOrder, plannedOrders } from '../src/game/orders';
-import { createVillage, getTroops } from '../src/game/village';
+import { createVillage, freeTroops, getTroops } from '../src/game/village';
 
 const HOUR = 3_600_000;
 const T0 = new Date('2030-01-15T12:00:00Z');
@@ -78,8 +78,9 @@ describe('ordres planifiés', () => {
     const landAt = new Date(T0.getTime() + 2 * HOUR);
     await tx((c) => placeOrder(c, new Outbox(), me, home, { type: 'attack', targetId: target, units: { swordsman: 40 }, arriveAt: landAt }, T0));
 
-    // Les troupes sont réservées, mais rien n'est encore en route : la cible ne voit rien venir.
-    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(60);
+    // Les troupes sont réservées mais restent au village, et rien n'est encore en route : la cible ne voit rien venir.
+    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(100);
+    expect((await tx((c) => freeTroops(c, home))).swordsman).toBe(60);
     expect((await pool.query('SELECT count(*)::int AS n FROM commands WHERE player_id = $1', [me])).rows[0].n).toBe(0);
     const orders = await tx((c) => plannedOrders(c, me));
     expect(orders).toHaveLength(1);
@@ -90,7 +91,9 @@ describe('ordres planifiés', () => {
     expect(await launchDueOrders(departAt)).toBe(1);
     const cmd = (await pool.query("SELECT type, arrive_at, units FROM commands WHERE player_id = $1", [me])).rows[0];
     expect(cmd.type).toBe('attack');
+    expect(cmd.units.swordsman).toBe(40);
     expect(new Date(cmd.arrive_at).getTime()).toBe(landAt.getTime());
+    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(60);
     expect((await tx((c) => plannedOrders(c, me)))).toHaveLength(0);
     expect(await processDueEvents(new Date(landAt.getTime() + 1))).toBeGreaterThan(0);
   });
@@ -126,7 +129,7 @@ describe('ordres planifiés', () => {
     const planned = (await tx((c) => plannedOrders(c, me)))[0];
     expect(planned.parts).toHaveLength(4); // l'assaut + 3 nobles
     expect(planned.parts.filter((p) => p.units.noble === 1)).toHaveLength(3);
-    const left = await tx((c) => getTroops(c, home, home));
+    const left = await tx((c) => freeTroops(c, home));
     expect(left.noble).toBe(1);
     expect(left.spearman).toBe(1);
     // Les unités plus rapides partent plus tard : toutes les arrivées tombent à l'heure choisie (à la seconde d'écart près).
@@ -147,16 +150,17 @@ describe('ordres planifiés', () => {
     ).rejects.toThrow(/escorte/);
   });
 
-  it('annuler un ordre rend les troupes réservées', async () => {
+  it('annuler un ordre libère les troupes réservées', async () => {
     const me = await makePlayer('Prudent');
     const foe = await makePlayer('Voisin');
     const home = await village(me, 50, 50, { swordsman: 30 });
     const target = await village(foe, 52, 50);
     await tx((c) => placeOrder(c, new Outbox(), me, home, { type: 'attack', targetId: target, units: { swordsman: 30 }, arriveAt: new Date(T0.getTime() + 3 * HOUR) }, T0));
-    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(0);
+    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(30);
+    expect((await tx((c) => freeTroops(c, home))).swordsman).toBe(0);
     const [order] = await tx((c) => plannedOrders(c, me));
     await tx((c) => cancelOrder(c, new Outbox(), me, order.groupId));
-    expect((await tx((c) => getTroops(c, home, home))).swordsman).toBe(30);
+    expect((await tx((c) => freeTroops(c, home))).swordsman).toBe(30);
     expect(await tx((c) => plannedOrders(c, me))).toHaveLength(0);
     await expect(tx((c) => cancelOrder(c, new Outbox(), me, order.groupId))).rejects.toThrow(/déjà parti/);
   });
@@ -188,5 +192,71 @@ describe('ordres planifiés', () => {
     const cmd = (await pool.query("SELECT arrive_at FROM commands WHERE player_id = $1 AND type = 'support'", [me])).rows[0];
     const expected = travelTime({ ...emptyUnits(), swordsman: 10 }, { x: 90, y: 90 }, { x: 93, y: 90 }, env.worldSpeed) * 1000;
     expect(new Date(cmd.arrive_at).getTime() - T0.getTime()).toBe(expected);
+  });
+
+  it('les troupes réservées défendent le village jusqu’à leur départ, puis l’assaut part avec ce qui reste', async () => {
+    const me = await makePlayer('Défenseur patient');
+    const foe = await makePlayer('Pillard');
+    const home = await village(me, 150, 150, { spearman: 100 });
+    const target = await village(foe, 153, 150);
+    const raider = await village(foe, 152, 150, { swordsman: 30 });
+    const landAt = new Date(T0.getTime() + 6 * HOUR);
+    await tx((c) => placeOrder(c, new Outbox(), me, home, { type: 'attack', targetId: target, units: { spearman: 100 }, arriveAt: landAt }, T0));
+    // Les troupes réservées ne peuvent pas partir ailleurs.
+    await expect(tx((c) => sendCommand(c, new Outbox(), me, home, { type: 'support', targetId: target, units: { spearman: 1 } }, T0))).rejects.toThrow(/libres/);
+
+    // Une attaque tombe sur le village avant le départ : les lanciers réservés le défendent.
+    const strike = await tx((c) => sendCommand(c, new Outbox(), foe, raider, { type: 'attack', targetId: home, units: { swordsman: 30 } }, T0));
+    await processDueEvents(new Date(strike.arriveAt.getTime() + 1));
+    expect((await pool.query('SELECT owner_id FROM villages WHERE id = $1', [home])).rows[0].owner_id).toBe(me);
+    const survivors = (await tx((c) => getTroops(c, home, home))).spearman;
+    expect(survivors).toBeGreaterThan(0);
+    expect(survivors).toBeLessThan(100);
+
+    const wheatBefore = Number((await pool.query('SELECT wheat FROM villages WHERE id = $1', [home])).rows[0].wheat);
+    const departAt = new Date((await tx((c) => plannedOrders(c, me)))[0].parts[0].departAt);
+    expect(await launchDueOrders(departAt)).toBe(1);
+    const cmd = (await pool.query("SELECT units FROM commands WHERE player_id = $1 AND type = 'attack'", [me])).rows[0];
+    expect(cmd.units.spearman).toBe(survivors);
+    expect((await tx((c) => getTroops(c, home, home))).spearman).toBe(0);
+    // Le blé des lanciers tombés est rendu.
+    expect(Number((await pool.query('SELECT wheat FROM villages WHERE id = $1', [home])).rows[0].wheat)).toBeGreaterThan(wheatBefore);
+  });
+
+  it('un train dont l’escorte n’est plus complète ne part pas ; l’assaut part avec le reste', async () => {
+    const me = await makePlayer('Train amputé');
+    const foe = await makePlayer('Cible du train');
+    const home = await village(me, 170, 170, { swordsman: 40, noble: 2 });
+    const target = await village(foe, 173, 170);
+    const landAt = new Date(T0.getTime() + 6 * HOUR);
+    await tx((c) => placeOrder(c, new Outbox(), me, home, { type: 'attack', targetId: target, units: { swordsman: 20 }, arriveAt: landAt, train: { nobles: 2, escort: { swordsman: 10 }, gapSeconds: 1 } }, T0));
+    // Des pertes avant le départ : 15 épéistes au lieu de 40, il en faut 20 pour l’escorte complète des 2 nobles.
+    await pool.query("UPDATE troops SET units = units || '{\"swordsman\": 15}'::jsonb WHERE village_id = $1 AND home_village_id = $1", [home]);
+    const parts = (await tx((c) => plannedOrders(c, me)))[0].parts;
+    for (const at of parts.map((p) => Date.parse(p.departAt)).sort((a, b) => a - b)) await launchDueOrders(new Date(at));
+    const cmds = (await pool.query("SELECT units FROM commands WHERE player_id = $1 AND type = 'attack'", [me])).rows;
+    // Aucun noble ne part : l'assaut seul, avec tout ce qui reste.
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0].units).toMatchObject({ swordsman: 15, noble: 0 });
+    expect(await tx((c) => getTroops(c, home, home))).toMatchObject({ swordsman: 0, noble: 2 });
+    expect(await tx((c) => plannedOrders(c, me))).toHaveLength(0);
+  });
+
+  it('l’assaut laisse au village l’escorte d’un train qui peut encore partir au complet', async () => {
+    const me = await makePlayer('Train prioritaire');
+    const foe = await makePlayer('Cible prioritaire');
+    const home = await village(me, 190, 190, { cavalry: 30, swordsman: 20, noble: 2 });
+    const target = await village(foe, 193, 190);
+    const landAt = new Date(T0.getTime() + 6 * HOUR);
+    // L'assaut emporte des épéistes et des cavaliers ; chaque noble est escorté de 5 épéistes.
+    await tx((c) => placeOrder(c, new Outbox(), me, home, { type: 'attack', targetId: target, units: { cavalry: 30, swordsman: 10 }, arriveAt: landAt, train: { nobles: 2, escort: { swordsman: 5 }, gapSeconds: 1 } }, T0));
+    // 6 épéistes perdus : il en reste 14, assez pour les 10 de l'escorte, pas pour tout l'assaut.
+    await pool.query("UPDATE troops SET units = units || '{\"swordsman\": 14}'::jsonb WHERE village_id = $1 AND home_village_id = $1", [home]);
+    const parts = (await tx((c) => plannedOrders(c, me)))[0].parts;
+    for (const at of parts.map((p) => Date.parse(p.departAt)).sort((a, b) => a - b)) await launchDueOrders(new Date(at));
+    const cmds = (await pool.query("SELECT units FROM commands WHERE player_id = $1 AND type = 'attack' ORDER BY arrive_at", [me])).rows;
+    expect(cmds).toHaveLength(3);
+    expect(cmds[0].units).toMatchObject({ cavalry: 30, swordsman: 4 });
+    expect(cmds.slice(1).every((r) => r.units.noble === 1 && r.units.swordsman === 5)).toBe(true);
   });
 });

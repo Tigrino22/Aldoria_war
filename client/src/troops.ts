@@ -11,3 +11,10 @@ export function awayTroops(v: VillageState): UnitCounts {
   for (const g of v.supportAway) add(g.units);
   return away;
 }
+
+/** Troupes présentes au village, qui le défendent : les libres et celles réservées par un ordre planifié pas encore parti. */
+export function homeTroops(v: VillageState): UnitCounts {
+  const home = emptyUnits();
+  for (const k of UNIT_KEYS) home[k] = v.troopsHome[k] + v.troopsReserved[k];
+  return home;
+}

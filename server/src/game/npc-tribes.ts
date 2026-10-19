@@ -5,7 +5,7 @@ import { GameError } from '../errors';
 import type { Outbox } from '../notify';
 import { sendCommand } from './commands';
 import type { TribeWar } from './npc-wars';
-import { getTroops, loadVillage } from './village';
+import { freeTroops, loadVillage } from './village';
 
 /** Opération coordonnée : tous les membres frappent la même cible dans une fenêtre d'arrivée. */
 export interface TribeOp {
@@ -98,7 +98,7 @@ export async function defendStep(c: Db, outbox: Outbox, npcId: number, villageId
       [npcId, threat.vid],
     );
     if (already.rows.length) continue;
-    const troops = await getTroops(c, villageId, villageId);
+    const troops = await freeTroops(c, villageId);
     // Les défenseurs partent, mais le village garde de quoi tenir : 60 % des lanciers et des hallebardiers, 30 % des épéistes.
     const units: UnitCounts = {
       ...emptyUnits(),

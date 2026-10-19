@@ -19,7 +19,7 @@ import { saveTribeState, type TribeInfo } from './npc-tribes';
 import type { VillageRole } from './npc-roles';
 import { placeOrder } from './orders';
 import { areAllied } from './tribe-alliances';
-import { getTroops, loadVillage } from './village';
+import { freeTroops, loadVillage } from './village';
 
 /**
  * Les tribus de PNJ et les Croisades : elles s'y préparent comme une tribu de joueurs, au lieu d'attaquer au hasard.
@@ -155,7 +155,7 @@ export async function crusadeStep(
   // 1. Décision de la tribu, par le chef : il espionne d'abord la Citadelle (une poignée d'éclaireurs), puis décide.
   if (state.join === null) {
     if (tribe.leaderId !== npcId) return;
-    const home = villages[0] ? await getTroops(c, villages[0].id, villages[0].id) : emptyUnits();
+    const home = villages[0] ? await freeTroops(c, villages[0].id) : emptyUnits();
     if (home.scout >= 5) {
       try {
         await sendCommand(c, outbox, npcId, villages[0].id, { type: 'attack', targetId: citadel.id, units: { ...emptyUnits(), scout: 5 } }, now);
@@ -174,7 +174,7 @@ export async function crusadeStep(
 
   for (const [i, v] of villages.entries()) {
     const village = await loadVillage(c, v.id);
-    const home = await getTroops(c, v.id, v.id);
+    const home = await freeTroops(c, v.id);
     try {
       if (v.role === 'offense' && !state.sent.includes(v.id)) {
         // 2. L'assaut programmé de ce village (avec un train de nobles s'il en a).
