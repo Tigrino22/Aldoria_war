@@ -8,6 +8,7 @@ import { forbidden } from '../errors';
 import { fillNpcWarehouses } from '../game/npc-fill';
 import { worldStats } from '../game/world-stats';
 import { adminPlayerDetail } from '../game/admin-player';
+import { fillTroopsToPlan } from '../manager/engine';
 import { WAR_SCORE_SQL } from '../game/war-stats';
 import { isQuiet, npcType, PROFILE_LABEL } from '../game/npc-rules';
 import { warOverview } from '../game/npc-war-report';
@@ -160,6 +161,21 @@ export default async function adminRoutes(app: FastifyInstance) {
     await requireAdmin(req);
     const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
     return adminPlayerDetail(id);
+  });
+
+  /**
+   * Outil exceptionnel : remplit les troupes de tous les villages d'un joueur selon son modèle du gestionnaire,
+   * sans coût, dans la limite des places libres de la ferme.
+   */
+  app.post('/api/admin/players/:id/fill-troops', async (req) => {
+    await requireAdmin(req);
+    const { id } = z.object({ id: z.coerce.number().int().positive() }).parse(req.params);
+    return act(async (c, outbox, now) => {
+      if (!(await c.query('SELECT 1 FROM players WHERE id = $1', [id])).rowCount) throw new GameError('Joueur introuvable');
+      const result = await fillTroopsToPlan(c, id, now);
+      for (const v of result.villages) outbox.push(id, { type: 'village', villageId: v.id });
+      return result;
+    });
   });
 
   /** Statistiques anonymes : troupes, ressources, bâtiments et activité, sans aucun nom de joueur. */

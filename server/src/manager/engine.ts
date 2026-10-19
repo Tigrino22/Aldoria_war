@@ -6,6 +6,7 @@ import {
   UNIT_KEYS,
   BUILD_QUEUE_LIMIT,
   emptyResources,
+  emptyUnits,
   merchantCount,
   populationCapacity,
   productionRates,
@@ -19,10 +20,10 @@ import { env } from '../env';
 import { GameError } from '../errors';
 import { unlocked, type Locker } from '../lock';
 import { sendTrade } from '../game/commands';
-import { busyMerchants, computePopulation, enqueueBuild, enqueueRecruit, ownedUnits, resourcesOf, syncVillage } from '../game/village';
+import { addTroops, busyMerchants, computePopulation, enqueueBuild, enqueueRecruit, ownedUnits, resourcesOf, syncVillage } from '../game/village';
 import { Outbox } from '../notify';
 import { describeCargo, planBalance, type BalanceVillage } from './balance';
-import { costOf, nextBuilding, nextTroopLot, parsePlan, reserveFor, troopBudget, type Plan } from './rules';
+import { costOf, fillToPlan, nextBuilding, nextTroopLot, parsePlan, reserveFor, troopBudget, type Plan } from './rules';
 
 /**
  * Exécution du gestionnaire de compte. Il n'écrit jamais lui-même dans les tables du jeu : il appelle `enqueueBuild` et
@@ -224,4 +225,32 @@ export async function runBalance(c: Db, outbox: Outbox, playerId: number, thresh
     sent++;
   }
   return sent;
+}
+
+/**
+ * Outil d'administration : ajoute d'un coup, sans coût, les troupes qui manquent à chaque village d'un joueur pour atteindre
+ * les objectifs de son modèle du gestionnaire, dans la limite des places libres de la ferme. Renvoie le détail par village.
+ */
+export async function fillTroopsToPlan(c: Db, playerId: number, now: Date) {
+  const rows = (
+    await c.query(
+      `SELECT v.id, v.name, mv.custom, t.buildings AS t_buildings, t.troops AS t_troops, t.troops_share AS t_share
+       FROM villages v
+       LEFT JOIN manager_villages mv ON mv.village_id = v.id
+       LEFT JOIN manager_templates t ON t.id = mv.template_id
+       WHERE v.owner_id = $1 ORDER BY v.id`,
+      [playerId],
+    )
+  ).rows;
+  const villages: { id: number; name: string; added: UnitCounts; noPlan: boolean }[] = [];
+  for (const row of rows) {
+    const plan = planOf(row);
+    const v = await syncVillage(c, row.id, now);
+    const added = plan
+      ? fillToPlan(plan.troops, await ownedUnits(c, row.id), v.buildings, populationCapacity(v.buildings.farm) - (await computePopulation(c, row.id)))
+      : emptyUnits();
+    if (UNIT_KEYS.some((u) => added[u] > 0)) await addTroops(c, row.id, row.id, added);
+    villages.push({ id: row.id, name: row.name, added, noPlan: !plan });
+  }
+  return { villages };
 }

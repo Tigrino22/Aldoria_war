@@ -6,7 +6,7 @@ import { env } from '../src/env';
 import { pool, tx } from '../src/db';
 import { migrate } from '../src/migrate';
 import { processManager } from '../src/manager/engine';
-import { PRESETS, nextBuilding, nextTroopLot, parsePlan, reserveFor, troopBudget } from '../src/manager/rules';
+import { PRESETS, fillToPlan, nextBuilding, nextTroopLot, parsePlan, reserveFor, troopBudget } from '../src/manager/rules';
 import { saveSettings } from '../src/settings';
 
 // Identifiants jetables des comptes de test, générés à chaque exécution.
@@ -65,6 +65,19 @@ describe('règles du gestionnaire', () => {
 
   it("monte l'entrepôt d'abord quand le niveau visé coûte plus qu'il ne peut contenir", () => {
     expect(nextBuilding([{ building: 'barracks', level: 15 }], B({ townhall: 3, barracks: 14, warehouse: 8 }))).toEqual({ building: 'warehouse', level: 9 });
+  });
+
+  it("remplit les troupes d'un plan dans la limite de la ferme, sans les unités dont le prérequis manque", () => {
+    const plan = { spearman: 100, swordsman: 100, noble: 4 };
+    // Tout tient : on ajoute exactement ce qui manque (les nobles demandent l'hôtel de ville : ici trop bas, aucun).
+    const all = fillToPlan(plan, { ...emptyUnits(), spearman: 40 }, B({ barracks: 3 }), 100000);
+    expect(all).toMatchObject({ spearman: 60, swordsman: 100, noble: 0 });
+    // Ferme trop petite : jamais plus de places que libres, chaque unité en reçoit sa part.
+    const tight = fillToPlan({ spearman: 100, swordsman: 100 }, emptyUnits(), B({ barracks: 3 }), 100);
+    expect(tight.spearman * UNITS.spearman.population + tight.swordsman * UNITS.swordsman.population).toBeLessThanOrEqual(100);
+    expect(tight.spearman).toBeGreaterThan(0);
+    expect(tight.swordsman).toBeGreaterThan(0);
+    expect(fillToPlan({ spearman: 100 }, { ...emptyUnits(), spearman: 100 }, B({ barracks: 3 }), 100).spearman).toBe(0);
   });
 
   it('les modèles de départ montent tout le village et remplissent la ferme', () => {
@@ -181,6 +194,33 @@ describe('gestionnaire de compte', () => {
     await processManager(new Date());
     // Les 50 lanciers demandés existent déjà : rien à recruter.
     expect((await pool.query('SELECT count(*)::int AS n FROM recruit_queue WHERE village_id=$1', [villageId])).rows[0].n).toBe(0);
+  });
+
+  it("le bouton d'administration remplit les troupes selon le modèle, réservé à l'administrateur", async () => {
+    const tpl = await app.inject({
+      method: 'POST', url: '/api/manager/templates', headers,
+      payload: { name: 'Objectif 80', plan: { buildings: [], troops: { spearman: 80 }, troopsShare: 100 } },
+    });
+    await put(`/api/manager/villages/${villageId}`, { enabled: true, templateId: tpl.json().id });
+    await tx(async (c) => {
+      await c.query('DELETE FROM recruit_queue WHERE village_id = $1', [villageId]);
+      await c.query('DELETE FROM troops WHERE home_village_id = $1', [villageId]);
+    });
+    await give(R(0, 0, 0, 0), { barracks: 1, townhall: 3, farm: 10 });
+    const player = (await pool.query('SELECT owner_id FROM villages WHERE id = $1', [villageId])).rows[0].owner_id;
+    const url = `/api/admin/players/${player}/fill-troops`;
+    expect((await app.inject({ method: 'POST', url, headers })).statusCode).toBe(403);
+    env.adminUsernames.push('intendant');
+    try {
+      const res = await app.inject({ method: 'POST', url, headers });
+      expect(res.statusCode).toBe(200);
+      const units = (await pool.query('SELECT units FROM troops WHERE village_id = $1 AND home_village_id = $1', [villageId])).rows[0].units;
+      expect(units.spearman).toBe(80);
+      // Ressources intactes : aucun coût.
+      expect(Number((await state()).wood)).toBeLessThan(10);
+    } finally {
+      env.adminUsernames.length = 0;
+    }
   });
 
   it('refuse de régler le village de quelqu\'un d\'autre', async () => {
